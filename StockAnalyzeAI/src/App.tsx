@@ -581,10 +581,10 @@ function AuthGate() {
   );
   if (!user) return <AuthPage />;
   return (
-    <>
+    <MarketDataProvider>
       <MainApp/>
       <PricingModal />
-    </>
+    </MarketDataProvider>
   );
 }
 
@@ -597,11 +597,9 @@ export default function App() {
             <SubscriptionProvider>
               <ToastProvider>
                 <NotificationProvider>
-                  <MarketDataProvider>
-                    <NavigationProvider>
-                      <AuthGate />
-                    </NavigationProvider>
-                  </MarketDataProvider>
+                  <NavigationProvider>
+                    <AuthGate />
+                  </NavigationProvider>
                 </NotificationProvider>
               </ToastProvider>
             </SubscriptionProvider>
