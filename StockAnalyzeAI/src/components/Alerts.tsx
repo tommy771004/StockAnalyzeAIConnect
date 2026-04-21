@@ -56,17 +56,27 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
     <div className={cn("bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shrink-0", compact ? "p-2" : "p-3")}>
       <div className={cn("flex items-center justify-between", compact ? "mb-1" : "mb-2")}>
         <span className={cn("font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1", compact ? "label-meta" : "text-xs")}>
-          <Bell size={compact ? 10 : 12} /> 警示設定
+          <Bell size={compact ? 10 : 12} aria-hidden="true" /> 警示設定
         </span>
-        <button onClick={() => setAdding(!adding)} className="text-emerald-400 hover:text-emerald-300">
-          {adding ? <X size={compact ? 12 : 14} /> : <Plus size={compact ? 12 : 14} />}
+        <button
+          onClick={() => setAdding(!adding)}
+          aria-label={adding ? '取消新增警示' : '新增警示'}
+          aria-expanded={adding}
+          className="text-emerald-400 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400 rounded"
+        >
+          {adding ? <X size={compact ? 12 : 14} aria-hidden="true" /> : <Plus size={compact ? 12 : 14} aria-hidden="true" />}
         </button>
       </div>
 
+      {/* Vercel web-design-guidelines: aria-live="polite" for async error updates */}
       {error && (
-        <div className={cn("flex items-center gap-1.5 text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg", compact ? "p-1.5 text-xs mb-1" : "p-2 text-sm mb-2")}>
-          <AlertCircle size={compact ? 10 : 12}/> {error}
-          <button onClick={() => setError('')} className="ml-auto"><X size={compact ? 10 : 12}/></button>
+        <div
+          role="alert"
+          aria-live="polite"
+          className={cn("flex items-center gap-1.5 text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg", compact ? "p-1.5 text-xs mb-1" : "p-2 text-sm mb-2")}
+        >
+          <AlertCircle size={compact ? 10 : 12} aria-hidden="true" /> {error}
+          <button onClick={() => setError('')} aria-label="關閉錯誤訊息" className="ml-auto"><X size={compact ? 10 : 12} aria-hidden="true" /></button>
         </div>
       )}
 
@@ -89,15 +99,15 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
             <span>{a.condition === 'above' ? '↑' : '↓'} {a.target}</span>
             {deleteConfirmId === a.id ? (
               <div className="flex items-center gap-1">
-                <button onClick={() => deleteAlert(a.id)} className="text-rose-400 hover:text-rose-300" title="確認刪除">
-                  <AlertCircle size={compact ? 12 : 14} />
+                <button onClick={() => deleteAlert(a.id)} aria-label="確認刪除警示" className="text-rose-400 hover:text-rose-300">
+                  <AlertCircle size={compact ? 12 : 14} aria-hidden="true" />
                 </button>
-                <button onClick={() => setDeleteConfirmId(null)} className="text-zinc-500 hover:text-[var(--text-color)] opacity-70" title="取消">
-                  <X size={compact ? 12 : 14} />
+                <button onClick={() => setDeleteConfirmId(null)} aria-label="取消刪除" className="text-zinc-500 hover:text-[var(--text-color)] opacity-70">
+                  <X size={compact ? 12 : 14} aria-hidden="true" />
                 </button>
               </div>
             ) : (
-              <button onClick={() => setDeleteConfirmId(a.id)} className="text-zinc-500 hover:text-rose-400"><X size={compact ? 12 : 14} /></button>
+              <button onClick={() => setDeleteConfirmId(a.id)} aria-label={`刪除 ${a.symbol} 警示`} className="text-zinc-500 hover:text-rose-400"><X size={compact ? 12 : 14} aria-hidden="true" /></button>
             )}
           </div>
         ))}
