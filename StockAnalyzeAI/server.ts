@@ -393,19 +393,19 @@ app.use(express.json());
   });
 
   // --- API Routes ---
-  app.get('/api/stock/:symbol', async (req, res) => {
+  app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
     try { const q = await NativeYahooApi.quote(req.params.symbol); res.json(q); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/stock/:symbol/history', async (req, res) => {
+  app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
     try {
       const q = await NativeYahooApi.chart(req.params.symbol, req.query);
       res.json(q.quotes);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/quotes', async (req, res) => {
+  app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
     try {
       const syms = (req.query.symbols as string)?.split(',') || [];
       const results = await NativeYahooApi.quote(syms);
@@ -413,22 +413,22 @@ app.use(express.json());
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/news/:symbol', async (req, res) => {
+  app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
     try { const data = await NativeYahooApi.search(req.params.symbol); res.json(data.news || []); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/search/:query', async (req, res) => {
+  app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
     try { const data = await NativeYahooApi.search(req.params.query); res.json(data.quotes || []); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/calendar/:symbol', async (req, res) => {
+  app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
     try { const data = await NativeYahooApi.quoteSummary(req.params.symbol, ['calendarEvents']); res.json(data.calendarEvents || {}); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/forex/:pair', async (req, res) => {
+  app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
     try { const q = await NativeYahooApi.quote(req.params.pair); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -506,7 +506,7 @@ app.use(express.json());
   });
 
   // --- Screener ---
-  app.post('/api/screener', async (req, res) => {
+  app.post('/api/screener', authMiddleware, async (req: AuthRequest, res) => {
     const { symbols, filters } = req.body;
     try {
       const results = await Promise.all(symbols.map(async (s: string) => {
@@ -664,7 +664,7 @@ app.use(express.json());
   // --- Unified multi-source insights ---
   // Yahoo 為主要資料源（價格、歷史），TradingView 為補強（指標、想法、社群）。
   // 任一來源失敗不阻斷另一來源。
-  app.get('/api/insights/:symbol', async (req, res) => {
+  app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
     const input = req.params.symbol;
     const canonical = parseSymbol(input);
     const yahooSymbol = toYahoo(canonical);
@@ -691,7 +691,7 @@ app.use(express.json());
   });
 
   // --- Backtest Engine ---
-  app.post('/api/backtest', async (req, res) => {
+  app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
     const { symbol, period1, period2, initialCapital, strategy } = req.body;
     try {
       const data = await NativeYahooApi.chart(symbol, { period1, period2 });
