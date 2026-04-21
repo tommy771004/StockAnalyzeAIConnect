@@ -581,10 +581,12 @@ function AuthGate() {
   );
   if (!user) return <AuthPage />;
   return (
-    <MarketDataProvider>
-      <MainApp/>
-      <PricingModal />
-    </MarketDataProvider>
+    <SettingsProvider>
+      <MarketDataProvider>
+        <MainApp/>
+        <PricingModal />
+      </MarketDataProvider>
+    </SettingsProvider>
   );
 }
 
@@ -593,17 +595,15 @@ export default function App() {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <SettingsProvider>
-            <SubscriptionProvider>
-              <ToastProvider>
-                <NotificationProvider>
-                  <NavigationProvider>
-                    <AuthGate />
-                  </NavigationProvider>
-                </NotificationProvider>
-              </ToastProvider>
-            </SubscriptionProvider>
-          </SettingsProvider>
+          <SubscriptionProvider>
+            <ToastProvider>
+              <NotificationProvider>
+                <NavigationProvider>
+                  <AuthGate />
+                </NavigationProvider>
+              </NotificationProvider>
+            </ToastProvider>
+          </SubscriptionProvider>
         </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
