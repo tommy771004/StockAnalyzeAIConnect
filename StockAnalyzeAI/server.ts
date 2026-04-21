@@ -477,11 +477,11 @@ app.use(express.json());
       const pos = existing.find(p => p.symbol === order.symbol);
       if (order.side === 'buy') {
         if (pos) {
-          const totalCost = Number(pos.shares) * Number(pos.avgPrice) + order.total;
+          const totalCost = Number(pos.shares) * Number(pos.avgCost) + order.total;
           const newShares = Number(pos.shares) + order.amount;
-          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgPrice: String(totalCost / newShares) });
+          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: String(totalCost / newShares) });
         } else {
-          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(order.amount), avgPrice: String(order.price) });
+          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(order.amount), avgCost: String(order.price) });
         }
       } else {
         if (pos) {
@@ -489,7 +489,7 @@ app.use(express.json());
           if (newShares <= 0) {
             await positionsRepo.removePosition(userId, order.symbol);
           } else {
-            await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgPrice: pos.avgPrice });
+            await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: pos.avgCost });
           }
         }
       }
@@ -527,7 +527,7 @@ app.use(express.json());
     try { const q = await NativeYahooApi.quote('USDTWD=X'); usdtwd = q?.regularMarketPrice ?? 32.5; } catch { /**/ }
     try {
       const list = await positionsRepo.getPositionsByUser(req.userId!);
-      res.json({ positions: list.map(p => ({ symbol: p.symbol, shares: Number(p.shares), avgPrice: Number(p.avgPrice) })), usdtwd });
+      res.json({ positions: list.map(p => ({ symbol: p.symbol, shares: Number(p.shares), avgCost: Number(p.avgCost) })), usdtwd });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -568,14 +568,14 @@ app.use(express.json());
 
   app.get('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
     try {
-      const value = await settingsRepo.getSetting(req.userId!, req.params.key);
+      const value = await settingsRepo.getSetting(req.userId!, req.params.key as string);
       res.json({ value: value ?? null });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
     try {
-      await settingsRepo.setSetting(req.userId!, req.params.key, req.body.value);
+      await settingsRepo.setSetting(req.userId!, req.params.key as string, req.body.value);
       res.json({ ok: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
