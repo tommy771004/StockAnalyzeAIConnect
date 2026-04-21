@@ -13,6 +13,7 @@ import {
   timestamp,
   jsonb,
   uniqueIndex,
+  index,
   primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -93,7 +94,13 @@ export const trades = pgTable('trades', {
   orderType:   text('order_type'),
   aiGenerated: boolean('ai_generated').notNull().default(false),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
-});
+},
+(t) => [
+  // Supabase/Postgres best-practice: index every FK column used in WHERE/ORDER BY
+  index('trades_user_id_idx').on(t.userId),
+  index('trades_user_created_idx').on(t.userId, t.createdAt),
+  index('trades_ticker_idx').on(t.ticker),
+]);
 
 export const tradesRelations = relations(trades, ({ one }) => ({
   user: one(users, { fields: [trades.userId], references: [users.id] }),
@@ -110,7 +117,12 @@ export const alerts = pgTable('alerts', {
   triggeredAt:    timestamp('triggered_at'),
   triggeredPrice: numeric('triggered_price'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
-});
+},
+(t) => [
+  // userId index for per-user queries; triggered index for polling job (getAllPendingAlerts)
+  index('alerts_user_id_idx').on(t.userId),
+  index('alerts_triggered_idx').on(t.triggered),
+]);
 
 export const alertsRelations = relations(alerts, ({ one }) => ({
   user: one(users, { fields: [alerts.userId], references: [users.id] }),
@@ -144,7 +156,10 @@ export const strategies = pgTable('strategies', {
   isActive:     boolean('is_active').notNull().default(false),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
   updatedAt:    timestamp('updated_at').defaultNow().notNull(),
-});
+},
+(t) => [
+  index('strategies_user_id_idx').on(t.userId),
+]);
 
 export const strategiesRelations = relations(strategies, ({ one }) => ({
   user: one(users, { fields: [strategies.userId], references: [users.id] }),
