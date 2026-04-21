@@ -47,11 +47,17 @@ class NativeYahooApi {
   private static crumbFetchedAt = 0;
   private static crumbTtl = 25 * 60 * 1000;
   private static isFetchingCrumb = false;
+  private static lastFailedAt = 0;
+  private static failureCooldown = 60 * 1000; // 60s backoff after failure
 
   public static async ensureAuth() {
     if (this.crumb && Date.now() - this.crumbFetchedAt < this.crumbTtl) return;
+    if (this.lastFailedAt && Date.now() - this.lastFailedAt < this.failureCooldown) {
+      throw new Error('Yahoo Finance 暫時不可用，請稍後再試');
+    }
     if (this.isFetchingCrumb) {
       while (this.isFetchingCrumb) await new Promise(r => setTimeout(r, 100));
+      if (!this.crumb) throw new Error('Yahoo Finance 驗證失敗');
       return;
     }
 
@@ -97,7 +103,9 @@ class NativeYahooApi {
         throw new Error(`Crumb 取得失敗: HTTP ${res2.status}`);
       }
     } catch (err) {
+      this.lastFailedAt = Date.now();
       console.error('[NativeYF] 取得驗證資料失敗:', err);
+      throw err;
     } finally {
       this.isFetchingCrumb = false;
     }
