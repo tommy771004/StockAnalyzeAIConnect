@@ -8,8 +8,8 @@ export async function fetchJ<T = unknown>(url: string, options?: RequestInit): P
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
-    if (response.status === 401) {
-      // Clear stale token and reload to show login screen
+    if (response.status === 401 && token) {
+      // Only reload if we had a token that expired — not on pre-login requests
       localStorage.removeItem(TOKEN_KEY);
       window.location.reload();
     }
