@@ -6,7 +6,8 @@
 }
 
 /* Desktop base */
-html { font-size: 18px; }
+/* Vercel web-design-guidelines: color-scheme on <html> fixes scrollbar & native inputs in dark mode */
+html { font-size: 18px; color-scheme: dark; }
 html.font-size-small { font-size: 16px; }
 html.font-size-normal { font-size: 18px; }
 html.font-size-large { font-size: 20px; }
@@ -33,6 +34,11 @@ body.light-theme {
   --card-bg: #ffffff; /* white */
   --border-color: #e4e4e7; /* zinc-200 */
 }
+
+/* Vercel web-design-guidelines: switch color-scheme for light mode */
+body.light-theme ~ html,
+:root:has(body.light-theme) { color-scheme: light; }
+html:has(body.light-theme) { color-scheme: light; }
 
 /* ── Commute Mode Overrides (High Contrast) ── */
 body.commute-mode {
@@ -75,6 +81,11 @@ body {
   color: var(--text-color);
   transition: background-color 0.3s, color 0.3s;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Vercel web-design-guidelines: touch-action:manipulation prevents 300ms double-tap delay on mobile */
+button, [role="button"], a, select, label {
+  touch-action: manipulation;
 }
 
 /* ── iOS Input Zoom Prevention ───────────────────────────────── */
@@ -260,7 +271,8 @@ body.light-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: 
 
 /* ── Stock Card ────────────────────────────────────────────────── */
 .stock-card {
-  transition: all 0.2s ease-in-out;
+  /* Vercel web-design-guidelines: never use transition:all — list properties explicitly */
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.1s ease-in-out;
 }
 
 .stock-card:hover {
@@ -290,14 +302,21 @@ body.light-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: 
 }
 
 /* ── Reduced Motion ────────────────────────────────────────────── */
+/* Anthropic frontend-design + Vercel web-design-guidelines: honor prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-  .bg-blob { animation: none; }
+  .bg-blob { animation: none; opacity: 0.3; }
 }
+
+/* ── Heading text-wrap utilities ────────────────────────────────── */
+/* Vercel web-design-guidelines: text-wrap:balance prevents typographic widows */
+h1, h2, h3, .heading-balance { text-wrap: balance; }
+.text-pretty { text-wrap: pretty; }
 
 /* ── Alert Modal ───────────────────────────────────────────────── */
 .alert-modal-backdrop {
