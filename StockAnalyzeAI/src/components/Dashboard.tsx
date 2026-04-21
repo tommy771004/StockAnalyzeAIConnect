@@ -80,13 +80,12 @@ export default function Dashboard({ model, symbol }: { model: string, symbol: st
       try {
         analyzingRef.current = true;
         if (mounted) setAiStatus('analyzing');
-        const analysis = await analyzeStock(symbol, quote, historicalData, model);
-        if (mounted) setAiAnalysis(analysis);
-
-        if (mounted) setAiStatus('sentiment');
-        const sentiment = await analyzeSentiment(marketData, model, String(settings.systemInstruction || ''));
-        if (mounted) setSentimentAnalysis(sentiment);
-        if (mounted) setAiStatus('done');
+        // Vercel react-best-practices: async-parallel — run independent AI calls concurrently
+        const [analysis, sentiment] = await Promise.all([
+          analyzeStock(symbol, quote, historicalData, model),
+          analyzeSentiment(marketData, model, String(settings.systemInstruction || '')),
+        ]);
+        if (mounted) { setAiAnalysis(analysis); setSentimentAnalysis(sentiment); setAiStatus('done'); }
       } catch (error) {
         console.error("Error running AI analysis:", error);
         if (mounted) setAiStatus('idle');
@@ -200,9 +199,10 @@ const exportToCSV = (data: HistoricalData[], filename: string) => {
                 <button
                   onClick={() => fetchData(true)}
                   disabled={fetchStatus === 'refreshing'}
-                  className={cn("rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-all press-feedback shrink-0", compact ? "p-2" : "p-2 md:p-3")}
+                  aria-label={fetchStatus === 'refreshing' ? '資料更新中…' : '重新整理資料'}
+                  className={cn("rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors press-feedback shrink-0", compact ? "p-2" : "p-2 md:p-3")}
                 >
-                  <Loader2 className={cn("w-5 h-5", fetchStatus === 'refreshing' && "animate-spin")} />
+                  <Loader2 aria-hidden="true" className={cn("w-5 h-5", fetchStatus === 'refreshing' && "animate-spin")} />
                 </button>
                 <button 
                   onClick={() => exportToCSV(historicalData, symbol)}
@@ -217,7 +217,7 @@ const exportToCSV = (data: HistoricalData[], filename: string) => {
                 </div>
                 {quote && (
                   <div className={cn('text-sm font-mono font-black flex items-center justify-end', isUp ? 'text-emerald-400' : 'text-rose-400')}>
-                    {isUp ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
+                    {isUp ? <TrendingUp aria-hidden="true" className="w-4 h-4 mr-1" /> : <TrendingDown aria-hidden="true" className="w-4 h-4 mr-1" />}
                     {(quote.regularMarketChange ?? 0) > 0 ? '+' : ''}{(quote.regularMarketChange ?? 0).toFixed(2)} ({quote.regularMarketChangePercent?.toFixed(2)}%)
                   </div>
                 )}
