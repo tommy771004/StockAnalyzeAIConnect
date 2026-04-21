@@ -1,0 +1,15 @@
+{
+  "autoTrade": false,
+  "maxDailyLoss": 10000,
+  "ollamaBaseUrl": "http://localhost:11434",
+  "atrMultiplier": "1.5",
+  "animationsOn": true,
+  "compactMode": false,
+  "openrouterKey": "",
+  "defaultRR": "2.5",
+  "priceAlerts": true,
+  "aggressiveness": "Balanced",
+  "dailyDrawdown": "5.0",
+  "orderFillAlerts": true,
+  "fontSize": "normal"
+}
