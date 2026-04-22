@@ -28,8 +28,8 @@ export interface SwipeHandlers {
 export function useSwipeNavigation({
   onSwipeLeft,
   onSwipeRight,
-  threshold = 55,
-  maxVerticalRatio = 0.8,
+  threshold = 90,
+  maxVerticalRatio = 0.5,
   enabled = true,
 }: Options): SwipeHandlers {
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -48,8 +48,8 @@ export function useSwipeNavigation({
     const t = e.touches[0];
     const dx = Math.abs(t.clientX - start.current.x);
     const dy = Math.abs(t.clientY - start.current.y);
-    // Once we can tell it's mostly vertical, lock as scroll for this gesture
-    if (dy > 10 && dy / Math.max(dx, 1) > maxVerticalRatio) {
+    // Lock as vertical scroll as soon as dy > dx (stricter angle requirement)
+    if (dy > 8 && dy / Math.max(dx, 1) > maxVerticalRatio) {
       isScroll.current = true;
     }
   }, [enabled, maxVerticalRatio]);
@@ -64,7 +64,7 @@ export function useSwipeNavigation({
     const dy = t.clientY - start.current.y;
     start.current = null;
 
-    // Final angle check: reject if too vertical
+    // Final angle check: reject if too vertical (angle from horizontal must be < ~27°)
     if (Math.abs(dy) / Math.max(Math.abs(dx), 1) > maxVerticalRatio) return;
     // Must pass horizontal threshold
     if (Math.abs(dx) < threshold) return;
