@@ -1,16 +1,17 @@
 /**
  * App.tsx — central nav + prop wiring
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Zap, FlaskConical,Activity, Wallet, BookOpen,
   Terminal, Settings as SettingsIcon, Target,
-  Menu, BarChart2, Cpu, ChevronDown, Search, Moon, Sun, User, TrainFront, WifiOff
+  Menu, BarChart2, Cpu, ChevronDown, ChevronLeft, ChevronRight, Search, Moon, Sun, User, TrainFront, WifiOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { vibrate } from './utils/helpers';
 import { MODELS, FREE_MODEL } from './constants';
+import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { useDeviceType } from './hooks/useDeviceType';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -112,6 +113,8 @@ function MainApp() {
   const model = isFree ? FREE_MODEL : String(settings.defaultModel || MODELS[0].id);
   const setModel = (m: string) => set('defaultModel', m);
   const [modelOpen,  setModelOpen]  = useState(false);
+  // 0 = default (y-axis), 1 = swipe next (x left), -1 = swipe prev (x right)
+  const [swipeDir, setSwipeDir] = useState<0 | 1 | -1>(0);
   const [symbol,     setSymbol]     = useState('2330.TW');
   // 🌟 修正：將 sidebar 狀態初始化邏輯移出 useEffect，避免 set-state-in-effect
   const [sidebar, setSidebar] = useState(() => {
@@ -131,6 +134,9 @@ function MainApp() {
   
   // Landscape Chart Mode trigger
   const [isLandscape, setIsLandscape] = useState(false);
+  // Mobile: scroll-to-hide breadcrumb
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [breadcrumbVisible, setBreadcrumbVisible] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -146,6 +152,30 @@ function MainApp() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
+
+  // Auto-hide breadcrumb when scrolling down on mobile
+  useEffect(() => {
+    if (!isMobile) { setBreadcrumbVisible(true); return; }
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    let lastY = 0;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      const d = y - lastY;
+      if (y < 48) setBreadcrumbVisible(true);
+      else if (d > 5) setBreadcrumbVisible(false);
+      else if (d < -5) setBreadcrumbVisible(true);
+      lastY = y;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [isMobile]);
+
+  // Reset breadcrumb visibility + scroll position on page navigation
+  useEffect(() => {
+    setBreadcrumbVisible(true);
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, [page]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -254,10 +284,36 @@ function MainApp() {
     return ()=>window.removeEventListener('keydown',h);
   },[setPage, setTopTab]);
 
-  const handleTopTab=(tab:TopTab)=>{setTopTab(tab);const f=NAV.find(n=>n.topTab===tab);if(f)setPage(f.id); if(isMobile) setSidebar(false);};
-  const handleNav=(item:typeof NAV[0])=>{setPage(item.id);setTopTab(item.topTab); if(isMobile) setSidebar(false);};
+  const handleTopTab=(tab:TopTab)=>{setSwipeDir(0);setTopTab(tab);const f=NAV.find(n=>n.topTab===tab);if(f)setPage(f.id); if(isMobile) setSidebar(false);};
+  const handleNav=(item:typeof NAV[0])=>{setSwipeDir(0);setPage(item.id);setTopTab(item.topTab); if(isMobile) setSidebar(false);};
   const visibleNav=NAV.filter(n=>n.topTab===topTab);
   const activeLabel=NAV.find(n=>n.id===page)?.label??'';
+
+  // ── Mobile swipe page navigation ─────────────────────────────────────────
+  const currentPageIndex = NAV.findIndex(n => n.id === page);
+  const goPrevPage = useCallback(() => {
+    if (currentPageIndex <= 0) return;
+    const prev = NAV[currentPageIndex - 1];
+    setSwipeDir(-1);
+    setPage(prev.id);
+    setTopTab(prev.topTab);
+    vibrate(30);
+  }, [currentPageIndex, setPage, setTopTab]);
+
+  const goNextPage = useCallback(() => {
+    if (currentPageIndex >= NAV.length - 1) return;
+    const next = NAV[currentPageIndex + 1];
+    setSwipeDir(1);
+    setPage(next.id);
+    setTopTab(next.topTab);
+    vibrate(30);
+  }, [currentPageIndex, setPage, setTopTab]);
+
+  const swipeHandlers = useSwipeNavigation({
+    onSwipeLeft:  goNextPage,
+    onSwipeRight: goPrevPage,
+    enabled: isMobile,
+  });
 
   return (
     <div className={cn("h-screen w-screen flex flex-col overflow-hidden select-none relative font-sans")}
@@ -265,6 +321,7 @@ function MainApp() {
       {/* Ambient glow effects */}
       <div className="ambient-glow-primary" aria-hidden="true" />
       <div className="ambient-glow-secondary" aria-hidden="true" />
+      <div className="ambient-glow-accent" aria-hidden="true" />
 
       {isOffline && (
          <div className="w-full text-xs font-bold py-1.5 px-4 flex items-center justify-center gap-2 border-b shrink-0 z-[100]"
@@ -294,8 +351,9 @@ function MainApp() {
                 <span className="material-symbols-outlined text-[20px]" style={{ color: 'var(--md-on-primary-container)', fontVariationSettings: "'FILL' 1" }}>terminal</span>
               </div>
               <div className="hidden sm:flex flex-col leading-none">
-                <span className="text-base font-black tracking-tighter" style={{ fontFamily: 'var(--font-heading)', color: 'var(--md-primary)' }}>QUANTUM</span>
-                <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--md-outline)' }}>COMMAND</span>
+                <span className="text-base font-black tracking-tight text-gradient-primary"
+                      style={{ fontFamily: 'var(--font-heading)', background: 'linear-gradient(120deg, var(--md-primary) 0%, #adc6ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>QUANTUM</span>
+                <span className="text-[9px] font-bold tracking-[0.18em] uppercase" style={{ fontFamily: 'var(--font-data)', color: 'var(--md-outline)', letterSpacing: '0.18em' }}>COMMAND</span>
               </div>
             </div>
             {/* Desktop search bar */}
@@ -326,9 +384,9 @@ function MainApp() {
           <div className="flex items-center gap-2 md:gap-3">
             {/* Live indicator */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl"
-                 style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}>
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#52c41a' }} />
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52c41a' }}>Live</span>
+                 style={{ background: 'var(--md-surface-container)', border: '1px solid rgba(82,196,26,0.2)', boxShadow: '0 0 0 1px rgba(82,196,26,0.06) inset' }}>
+              <span className="live-dot" />
+              <span className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ fontFamily: 'var(--font-data)', color: '#52c41a' }}>Live</span>
             </div>
 
             {/* AI Model selector */}
@@ -371,7 +429,7 @@ function MainApp() {
 
             <button
               onClick={()=>{updateSetting('commuteMode', !settings.commuteMode); vibrate(50);}}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: settings.commuteMode ? 'var(--md-primary)' : 'var(--md-outline)' }}
               title="通勤模式 (高對比)">
               <TrainFront size={14} />
@@ -379,6 +437,12 @@ function MainApp() {
             </button>
 
             <div className="flex items-center gap-1">
+              <button onClick={()=>setSearch(v=>!v)}
+                      className="md:hidden p-2 rounded-xl transition-colors"
+                      style={{ color: 'var(--md-outline)' }}
+                      aria-label="搜尋股票">
+                <Search size={18}/>
+              </button>
               <button onClick={()=>set('theme', settings.theme==='light'?'dark':'light')}
                       className="p-2 rounded-xl transition-colors"
                       style={{ color: 'var(--md-outline)' }}
@@ -503,10 +567,10 @@ function MainApp() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm font-black tracking-wide truncate"
-                         style={{ fontFamily: 'var(--font-heading)', color: 'var(--md-primary)' }}>Hermes AI</div>
+                         style={{ fontFamily: 'var(--font-heading)', background: 'linear-gradient(120deg, var(--md-primary) 0%, #adc6ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hermes AI</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: '#52c41a' }} />
-                      <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--md-outline)' }}>系統狀態: 正常</span>
+                      <span className="text-[9px] font-bold tracking-[0.14em] uppercase" style={{ fontFamily: 'var(--font-data)', color: 'var(--md-outline)' }}>系統狀態: 正常</span>
                     </div>
                   </div>
                 </div>
@@ -549,16 +613,60 @@ function MainApp() {
           {/* Breadcrumbs / Sub-header */}
           {!isLandscape && (
             <div className="h-10 flex items-center justify-between px-4 md:px-6 border-b shrink-0 z-20"
-                 style={{ background: 'rgba(7,13,31,0.5)', backdropFilter: 'blur(8px)', borderColor: 'rgba(70,69,84,0.3)' }}
+                 style={{
+                   background: 'rgba(7,13,31,0.5)',
+                   backdropFilter: 'blur(8px)',
+                   borderColor: 'rgba(70,69,84,0.3)',
+                   ...(isMobile ? {
+                     maxHeight: breadcrumbVisible ? '40px' : '0px',
+                     overflow: 'hidden',
+                     opacity: breadcrumbVisible ? 1 : 0,
+                     pointerEvents: breadcrumbVisible ? 'auto' : 'none',
+                     transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
+                   } : {}),
+                 }}
                  aria-label="導覽路徑" role="navigation">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <span style={{ color: 'var(--md-outline-variant)' }}>{TOP_TABS.find(t=>t.id===topTab)?.label}</span>
+                {/* Mobile prev/next page buttons */}
+                {isMobile && (
+                  <>
+                    <button
+                      onClick={goPrevPage}
+                      disabled={currentPageIndex <= 0}
+                      aria-label="上一頁"
+                      className="p-1 rounded-lg transition-all active:scale-95"
+                      style={{
+                        color: currentPageIndex <= 0 ? 'var(--md-outline-variant)' : 'var(--md-on-surface-variant)',
+                        background: 'transparent',
+                        opacity: currentPageIndex <= 0 ? 0.35 : 1,
+                      }}>
+                      <ChevronLeft size={15} />
+                    </button>
+                    <span className="font-mono text-[10px] tabular-nums px-0.5" style={{ color: 'var(--md-outline)', fontFamily: 'var(--font-mono)' }}>
+                      {currentPageIndex + 1}<span style={{ color: 'var(--md-outline-variant)' }}>/{NAV.length}</span>
+                    </span>
+                    <button
+                      onClick={goNextPage}
+                      disabled={currentPageIndex >= NAV.length - 1}
+                      aria-label="下一頁"
+                      className="p-1 rounded-lg transition-all active:scale-95"
+                      style={{
+                        color: currentPageIndex >= NAV.length - 1 ? 'var(--md-outline-variant)' : 'var(--md-on-surface-variant)',
+                        background: 'transparent',
+                        opacity: currentPageIndex >= NAV.length - 1 ? 0.35 : 1,
+                      }}>
+                      <ChevronRight size={15} />
+                    </button>
+                    <span style={{ color: 'var(--md-outline-variant)', fontSize: 10, margin: '0 2px' }}>|</span>
+                  </>
+                )}
+                <span style={{ color: 'var(--md-outline-variant)', fontFamily: 'var(--font-data)', letterSpacing: '0.06em' }}>{TOP_TABS.find(t=>t.id===topTab)?.label}</span>
                 <span style={{ color: 'var(--md-outline-variant)' }}>/</span>
-                <span style={{ color: 'var(--md-on-surface)' }}>{activeLabel}</span>
+                <span style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)', fontWeight: 600, letterSpacing: '-0.01em' }}>{activeLabel}</span>
                 {page==='trading'&& (
                   <>
                     <span style={{ color: 'var(--md-outline-variant)' }}>/</span>
-                    <span className="font-mono tracking-normal" style={{ color: 'var(--md-primary)' }}>{symbol}</span>
+                    <span className="font-mono" style={{ color: 'var(--md-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>{symbol}</span>
                   </>
                 )}
               </div>
@@ -579,15 +687,33 @@ function MainApp() {
           )}
 
           <div className={cn("flex-1 min-h-0 overflow-auto custom-scrollbar relative", isLandscape ? "p-0" : "p-2 sm:p-4 md:p-6 lg:p-8")}
-               style={isLandscape ? { background: '#000' } : {}}>
+               style={isLandscape ? { background: '#000' } : { overscrollBehavior: 'contain' }}
+               ref={scrollContainerRef}
+               {...(isMobile ? swipeHandlers : {})}>
             <div className="w-full h-full">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" custom={swipeDir}>
                 <motion.div
                   key={page}
-                  initial={{ opacity: 0, y: 10, scale: 0.99 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.99 }}
-                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  custom={swipeDir}
+                  variants={{
+                    initial: (dir: number) => ({
+                      opacity: 0,
+                      x: dir === 1 ? 36 : dir === -1 ? -36 : 0,
+                      y: dir === 0 ? 8 : 0,
+                      scale: 0.985,
+                    }),
+                    animate: { opacity: 1, x: 0, y: 0, scale: 1 },
+                    exit: (dir: number) => ({
+                      opacity: 0,
+                      x: dir === 1 ? -36 : dir === -1 ? 36 : 0,
+                      y: dir === 0 ? -8 : 0,
+                      scale: 0.985,
+                    }),
+                  }}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.26, ease: [0.25, 0.46, 0.45, 0.94] }}
                   className="h-full"
                 >
                   {page==='market'    && <ErrorBoundary name="市場總覽"><MarketOverview onSelectSymbol={goTrading}/></ErrorBoundary>}
@@ -609,20 +735,43 @@ function MainApp() {
 
       {/* ── Mobile Bottom Nav ── */}
       {!isLandscape && (
-        <nav className="md:hidden h-16 flex items-center justify-around border-t px-1 shrink-0 z-50 safe-area-bottom"
-             style={{ background: 'rgba(7,13,31,0.95)', backdropFilter: 'blur(20px)', borderColor: 'var(--md-outline-variant)' }}
+        <nav className="md:hidden flex items-center justify-around px-3 shrink-0 z-50 safe-area-bottom"
+             style={{
+               background: 'rgba(8,14,32,0.96)',
+               backdropFilter: 'blur(28px)',
+               WebkitBackdropFilter: 'blur(28px)',
+               borderTop: '1px solid rgba(128,131,255,0.12)',
+               borderLeft: '1px solid rgba(70,69,84,0.18)',
+               borderRight: '1px solid rgba(70,69,84,0.18)',
+               borderTopLeftRadius: '20px',
+               borderTopRightRadius: '20px',
+               boxShadow: '0 -8px 36px -6px rgba(0,0,0,0.45), 0 -1px 0 0 rgba(128,131,255,0.06) inset',
+               height: '60px',
+             }}
              role="navigation" aria-label="行動導覽">
           {MOBILE_NAVS.map(item => {
             const Icon = item.icon;
             const active = page === item.id;
             return (
-              <button key={item.id} onClick={() => {setPage(item.id as Page); setTopTab(item.topTab);}}
+              <button key={item.id} onClick={() => { setSwipeDir(0); setPage(item.id as Page); setTopTab(item.topTab); vibrate(20); }}
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
-                className="flex flex-col items-center justify-center min-w-[52px] min-h-[48px] px-2 py-1.5 rounded-xl transition-all"
-                style={active ? { color: 'var(--md-primary)', background: 'rgba(128,131,255,0.12)' } : { color: 'var(--md-outline)' }}>
-                <Icon size={active ? 22 : 20} className="transition-all" />
-                {active && <div className="w-1 h-1 rounded-full mt-1" style={{ background: 'var(--md-primary)' }} />}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-all duration-200 active:scale-95 relative',
+                  active ? 'mobile-nav-item-active' : ''
+                )}
+                style={active ? { color: 'var(--md-primary)' } : { color: 'var(--md-outline)' }}>
+                <div className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200',
+                  active ? 'scale-110' : 'scale-100'
+                )}
+                  style={active ? { background: 'rgba(128,131,255,0.14)', boxShadow: '0 0 12px rgba(128,131,255,0.2)' } : {}}>
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                </div>
+                <span className="text-[9px] font-bold tracking-wide uppercase leading-none"
+                      style={{ fontFamily: 'var(--font-data)', opacity: active ? 1 : 0.6 }}>
+                  {item.label.replace('市場總覽','市場').replace('Trading Core','交易').replace('回測引擎','回測').replace('投資組合','組合').replace('市場情緒','情緒')}
+                </span>
               </button>
             );
           })}
