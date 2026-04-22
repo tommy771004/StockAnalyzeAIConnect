@@ -396,16 +396,43 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
     if (stocks.find(s => s.symbol === sym)) { setAddInput(''); setShowAdd(false); return; }
     setLoadState('refreshing'); setAddErr('');
     try {
-      const q: Quote = await api.getQuote(sym);
-      if (!q?.regularMarketPrice) throw new Error('找不到此代碼，請確認格式');
-      const bars = await fetchBars(sym, 7);
-      const ns = enrich(q, bars);
-      const updated = [...stocks, ns];
-      setStocks(updated); setSelected(ns);
-      await api.setWatchlist(updated.map(s => ({ symbol: s.symbol, name: s.name })));
+      // Try to enrich with live quote, but don't block if Yahoo Finance is unavailable
+      let liveStock: Stock | null = null;
+      try {
+        const q = await api.getQuote(sym);
+        if (q?.symbol) {
+          const bars = await fetchBars(sym, 7);
+          liveStock = {
+            symbol: q.symbol,
+            name: q.shortName ?? q.longName ?? sym,
+            shortName: q.shortName ?? sym,
+            price: q.regularMarketPrice ?? 0,
+            change: q.regularMarketChange ?? 0,
+            changePct: q.regularMarketChangePercent ?? 0,
+            volume: q.regularMarketVolume ?? 0,
+            open: 0,
+            high: q.regularMarketDayHigh ?? 0,
+            low: q.regularMarketDayLow ?? 0,
+            bid: q.regularMarketPrice ?? 0,
+            ask: q.regularMarketPrice ?? 0,
+            bars,
+          };
+        }
+      } catch {
+        // Yahoo Finance unavailable — still add the stock with placeholder data
+      }
+      // Add via single-item upsert to avoid full-replace race conditions
+      await api.addWatchlistItem(sym, liveStock?.name ?? sym);
+      const newStock: Stock = liveStock ?? {
+        symbol: sym, name: sym, shortName: sym,
+        price: 0, change: 0, changePct: 0,
+        volume: 0, open: 0, high: 0, low: 0, bid: 0, ask: 0, bars: [],
+      };
+      setStocks(prev => [...prev, newStock]);
+      setSelected(newStock);
       setAddInput(''); setShowAdd(false);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '查詢失敗';
+      const msg = e instanceof Error ? e.message : '新增失敗';
       setAddErr(msg);
     } finally { setLoadState('idle'); }
   };

@@ -22,15 +22,28 @@ export async function replaceWatchlist(userId: string, items: Array<{ symbol: st
 }
 
 export async function addWatchlistItem(data: NewWatchlistItem): Promise<WatchlistItem> {
-  const [item] = await db
-    .insert(watchlistItems)
-    .values(data)
-    .onConflictDoUpdate({
-      target: [watchlistItems.userId, watchlistItems.symbol],
-      set: { name: data.name, addedAt: data.addedAt },
-    })
-    .returning();
-  return item;
+  try {
+    const [item] = await db
+      .insert(watchlistItems)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [watchlistItems.userId, watchlistItems.symbol],
+        set: { name: data.name, addedAt: data.addedAt },
+      })
+      .returning();
+    return item;
+  } catch {
+    // Fallback when unique index is missing in DB (schema not yet pushed/migrated):
+    // Check for existing row and return it, or rethrow if it's a different error.
+    const [existing] = await db
+      .select()
+      .from(watchlistItems)
+      .where(and(eq(watchlistItems.userId, data.userId), eq(watchlistItems.symbol, data.symbol)));
+    if (existing) return existing;
+    // Re-attempt plain insert without conflict clause
+    const [item] = await db.insert(watchlistItems).values(data).returning();
+    return item;
+  }
 }
 
 export async function removeWatchlistItem(userId: string, symbol: string): Promise<void> {
