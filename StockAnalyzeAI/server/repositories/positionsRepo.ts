@@ -14,23 +14,22 @@ export async function replacePositions(
   userId: string,
   items: Array<{ symbol: string; name?: string; shares: number | string; avgCost: number | string; currency?: string }>,
 ): Promise<Position[]> {
-  return db.transaction(async (tx) => {
-    await tx.delete(positions).where(eq(positions.userId, userId));
-    if (items.length === 0) return [];
-    return tx
-      .insert(positions)
-      .values(
-        items.map((p) => ({
-          userId,
-          symbol:   p.symbol,
-          name:     p.name ?? null,
-          shares:   String(p.shares),
-          avgCost:  String(p.avgCost),
-          currency: p.currency ?? 'USD',
-        })),
-      )
-      .returning();
-  });
+  // neon-http does not support interactive transactions; use sequential ops instead
+  await db.delete(positions).where(eq(positions.userId, userId));
+  if (items.length === 0) return [];
+  return db
+    .insert(positions)
+    .values(
+      items.map((p) => ({
+        userId,
+        symbol:   p.symbol,
+        name:     p.name ?? null,
+        shares:   String(p.shares),
+        avgCost:  String(p.avgCost),
+        currency: p.currency ?? 'USD',
+      })),
+    )
+    .returning();
 }
 
 export async function upsertPosition(userId: string, data: Omit<NewPosition, 'userId'>): Promise<Position> {

@@ -4,13 +4,14 @@ import { AlertTriangle, Send, ShieldCheck, CheckCircle, XCircle, Loader2 } from 
 import { cn } from '../lib/utils';
 import * as api from '../services/api';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function LiveTradingConsole() {
-  const settings = { compactMode: false };
-  const compact = settings.compactMode;
-  const [symbol, setSymbol] = useState('2330.TW');
-  const [qty, setQty] = useState(1000);
-  const [price, setPrice] = useState(680);
+  const { settings } = useSettings();
+  const compact = Boolean(settings.compactMode);
+  const [symbol, setSymbol] = useState('');
+  const [qty, setQty] = useState(0);
+  const [price, setPrice] = useState(0);
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
   const [status, setStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -36,7 +37,7 @@ export default function LiveTradingConsole() {
     setErrorMsg('');
     try {
       const data = await api.addTrade({ symbol: symbol.trim().toUpperCase(), side, qty, price, mode: 'real' });
-      if (data.status !== 'success') throw new Error(data.message || '交易失敗');
+      if (!data?.id) throw new Error((data as unknown as { message?: string })?.message || '交易失敗');
       setStatus('success');
       setTimeout(() => setStatus('idle'), 5000);
     } catch (e: unknown) {
