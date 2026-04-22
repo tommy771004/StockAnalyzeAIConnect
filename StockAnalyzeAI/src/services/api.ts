@@ -128,6 +128,14 @@ export const setWatchlist  = (list: WatchlistItem[]): Promise<boolean> =>
   IS_ELECTRON ? E().setWatchlist(list)
     : fetchJ<boolean>('/api/watchlist', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(list) });
 
+/** Add a single item via upsert — avoids full-replace race conditions. */
+export const addWatchlistItem = (symbol: string, name?: string): Promise<WatchlistItem> =>
+  fetchJ<WatchlistItem>('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol, name }),
+  });
+
 // ── Positions ─────────────────────────────────────────────────────────────────
 export const getPositions  = (): Promise<{ positions: Position[]; usdtwd: number }> =>
   IS_ELECTRON ? E().getPositions() : fetchJ<{ positions: Position[]; usdtwd: number }>('/api/positions');
