@@ -4,6 +4,7 @@
  */
 import {
   pgTable,
+  pgEnum,
   serial,
   uuid,
   text,
@@ -36,6 +37,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   alerts:         many(alerts),
   settings:       many(userSettings),
   strategies:     many(strategies),
+  agentMemories:  many(agentMemories),
 }));
 
 // ─── watchlist_items ──────────────────────────────────────────────────────────
@@ -165,6 +167,28 @@ export const strategiesRelations = relations(strategies, ({ one }) => ({
   user: one(users, { fields: [strategies.userId], references: [users.id] }),
 }));
 
+// ─── agent_memory_type enum ───────────────────────────────────────────────────
+export const agentMemoryTypeEnum = pgEnum('agent_memory_type', ['PREFERENCE', 'SKILL', 'CONTEXT']);
+
+// ─── agent_memories ───────────────────────────────────────────────────────────
+export const agentMemories = pgTable('agent_memories', {
+  id:         serial('id').primaryKey(),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  memoryType: agentMemoryTypeEnum('memory_type').notNull().default('CONTEXT'),
+  content:    jsonb('content').notNull(),         // free-form JSON: { key, value, ... }
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+},
+(t) => [
+  index('agent_memories_user_id_idx').on(t.userId),
+  index('agent_memories_type_idx').on(t.userId, t.memoryType),
+]);
+
+export const agentMemoriesRelations = relations(agentMemories, ({ one }) => ({
+  user: one(users, { fields: [agentMemories.userId], references: [users.id] }),
+}));
+
+// update usersRelations to include agentMemories
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -179,3 +203,7 @@ export type NewAlert     = typeof alerts.$inferInsert;
 export type UserSetting  = typeof userSettings.$inferSelect;
 export type Strategy     = typeof strategies.$inferSelect;
 export type NewStrategy  = typeof strategies.$inferInsert;
+export type AgentMemory    = typeof agentMemories.$inferSelect;
+export type NewAgentMemory = typeof agentMemories.$inferInsert;
+export type AgentMemoryType = 'PREFERENCE' | 'SKILL' | 'CONTEXT';
+
