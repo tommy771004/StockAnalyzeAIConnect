@@ -65,12 +65,12 @@ export const PriceBar: React.FC<PriceBarProps> = React.memo(({
             </div>
           ) : price != null && (
             <div className="flex items-center gap-2">
-              <span className={safeCn('font-black font-mono', compact ? 'text-xl' : 'text-2xl sm:text-3xl', isUp ? 'text-emerald-400' : 'text-rose-400')}>{safeN(price)}</span>
+              <span className={safeCn('data-num font-black', compact ? 'text-xl' : 'text-2xl sm:text-3xl', isUp ? 'text-emerald-400' : 'text-rose-400')}>{safeN(price)}</span>
               {isUp ? <TrendingUp size={compact ? 16 : 18} className="text-emerald-400" /> : <TrendingDown size={compact ? 16 : 18} className="text-rose-400" />}
             </div>
           )}
           {!loading && change != null && (
-            <span className={safeCn('font-bold font-mono', compact ? 'text-xs' : 'text-sm', isUp ? 'text-emerald-400' : 'text-rose-400')}>
+            <span className={safeCn('data-num font-bold', compact ? 'text-xs' : 'text-sm', isUp ? 'text-emerald-400' : 'text-rose-400')}>
               {isUp ? '+' : ''}{safeN(change)} ({isUp ? '+' : ''}{safeN(pct)}%)
             </span>
           )}
