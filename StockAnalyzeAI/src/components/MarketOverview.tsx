@@ -6,6 +6,7 @@
  * 2. 完美還原自選股清單、五檔深度、逐筆成交、快速下單 (使用者原版功能)
  * 3. 全部串接 Electron IPC API 取得真實數據
  */
+
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import Decimal from 'decimal.js';
 import { motion } from 'motion/react';
@@ -33,16 +34,17 @@ interface Stock {
   price: number; change: number; changePct: number;
   volume: number; open: number; high: number; low: number;
   bid: number; ask: number;
-  bars: number[];   // real 7-day close prices
+  bars: number[]; // real 7-day close prices
 }
 
 const INDICES = [
   { symbol: '^GSPC', name: 'S&P 500', icon: Globe2 },
-  { symbol: '^IXIC', name: 'NASDAQ',  icon: Activity },
+  { symbol: '^IXIC', name: 'NASDAQ', icon: Activity },
   { symbol: 'BTC-USD', name: 'Bitcoin', icon: DollarSign },
-  { symbol: '2330.TW', name: '台積電',  icon: Activity },
+  { symbol: '2330.TW', name: '台積電', icon: Activity },
   { symbol: '^VIX', name: 'VIX 指數', icon: Zap }
 ];
+
 const TRENDING_SYMBOLS = ['NVDA', 'TSLA', 'AAPL', 'MSFT', 'META', 'AMD', 'MSTR'];
 const BROKERS = ['元大證券 Yuanta', '盈透 Interactive Brokers', '富途 Futu'];
 
@@ -59,6 +61,7 @@ interface MarketIndex {
 
 const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact: boolean; onSelect: (sym: string) => void }) => {
   const isUp = idx.changePct >= 0;
+
   return (
     <div
       role="button"
@@ -72,6 +75,7 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
       style={{ border: '1px solid var(--md-outline-variant)' }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.4)')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+
       <div className={cn("flex items-start justify-between", compact ? "mb-4" : "mb-6")}>
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
           <div className="shrink-0 p-3 md:p-4 rounded-2xl" style={isUp ? { background: 'rgba(255,77,79,0.12)', color: 'var(--color-up)' } : { background: 'rgba(82,196,26,0.12)', color: 'var(--color-down)' }}>
@@ -83,13 +87,14 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
           </div>
         </div>
       </div>
+
       <div className="flex items-end justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-mono font-black text-[var(--text-color)] mb-2 tracking-tighter truncate">
             {idx.price ? idx.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
           </div>
           <div className="flex items-center gap-1.5 text-xs sm:text-base font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg w-fit"
-               style={isUp ? { background: 'rgba(255,77,79,0.1)', color: 'var(--color-up)' } : { background: 'rgba(82,196,26,0.1)', color: 'var(--color-down)' }}>
+            style={isUp ? { background: 'rgba(255,77,79,0.1)', color: 'var(--color-up)' } : { background: 'rgba(82,196,26,0.1)', color: 'var(--color-down)' }}>
             {isUp ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
             {isUp ? '+' : ''}{idx.changePct ? idx.changePct.toFixed(2) : '0.00'}%
           </div>
@@ -112,6 +117,7 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
     </div>
   );
 });
+
 IndexCard.displayName = 'IndexCard';
 
 const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
@@ -119,6 +125,7 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
   onSelect: (s: Stock) => void; onRemove: (sym: string) => void;
 }) => {
   const isUp = s.changePct >= 0;
+
   return (
     <div
       role="button"
@@ -129,6 +136,7 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
       style={isSelected ? { borderColor: 'rgba(128,131,255,0.5)', background: 'rgba(128,131,255,0.06)' } : {}}
       onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = 'rgba(128,131,255,0.3)'; }}
       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--md-outline-variant)'; }}>
+
       <button onClick={e => { e.stopPropagation(); onRemove(s.symbol); }}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-all z-10 shrink-0"
         style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-outline)' }}
@@ -136,20 +144,23 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
         onMouseLeave={e => { e.currentTarget.style.color = 'var(--md-outline)'; }}>
         <X size={12}/>
       </button>
+
       <div className="flex items-start justify-between mb-3 min-w-0">
         <div className="min-w-0 flex-1 pr-4">
           <div className="text-base sm:text-lg font-black tracking-tight truncate" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{s.symbol}</div>
           <div className="text-xs sm:text-sm truncate" style={{ color: 'var(--md-outline)' }}>{s.shortName || s.name}</div>
         </div>
         <span className="text-xs sm:text-sm px-2 py-0.5 sm:px-3 sm:py-1 rounded font-mono font-bold shrink-0"
-              style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
+          style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
           {isUp ? '+' : ''}{s.changePct.toFixed(2)}%
         </span>
       </div>
+
       <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black font-mono tracking-tighter truncate"
-           style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>
+        style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>
         {s.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
       </div>
+
       <div className="flex justify-between text-[10px] sm:text-xs mt-4 sm:mt-6 font-mono border-t pt-2" style={{ color: 'var(--md-outline)', borderColor: 'var(--md-outline-variant)' }}>
         <span className="truncate mr-1">B {s.bid.toFixed(2)}</span>
         <span className="truncate">A {s.ask.toFixed(2)}</span>
@@ -157,41 +168,42 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
     </div>
   );
 });
+
 WatchlistStockCard.displayName = 'WatchlistStockCard';
 
 export default function MarketOverview({ onSelectSymbol }: Props) {
   const { settings } = useSettings();
   const compact = Boolean(settings.compactMode);
+
   // ── 狀態管理 ──
-  // Market Overview 狀態
   const [marketData, setMarketData] = useState<MarketIndex[]>([]);
   const [trending, setTrending] = useState<Stock[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [aiSummary, setAiSummary] = useState<SentimentData | null>(null);
   const [posInfo, setPosInfo] = useState<{ totalVal: number, plVal: number, plPct: number }>({ totalVal: 0, plVal: 0, plPct: 0 });
   const [lastUpdate, setLastUpdate] = useState('');
-  
-  // Watchlist & Trading 狀態
+
   const [stocks, setStocks] = useState<Stock[]>([]);
-  const [selected, setSelected] = useState<Stock|null>(null);
-  
-  // UI 控制狀態
+  const [selected, setSelected] = useState<Stock | null>(null);
+
   type LoadState = 'loading' | 'refreshing' | 'idle';
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const loading = loadState === 'loading';
-  const busy    = loadState === 'refreshing';
+  const busy = loadState === 'refreshing';
   const [fetchErr, setFetchErr] = useState<string | null>(null);
+
   const [showAdd, setShowAdd] = useState(false);
   const [addInput, setAddInput] = useState('');
   const [addErr, setAddErr] = useState('');
+
   const [showOrder, setShowOrder] = useState(false);
-  const [oSide, setOSide] = useState<'buy'|'sell'>('buy');
+  const [oSide, setOSide] = useState<'buy' | 'sell'>('buy');
   const [oQty, setOQty] = useState(Number(settings.defaultOrderQty || 100));
-  const [tradeMode, setTradeMode] = useState<'paper'|'real'>('paper');
+  const [tradeMode, setTradeMode] = useState<'paper' | 'real'>('paper');
   const [broker, setBroker] = useState(String(settings.defaultBroker || 'Fubon'));
   const [orderType, setOrderType] = useState(String(settings.defaultOrderType || 'ROD'));
   const [priceType, setPriceType] = useState(String(settings.defaultPriceType || 'LMT'));
-  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const executeTrade = async () => {
     if (!selected) return;
@@ -207,7 +219,6 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         orderType,
         priceType
       });
-      
       if (data.status === 'success') {
         setToast({ msg: '交易成功', type: 'success' });
         setShowOrder(false);
@@ -225,18 +236,18 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
 
   // ── 資料抓取邏輯 ──
   const enrich = (d: WatchlistItem, bars: number[] = []): Stock => ({
-    symbol:    d.symbol,
-    name:      d.name ?? d.symbol,
+    symbol: d.symbol,
+    name: d.name ?? d.symbol,
     shortName: d.name ?? d.symbol,
-    price:     d.price ?? 0,
-    change:    d.change ?? 0,
+    price: d.price ?? 0,
+    change: d.change ?? 0,
     changePct: d.changePct ?? 0,
-    volume:    0,
-    open:      0,
-    high:      0,
-    low:       0,
-    bid:       d.price ?? 0,
-    ask:       d.price ?? 0,
+    volume: 0,
+    open: 0,
+    high: 0,
+    low: 0,
+    bid: d.price ?? 0,
+    ask: d.price ?? 0,
     bars,
   });
 
@@ -247,7 +258,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
       return hist.slice(-days)
         .filter((r: { close: number }) => r?.close && isFinite(Number(r.close)))
         .map((r: { close: number }) => Number(r.close));
-    } catch(e) { console.warn('[MarketOverview] getHistory:', e); return []; }
+    } catch (e) { console.warn('[MarketOverview] getHistory:', e); return []; }
   };
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -258,23 +269,23 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
     loadingRef.current = true;
     setLoadState(quiet ? 'refreshing' : 'loading');
     setFetchErr(null);
+
     try {
       if (!navigator.onLine && quiet) {
-         // Silently skip update if offline and just refreshing
-         return setLoadState('idle'); 
+        return setLoadState('idle');
       }
-      
+
       const wlData = await api.getWatchlist().catch((e) => {
-         if (!navigator.onLine) return []; // Fallback empty if strict network fail
-         throw e;
+        if (!navigator.onLine) return [];
+        throw e;
       });
+
       const enrichedStocks = (Array.isArray(wlData) ? wlData : []).map((w: WatchlistItem) => enrich(w));
-      
       setStocks(enrichedStocks);
       setSelected(prev => enrichedStocks.find(e => e.symbol === prev?.symbol) ?? enrichedStocks[0] ?? null);
 
       const wlSymbols = enrichedStocks.map(s => s.symbol);
-      
+
       const fetchBarsConcurrently = async (symbols: string[], days: number, concurrency = 2) => {
         const results = new Map<string, number[]>();
         for (let i = 0; i < symbols.length; i += concurrency) {
@@ -288,7 +299,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
       };
 
       const barsMap = await fetchBarsConcurrently(wlSymbols, 7);
-      // Merge bars into enrichedStocks in one setState (avoid double render)
+
       const stocksWithBars = enrichedStocks.map(s => {
         const bars = barsMap.get(s.symbol);
         return bars && bars.length ? { ...s, bars } : s;
@@ -301,9 +312,8 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         const quotes = await api.getBatchQuotes(idxSymbols).catch(() => []);
         const quotesArr = (Array.isArray(quotes) ? quotes.filter(Boolean) : []) as Quote[];
         const qMap = new Map(quotesArr.map((q: Quote) => [q.symbol, q]));
-        
         const barsMap = await fetchBarsConcurrently(idxSymbols, 30);
-        
+
         return INDICES.map((idx) => {
           const quote = qMap.get(idx.symbol) as Quote | undefined;
           const bars = barsMap.get(idx.symbol) || [];
@@ -316,7 +326,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         });
       })();
 
-      const trendingPromise = api.getBatchQuotes(TRENDING_SYMBOLS).then((quotes: Quote[]) => 
+      const trendingPromise = api.getBatchQuotes(TRENDING_SYMBOLS).then((quotes: Quote[]) =>
         quotes.map(q => ({
           symbol: q.symbol,
           name: q.shortName || q.longName || q.symbol,
@@ -329,6 +339,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           bars: []
         }))
       ).catch(() => []);
+
       const newsPromise = api.getNews('^GSPC').catch(() => []);
       const posPromise = api.getPositions().catch(() => ({ positions: [], usdtwd: 32 }));
 
@@ -336,26 +347,25 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
 
       setMarketData(indicesData);
       setTrending(Array.isArray(trendingData) ? trendingData : [trendingData]);
+
       const validNews = Array.isArray(newsData) ? newsData.slice(0, 6) : [];
       setNews(validNews);
       setLastUpdate(new Date().toLocaleTimeString());
-      
-      // Calculate Portfolio P/L
+
       if (posData && Array.isArray(posData.positions)) {
-         let totalVal = 0; let totalCost = 0;
-         posData.positions.forEach(p => {
-             totalVal += (p.currentPrice || p.avgCost) * p.shares;
-             totalCost += p.avgCost * p.shares;
-         });
-         const plVal = totalVal - totalCost;
-         const plPct = totalCost > 0 ? (plVal / totalCost) * 100 : 0;
-         setPosInfo({ totalVal, plVal, plPct });
+        let totalVal = 0; let totalCost = 0;
+        posData.positions.forEach(p => {
+          totalVal += (p.currentPrice || p.avgCost) * p.shares;
+          totalCost += p.avgCost * p.shares;
+        });
+        const plVal = totalVal - totalCost;
+        const plPct = totalCost > 0 ? (plVal / totalCost) * 100 : 0;
+        setPosInfo({ totalVal, plVal, plPct });
       }
 
-      // Try fetching AI summary dynamically
       if (validNews.length > 0 && navigator.onLine) {
         analyzeNewsSentiment(validNews).then(res => {
-           if (res) setAiSummary(res);
+          if (res) setAiSummary(res);
         }).catch(e => console.warn('[MarketOverview] AI Summary fetch failed:', e));
       }
 
@@ -374,6 +384,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
   });
 
   useEffect(() => { loadAllData(); }, [loadAllData]);
+
   useEffect(() => {
     const id = setInterval(() => loadAllData(true), 30000);
     return () => clearInterval(id);
@@ -387,40 +398,37 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
     try {
       const q: Quote = await api.getQuote(sym);
       if (!q?.regularMarketPrice) throw new Error('找不到此代碼，請確認格式');
-      
       const bars = await fetchBars(sym, 7);
       const ns = enrich(q, bars);
       const updated = [...stocks, ns];
-      
       setStocks(updated); setSelected(ns);
-      await api.setWatchlist(updated.map(s => ({ symbol:s.symbol, name:s.name })));
+      await api.setWatchlist(updated.map(s => ({ symbol: s.symbol, name: s.name })));
       setAddInput(''); setShowAdd(false);
-    } catch(e: unknown) { 
+    } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '查詢失敗';
-      setAddErr(msg); 
-    }
-    finally { setLoadState('idle'); }
+      setAddErr(msg);
+    } finally { setLoadState('idle'); }
   };
 
   const handleRemove = async (sym: string) => {
     const updated = stocks.filter(s => s.symbol !== sym);
     setStocks(updated);
     if (selected?.symbol === sym) setSelected(updated[0] ?? null);
-    await api.setWatchlist(updated.map(s => ({ symbol:s.symbol, name:s.name })));
+    await api.setWatchlist(updated.map(s => ({ symbol: s.symbol, name: s.name })));
   };
 
   const up = (s: { changePct: number } | Stock) => s.changePct >= 0;
 
   if (fetchErr && marketData.length === 0 && stocks.length === 0) {
     if (!navigator.onLine) {
-        return (
-          <div className="h-full flex flex-col items-center justify-center gap-4 text-amber-500">
-            <AlertCircle size={32}/>
-            <div className="text-sm font-bold">無網路連線</div>
-            <div className="text-xs text-amber-500/70">請等待網路恢復後再試</div>
-            <button onClick={() => loadAllData()} className="px-4 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors">重新連線</button>
-          </div>
-        );
+      return (
+        <div className="h-full flex flex-col items-center justify-center gap-4 text-amber-500">
+          <AlertCircle size={32}/>
+          <div className="text-sm font-bold">無網路連線</div>
+          <div className="text-xs text-amber-500/70">請等待網路恢復後再試</div>
+          <button onClick={() => loadAllData()} className="px-4 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors">重新連線</button>
+        </div>
+      );
     }
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4">
@@ -454,11 +462,11 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
 
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xl z-50 whitespace-nowrap"
-             style={{ background: toast.type === 'success' ? '#52c41a' : '#ff4d4f' }}>
+          style={{ background: toast.type === 'success' ? '#52c41a' : '#ff4d4f' }}>
           {toast.msg}
         </div>
       )}
-      
+
       {/* ── 1. Time Contextual Dashboard ── */}
       <div className="flex flex-col gap-3 mb-4 shrink-0">
         {(() => {
@@ -466,96 +474,90 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           const isMorning = hour < 12;
           return (
             <div className="px-5 py-4 rounded-2xl border flex flex-col gap-4 shadow-lg overflow-hidden relative"
-               style={isMorning ? { background: 'rgba(255,183,131,0.08)', borderColor: 'rgba(255,183,131,0.3)', color: 'var(--md-tertiary)' } : { background: 'rgba(173,198,255,0.08)', borderColor: 'rgba(173,198,255,0.25)', color: 'var(--md-secondary)' }}>
-              
+              style={isMorning ? { background: 'rgba(255,183,131,0.08)', borderColor: 'rgba(255,183,131,0.3)', color: 'var(--md-tertiary)' } : { background: 'rgba(173,198,255,0.08)', borderColor: 'rgba(173,198,255,0.25)', color: 'var(--md-secondary)' }}>
+
               <div className="flex items-center justify-between z-10 relative">
                 <div className="flex items-center gap-3">
-                   <div className={cn("p-2.5 rounded-xl border backdrop-blur-md", isMorning ? "bg-amber-500/20 border-amber-500/20" : "bg-indigo-500/20 border-indigo-500/20")}>
-                      {isMorning ? <Sun size={20} style={{ color: 'var(--md-tertiary)' }} /> : <Moon size={20} style={{ color: 'var(--md-secondary)' }} />}
-                   </div>
-                   <div>
-                      <h3 className="text-base font-black tracking-widest uppercase">{isMorning ? '早安！早盤通勤摘要' : '晚安！收盤結算摘要'}</h3>
-                      <p className="text-xs opacity-70 mt-0.5">{isMorning ? '準備開盤，請關注以下重點資訊' : '今日盤勢已收，為您總結帳戶與市場概況'}</p>
-                   </div>
+                  <div className={cn("p-2.5 rounded-xl border backdrop-blur-md", isMorning ? "bg-amber-500/20 border-amber-500/20" : "bg-indigo-500/20 border-indigo-500/20")}>
+                    {isMorning ? <Sun size={20} style={{ color: 'var(--md-tertiary)' }} /> : <Moon size={20} style={{ color: 'var(--md-secondary)' }} />}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black tracking-widest uppercase">{isMorning ? '早安！早盤通勤摘要' : '晚安！收盤結算摘要'}</h3>
+                    <p className="text-xs opacity-70 mt-0.5">{isMorning ? '準備開盤，請關注以下重點資訊' : '今日盤勢已收，為您總結帳戶與市場概況'}</p>
+                  </div>
                 </div>
                 <div className="text-[10px] text-zinc-500 font-mono bg-black/40 border border-white/10 px-2 py-1 rounded truncate max-w-[120px] hidden sm:block">
                   LAST: {lastUpdate} {!navigator.onLine && <span className="text-amber-500 ml-1">[離線資料]</span>}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 z-10 relative">
-                  {isMorning ? (
-                      <>
-                      {marketData.some(m => m.symbol === '^GSPC' || m.symbol === '^IXIC') && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">美股夜盤總結</div>
-                            <div className="text-sm font-medium">
-                               {(() => {
-                                   const gspc = marketData.find(m => m.symbol === '^GSPC');
-                                   const ixic = marketData.find(m => m.symbol === '^IXIC');
-                                   return (
-                                     <div className="flex flex-col gap-1">
-                                       {gspc && <div>S&P 500: {gspc.price.toLocaleString()} ({gspc.changePct > 0 ? '+' : ''}{gspc.changePct.toFixed(2)}%)</div>}
-                                       {ixic && <div>NASDAQ: {ixic.price.toLocaleString()} ({ixic.changePct > 0 ? '+' : ''}{ixic.changePct.toFixed(2)}%)</div>}
-                                     </div>
-                                   );
-                               })()}
-                            </div>
+                {isMorning ? (
+                  <>
+                    {marketData.some(m => m.symbol === '^GSPC' || m.symbol === '^IXIC') && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">美股夜盤總結</div>
+                        <div className="text-sm font-medium">
+                          {(() => {
+                            const gspc = marketData.find(m => m.symbol === '^GSPC');
+                            const ixic = marketData.find(m => m.symbol === '^IXIC');
+                            return (
+                              <div className="flex flex-col gap-1">
+                                {gspc && <div>S&P 500: {gspc.price.toLocaleString()} ({gspc.changePct > 0 ? '+' : ''}{gspc.changePct.toFixed(2)}%)</div>}
+                                {ixic && <div>NASDAQ: {ixic.price.toLocaleString()} ({ixic.changePct > 0 ? '+' : ''}{ixic.changePct.toFixed(2)}%)</div>}
+                              </div>
+                            );
+                          })()}
                         </div>
-                      )}
-                      
-                      {aiSummary && aiSummary.aiAdvice && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">盤前 AI 分析</div>
-                            <div className="text-sm font-medium line-clamp-2">{aiSummary.aiAdvice}</div>
+                      </div>
+                    )}
+                    {aiSummary && aiSummary.aiAdvice && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">盤前 AI 分析</div>
+                        <div className="text-sm font-medium line-clamp-2">{aiSummary.aiAdvice}</div>
+                      </div>
+                    )}
+                    {aiSummary && aiSummary.keyDrivers && aiSummary.keyDrivers.length > 0 && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">市場情緒重點</div>
+                        <div className="text-sm font-bold text-amber-300 line-clamp-2">{aiSummary.keyDrivers.join('；')}</div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {marketData.some(m => m.symbol === '2330.TW') && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">今日台股收盤結算</div>
+                        <div className="text-sm font-medium">
+                          {(() => {
+                            const tsm = marketData.find(m => m.symbol === '2330.TW');
+                            if (!tsm) return null;
+                            return `台積電 (2330.TW): ${tsm.price.toLocaleString()} (${tsm.changePct >= 0 ? '+' : ''}${tsm.changePct.toFixed(2)}%)`;
+                          })()}
                         </div>
-                      )}
-                      
-                      {aiSummary && aiSummary.keyDrivers && aiSummary.keyDrivers.length > 0 && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-amber-400/80 font-bold mb-1 tracking-wider">市場情緒重點</div>
-                            <div className="text-sm font-bold text-amber-300 line-clamp-2">{aiSummary.keyDrivers.join('；')}</div>
+                      </div>
+                    )}
+                    {posInfo.totalVal > 0 && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">個人帳戶總損益</div>
+                        <div className={cn("text-sm font-mono font-bold", posInfo.plVal >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                          {posInfo.plVal >= 0 ? '+' : ''}{posInfo.plVal.toLocaleString(undefined, { maximumFractionDigits: 0 })} TWD ({posInfo.plPct >= 0 ? '+' : ''}{posInfo.plPct.toFixed(2)}%)
                         </div>
-                      )}
-                      </>
-                  ) : (
-                      <>
-                      {marketData.some(m => m.symbol === '2330.TW') && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">今日台股收盤結算</div>
-                            <div className="text-sm font-medium">
-                                {(() => {
-                                   const tsm = marketData.find(m => m.symbol === '2330.TW');
-                                   if (!tsm) return null;
-                                   return `台積電 (2330.TW): ${tsm.price.toLocaleString()} (${tsm.changePct >= 0 ? '+' : ''}${tsm.changePct.toFixed(2)}%)`;
-                                })()}
-                            </div>
-                        </div>
-                      )}
-                      
-                      {posInfo.totalVal > 0 && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">個人帳戶總損益</div>
-                            <div className={cn("text-sm font-mono font-bold", posInfo.plVal >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                                {posInfo.plVal >= 0 ? '+' : ''}{posInfo.plVal.toLocaleString(undefined, { maximumFractionDigits: 0 })} TWD ({posInfo.plPct >= 0 ? '+' : ''}{posInfo.plPct.toFixed(2)}%)
-                            </div>
-                        </div>
-                      )}
-                      
-                      {aiSummary && aiSummary.aiAdvice && (
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
-                            <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">市場情緒與動向</div>
-                            <div className="text-sm font-medium line-clamp-2">{aiSummary.aiAdvice}</div>
-                        </div>
-                      )}
-                      </>
-                  )}
+                      </div>
+                    )}
+                    {aiSummary && aiSummary.aiAdvice && (
+                      <div className="bg-black/20 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+                        <div className="text-[10px] text-indigo-400/80 font-bold mb-1 tracking-wider">市場情緒與動向</div>
+                        <div className="text-sm font-medium line-clamp-2">{aiSummary.aiAdvice}</div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-              
             </div>
-          )
+          );
         })()}
-        
         <div className="sm:hidden text-[10px] text-zinc-500 font-mono bg-black/40 border border-white/10 px-2 py-1 rounded w-fit">
           LAST: {lastUpdate} {!navigator.onLine && <span className="text-amber-500 ml-1">[離線資料]</span>}
         </div>
@@ -573,12 +575,12 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         <div className="flex items-center justify-between shrink-0">
           <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>Watchlist</h2>
           <div className="flex items-center gap-2 flex-wrap">
-            {BROKERS.map((b,i) => (
+            {BROKERS.map((b, i) => (
               <button key={i} onClick={() => setBroker(b)}
                 className="px-3 py-1.5 sm:py-1 rounded text-[10px] font-mono uppercase transition-all border"
-              style={broker === b
-                ? { background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', borderColor: 'rgba(128,131,255,0.3)' }
-                : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', borderColor: 'var(--md-outline-variant)' }}>
+                style={broker === b
+                  ? { background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', borderColor: 'rgba(128,131,255,0.3)' }
+                  : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', borderColor: 'var(--md-outline-variant)' }}>
                 {b}
               </button>
             ))}
@@ -598,45 +600,62 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
               />
             ))}
 
-            {/* 新增自選股 Card */}
+            {/* ── FIX TS1003: 新增自選股 Card ──
+                原始碼在此處有兩個嵌套的開頭元素，外層 <div role="button"> 缺少結束 `>`，
+                導致 TypeScript 將內層 <div className="glass-card..."> 解析為屬性名稱。
+                修法：移除多餘的外層包裝，直接在 glass-card div 上加 role/tabIndex/onClick/onKeyDown。
+            */}
             <div
               role="button"
               tabIndex={0}
               onClick={() => !showAdd && setShowAdd(true)}
               onKeyDown={e => e.key === 'Enter' && !showAdd && setShowAdd(true)}
-              <div className="glass-card rounded-2xl border-dashed p-4 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px]"
-                   style={{ borderColor: 'var(--md-outline-variant)' }}
-                   onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.4)')}
-                   onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+              className="glass-card rounded-2xl border-dashed p-4 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px]"
+              style={{ borderColor: 'var(--md-outline-variant)' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.4)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+
               {showAdd ? (
                 <div className="w-full space-y-3" onClick={e => e.stopPropagation()}>
                   <div className="text-base font-bold text-zinc-100 mb-3">新增自選股</div>
                   <div className="flex items-center gap-2 bg-zinc-950 rounded-xl px-4 border border-zinc-800">
                     <Search size={16} className="text-zinc-500 shrink-0"/>
-                    <input autoFocus value={addInput} onChange={e => { setAddInput(e.target.value.toUpperCase()); setAddErr(''); }}
-                      onKeyDown={e => e.key==='Enter' && handleAdd()} placeholder="輸入代碼..."
-                      className="flex-1 bg-transparent py-3 text-base text-zinc-100 focus:outline-none"/>
+                    <input
+                      autoFocus
+                      value={addInput}
+                      onChange={e => { setAddInput(e.target.value.toUpperCase()); setAddErr(''); }}
+                      onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                      placeholder="輸入代碼..."
+                      className="flex-1 bg-transparent py-3 text-base text-zinc-100 focus:outline-none"
+                    />
                   </div>
                   {addErr && <div className="text-sm text-rose-400 px-1">{addErr}</div>}
                   <div className="flex gap-3">
-                    <button onClick={handleAdd} disabled={busy} className="flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center"
-                            style={{ background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', border: '1px solid rgba(128,131,255,0.3)' }}>
-                      {busy?<Loader2 size={14} className="animate-spin mr-1.5"/>:null} 確認
+                    <button onClick={handleAdd} disabled={busy}
+                      className="flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center"
+                      style={{ background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', border: '1px solid rgba(128,131,255,0.3)' }}>
+                      {busy ? <Loader2 size={14} className="animate-spin mr-1.5"/> : null} 確認
                     </button>
-                    <button onClick={() => { setShowAdd(false); setAddInput(''); setAddErr(''); }} className="flex-1 py-2.5 rounded-lg text-sm"
-                            style={{ background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>取消</button>
+                    <button
+                      onClick={() => { setShowAdd(false); setAddInput(''); setAddErr(''); }}
+                      className="flex-1 py-2.5 rounded-lg text-sm"
+                      style={{ background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
+                      取消
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--md-surface-container-high)' }}><Plus size={24} style={{ color: 'var(--md-outline)' }}/></div>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--md-surface-container-high)' }}>
+                    <Plus size={24} style={{ color: 'var(--md-outline)' }}/>
+                  </div>
                   <div className="text-sm font-semibold" style={{ color: 'var(--md-outline)' }}>新增標的</div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 右側：五檔與逐筆成交 (給已選取的標的) */}
+          {/* 右側：五檔與逐筆成交 */}
           {selected && (
             <div className="w-full lg:w-[260px] flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
               <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col shadow-lg">
@@ -647,11 +666,18 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)' }}>{selected.symbol}</span>
                 </div>
                 <div className="text-xs font-mono space-y-2 mt-4">
-                  {[['開盤價', selected.open?.toFixed(2) ?? '-', ''], ['最高價', selected.high?.toFixed(2) ?? '-', 'up'], ['最低價', selected.low?.toFixed(2) ?? '-', 'down'], ['成交量', selected.volume?.toLocaleString() ?? '-', ''], ['買進價', selected.bid?.toFixed(2) ?? '-', ''], ['賣出價', selected.ask?.toFixed(2) ?? '-', '']].map(([label, val, dir]) => (
-                  <div key={label} className="flex justify-between py-1 border-b" style={{ borderColor: 'var(--md-outline-variant)' }}>
-                    <span style={{ color: 'var(--md-outline)' }}>{label}</span>
-                    <span style={{ color: dir === 'up' ? 'var(--color-up)' : dir === 'down' ? 'var(--color-down)' : 'var(--md-on-surface)' }}>{val}</span>
-                  </div>
+                  {[
+                    ['開盤價', selected.open?.toFixed(2) ?? '-', ''],
+                    ['最高價', selected.high?.toFixed(2) ?? '-', 'up'],
+                    ['最低價', selected.low?.toFixed(2) ?? '-', 'down'],
+                    ['成交量', selected.volume?.toLocaleString() ?? '-', ''],
+                    ['買進價', selected.bid?.toFixed(2) ?? '-', ''],
+                    ['賣出價', selected.ask?.toFixed(2) ?? '-', ''],
+                  ].map(([label, val, dir]) => (
+                    <div key={label} className="flex justify-between py-1 border-b" style={{ borderColor: 'var(--md-outline-variant)' }}>
+                      <span style={{ color: 'var(--md-outline)' }}>{label}</span>
+                      <span style={{ color: dir === 'up' ? 'var(--color-up)' : dir === 'down' ? 'var(--color-down)' : 'var(--md-on-surface)' }}>{val}</span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -682,6 +708,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.3)')}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+
                   <div className="flex items-center gap-3 min-w-0 overflow-hidden">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shrink-0" style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface)' }}>
                       {t.symbol.slice(0, 2)}
@@ -714,9 +741,10 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
             {news.length > 0 ? news.map((n: NewsItem, i: number) => (
               <a key={i} href={n.link} target="_blank" rel="noopener noreferrer"
                 className="flex flex-col p-3 rounded-xl transition-all group"
-              style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(173,198,255,0.3)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+                style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(173,198,255,0.3)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
+
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="text-xs font-bold leading-relaxed line-clamp-2" style={{ color: 'var(--md-on-surface-variant)' }}>
                     {n.title}
@@ -726,7 +754,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                 <div className="text-xs mt-auto flex items-center gap-1" style={{ color: 'var(--md-outline)' }}>
                   <span>{n.publisher || 'Yahoo Finance'}</span>
                   <span>·</span>
-                  <span>{new Date((n.providerPublishTime || Date.now()/1000) * 1000).toLocaleString()}</span>
+                  <span>{new Date((n.providerPublishTime || Date.now() / 1000) * 1000).toLocaleString()}</span>
                 </div>
               </a>
             )) : <div className="col-span-full text-center text-xs text-zinc-500 py-10">讀取新聞中...</div>}
@@ -734,25 +762,24 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         </div>
       </div>
 
-      {/* ── 4. 懸浮快速下單按鈕 (保留您的原創功能) ── */}
+      {/* ── 4. 懸浮快速下單按鈕 ── */}
       <div className="fixed bottom-20 right-4 md:bottom-10 md:right-6 z-[60] safe-area-bottom safe-area-right">
         {showOrder && selected && (
           <>
             {/* Mobile Backdrop */}
-            <div 
-              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[65]" 
-              onClick={() => setShowOrder(false)} 
+            <div
+              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[65]"
+              onClick={() => setShowOrder(false)}
             />
-            
-            {/* Order Panel (Bottom Sheet on Mobile, Floating Card on Desktop) */}
+
+            {/* Order Panel */}
             <div className={cn(
               "fixed md:absolute z-[70] transition-transform duration-300 ease-out",
-              "fixed md:absolute z-[70] transition-transform duration-300 ease-out bottom-0 left-0 right-0 w-full rounded-t-3xl p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t md:bottom-14 md:right-0 md:left-auto md:w-72 md:rounded-2xl md:p-5 md:shadow-2xl",
-              ""
+              "bottom-0 left-0 right-0 w-full rounded-t-3xl p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t md:bottom-14 md:right-0 md:left-auto md:w-72 md:rounded-2xl md:p-5 md:shadow-2xl"
             )}>
               {/* Mobile Handle */}
               <div className="md:hidden w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-6" />
-              
+
               <div className="flex items-center justify-between mb-4 md:mb-3">
                 <div>
                   <h3 className="text-lg md:text-sm font-bold" style={{ color: 'var(--md-on-surface)' }}>快速委託</h3>
@@ -762,76 +789,88 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   <X size={18} className="md:w-3.5 md:h-3.5" />
                 </button>
               </div>
-              
+
               <div className="flex gap-2 md:gap-1.5 mb-5 md:mb-4">
-                {(['buy','sell'] as const).map(s => (
+                {(['buy', 'sell'] as const).map(s => (
                   <button key={s} onClick={() => setOSide(s)}
-                    className={cn('flex-1 py-3 md:py-2 rounded-xl text-base md:text-sm font-bold transition-colors', 
-                      '')}
-                  style={oSide === s
-                    ? (s === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' })
-                    : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
-                    {s==='buy'?'買進':'賣出'}
+                    className={cn('flex-1 py-3 md:py-2 rounded-xl text-base md:text-sm font-bold transition-colors')}
+                    style={oSide === s
+                      ? (s === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' })
+                      : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
+                    {s === 'buy' ? '買進' : '賣出'}
                   </button>
                 ))}
               </div>
-              
+
               <div className="space-y-4 md:space-y-3">
                 <div className="flex gap-2">
-                  <select value={tradeMode} onChange={e => setTradeMode(e.target.value as 'paper' | 'real')} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
+                  <select value={tradeMode} onChange={e => setTradeMode(e.target.value as 'paper' | 'real')}
+                    className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="paper">模擬交易</option>
                     <option value="real">實際交易</option>
                   </select>
-                  <select value={broker} onChange={e => setBroker(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
+                  <select value={broker} onChange={e => setBroker(e.target.value)}
+                    className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="Fubon">富邦</option>
                     <option value="Cathay">國泰</option>
                     <option value="UB">聯邦</option>
                     <option value="Sinopac">永豐金</option>
                   </select>
                 </div>
-                
+
                 <div className="flex gap-2">
-                  <select value={orderType} onChange={e => setOrderType(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
+                  <select value={orderType} onChange={e => setOrderType(e.target.value)}
+                    className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="ROD">ROD</option>
                     <option value="IOC">IOC</option>
                     <option value="FOK">FOK</option>
                   </select>
-                  <select value={priceType} onChange={e => setPriceType(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
+                  <select value={priceType} onChange={e => setPriceType(e.target.value)}
+                    className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="LMT">限價</option>
                     <option value="MKT">市價</option>
                   </select>
                 </div>
-                
+
                 <div className="flex justify-between text-sm md:text-xs py-1">
                   <span className="text-zinc-400">現價</span>
                   <span className="font-mono font-bold text-lg md:text-base" style={{ color: up(selected) ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>{selected.price.toFixed(2)}</span>
                 </div>
-                
+
                 <div>
                   <div className="text-xs text-zinc-500 mb-1.5 md:mb-1">委託數量</div>
                   <input type="number" value={oQty} onChange={e => setOQty(Number(e.target.value))} min={1}
-                    className="w-full rounded-xl px-4 py-3 md:px-3 md:py-2 font-mono text-base md:text-xs focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}/>
+                    className="w-full rounded-xl px-4 py-3 md:px-3 md:py-2 font-mono text-base md:text-xs focus:outline-none"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}/>
                 </div>
-                
+
                 <div className="flex justify-between text-sm md:text-xs pt-2 border-t border-zinc-800">
                   <span className="text-zinc-400">預估金額</span>
-                  <span className="text-zinc-100 font-mono text-lg md:text-base">${new Decimal(selected.price).times(oQty).toNumber().toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                  <span className="text-zinc-100 font-mono text-lg md:text-base">
+                    ${new Decimal(selected.price).times(oQty).toNumber().toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </span>
                 </div>
-                
-                <button onClick={executeTrade} className="w-full py-4 md:py-2.5 rounded-xl text-base md:text-sm font-bold mt-2" style={oSide === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' }}>
-                  確認{oSide==='buy'?'買進':'賣出'}
+
+                <button onClick={executeTrade}
+                  className="w-full py-4 md:py-2.5 rounded-xl text-base md:text-sm font-bold mt-2"
+                  style={oSide === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' }}>
+                  確認{oSide === 'buy' ? '買進' : '賣出'}
                 </button>
               </div>
             </div>
           </>
         )}
+
         <button onClick={() => setShowOrder(v => !v)}
           className="flex items-center gap-2 px-5 py-3 md:py-2.5 font-bold rounded-full transition-all text-base md:text-sm hover:scale-105 active:scale-95"
           style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)', boxShadow: '0 0 20px rgba(128,131,255,0.35)' }}>
           <Zap size={18} className="md:w-4 md:h-4"/> <span className="hidden xs:inline">快速委託</span>
         </button>
       </div>
-
     </motion.div>
   );
 }
