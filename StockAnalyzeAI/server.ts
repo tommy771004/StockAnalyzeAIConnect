@@ -4,6 +4,7 @@ import * as https from 'https';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import * as TV from './server/services/TradingViewService.js';
+import * as TWSE from './server/services/TWSeService.js';
 import { parseSymbol, toYahoo } from './src/utils/symbolParser.js';
 import { authMiddleware, signToken, type AuthRequest } from './server/middleware/auth.js';
 import * as usersRepo from './server/repositories/usersRepo.js';
@@ -13,6 +14,9 @@ import * as tradesRepo from './server/repositories/tradesRepo.js';
 import * as alertsRepo from './server/repositories/alertsRepo.js';
 import * as settingsRepo from './server/repositories/settingsRepo.js';
 import * as strategiesRepo from './server/repositories/strategiesRepo.js';
+import { calcIndicators } from './server/utils/technical.js';
+import { analyzeSentiment } from './server/utils/sentiment.js';
+import { agentRouter } from './server/api/agent.js';
 
 // Lazy-load Neon DB (requires DATABASE_URL to be set)
 let dbAvailable = false;
@@ -752,6 +756,123 @@ app.use(express.json());
           : null)
         .filter(Boolean),
     });
+  });
+
+  // --- Hermes Agent ---
+  app.use('/api/agent', authMiddleware, agentRouter);
+
+  // --- Smart Market Routing (/api/market/:symbol) ---
+  // 解析 ticker 判斷市場（純數字為台股）。
+  // 預設呼叫 Yahoo Finance 獲取資料。
+  // 若為台股且 Yahoo 資料非最新，則同步呼叫 TWSE API 更新即時價格。
+  // 若上述失敗，嘗試 Fallback 到 TradingView。
+  app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+    const rawSymbol = req.params.symbol as string;
+    const isTWStock = /^\d{4,5}$/.test(rawSymbol);
+    const yahooSymbol = isTWStock ? `${rawSymbol}.TW` : rawSymbol;
+
+    try {
+      // Step 1: Yahoo Finance 主要資料源
+      const [quoteData, histData, newsData] = await Promise.allSettled([
+        NativeYahooApi.quote(yahooSymbol),
+        NativeYahooApi.chart(yahooSymbol, {
+          interval: '1d',
+          period1:  Date.now() - 90 * 24 * 60 * 60 * 1000,
+        }),
+        NativeYahooApi.search(yahooSymbol),
+      ]);
+
+      const quote   = quoteData.status === 'fulfilled' ? quoteData.value : null;
+      const history = histData.status  === 'fulfilled' ? histData.value.quotes : [];
+
+      // Step 2: 若為台股且 Yahoo 價格超過 5 分鐘未更新 → 嘗試 TWSE
+      let twseQuote: TWSE.TWSeQuote | null = null;
+      if (isTWStock && quote) {
+        const lastRefresh = quote.regularMarketTime
+          ? new Date(quote.regularMarketTime * 1000).getTime()
+          : 0;
+        const staleMs = Date.now() - lastRefresh;
+        if (staleMs > 5 * 60 * 1000) {
+          twseQuote = await TWSE.realtimeQuote(rawSymbol).catch(() => null);
+        }
+      }
+
+      // Step 3: 誡算技術指標
+      let techResult = null;
+      if (history.length >= 20) {
+        try {
+          techResult = calcIndicators(history);
+        } catch { /* 指標計算失敗不阻斷 */ }
+      }
+
+      // Step 4: 情緒分析
+      const rawNews = newsData.status === 'fulfilled' ? (newsData.value?.news ?? []) : [];
+      const sentiment = analyzeSentiment(rawNews, 3);
+
+      const price = twseQuote?.price ?? quote?.regularMarketPrice ?? 0;
+
+      // Step 5: 若全部失敗→ TradingView Fallback
+      if (!quote && !twseQuote) {
+        const canonical = parseSymbol(rawSymbol);
+        const tvData = await TV.getOverview(canonical).catch(() => null);
+        if (tvData) {
+          return res.json({
+            symbol:    rawSymbol,
+            source:    'TradingView',
+            price:     (tvData as Record<string, unknown>).close ?? 0,
+            history:   [],
+            technical: null,
+            sentiment,
+            raw:       tvData,
+          });
+        }
+        return res.status(404).json({ error: `找不到 ${rawSymbol} 的市場資料` });
+      }
+
+      return res.json({
+        symbol:    rawSymbol,
+        source:    twseQuote ? 'TWSE+Yahoo' : 'Yahoo',
+        price,
+        change:    twseQuote?.change   ?? quote?.regularMarketChange,
+        changePct: twseQuote?.changePercent ?? quote?.regularMarketChangePercent,
+        open:      twseQuote?.open  ?? quote?.regularMarketOpen,
+        high:      twseQuote?.high  ?? quote?.regularMarketDayHigh,
+        low:       twseQuote?.low   ?? quote?.regularMarketDayLow,
+        volume:    twseQuote?.volume ?? quote?.regularMarketVolume,
+        name:      twseQuote?.name  ?? quote?.longName ?? quote?.shortName,
+        history:   history.map(h => ({
+          date:   h.date instanceof Date ? h.date.toISOString().split('T')[0] : h.date,
+          open:   h.open,
+          high:   h.high,
+          low:    h.low,
+          close:  h.close,
+          volume: h.volume,
+        })),
+        technical: techResult ? {
+          sma20:          techResult.latest.sma20,
+          sma50:          techResult.latest.sma50,
+          macdLine:       techResult.latest.macdLine,
+          macdSignal:     techResult.latest.macdSignal,
+          macdHist:       techResult.latest.macdHist,
+          rsi14:          techResult.latest.rsi14,
+          recommendation: techResult.recommendation,
+          score:          techResult.score,
+        } : null,
+        sentiment,
+        twse:  twseQuote,
+      });
+    } catch (e: unknown) {
+      // 最終 Fallback→TradingView
+      try {
+        const canonical = parseSymbol(rawSymbol);
+        const tvData = await TV.getOverview(canonical);
+        if (tvData) {
+          return res.json({ symbol: rawSymbol, source: 'TradingView', price: (tvData as Record<string, unknown>).close ?? 0, history: [], technical: null });
+        }
+      } catch { /* ignore */ }
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: msg });
+    }
   });
 
   // --- Backtest Engine ---
