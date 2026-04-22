@@ -66,18 +66,20 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
       onClick={() => onSelect(idx.symbol)}
       onKeyDown={e => e.key === 'Enter' && onSelect(idx.symbol)}
       className={cn(
-        "min-w-[82vw] sm:min-w-[280px] md:min-w-0 shrink-0 md:shrink liquid-glass-strong rounded-2xl cursor-pointer hover:border-emerald-500/30 hover:bg-[var(--card-bg)] transition-all group shadow-xl border-[var(--border-color)] snap-start md:snap-center active:scale-[0.98] overflow-hidden",
-        compact ? "p-4" : "p-5 md:p-6 lg:p-8",
-        idx.symbol === '^VIX' && "bg-zinc-200/10"
-      )}>
+        "min-w-[82vw] sm:min-w-[280px] md:min-w-0 shrink-0 md:shrink glass-card cursor-pointer transition-all group snap-start md:snap-center active:scale-[0.98] overflow-hidden",
+        compact ? "p-4" : "p-5 md:p-6 lg:p-8"
+      )}
+      style={{ border: '1px solid var(--md-outline-variant)' }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.4)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
       <div className={cn("flex items-start justify-between", compact ? "mb-4" : "mb-6")}>
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <div className={cn("shrink-0 p-3 md:p-4 rounded-2xl", isUp ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+          <div className="shrink-0 p-3 md:p-4 rounded-2xl" style={isUp ? { background: 'rgba(255,77,79,0.12)', color: 'var(--color-up)' } : { background: 'rgba(82,196,26,0.12)', color: 'var(--color-down)' }}>
             <idx.icon size={compact ? 20 : 28} />
           </div>
           <div className="min-w-0">
-            <div className="text-base sm:text-lg md:text-xl font-black text-[var(--text-color)] group-hover:text-emerald-300 transition-colors tracking-tight truncate">{idx.name}</div>
-            <div className="text-xs sm:text-sm md:text-base text-[var(--text-color)] opacity-50 font-mono uppercase tracking-widest truncate">{idx.symbol}</div>
+            <div className="text-base sm:text-lg md:text-xl font-black tracking-tight truncate" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{idx.name}</div>
+            <div className="text-xs sm:text-sm md:text-base font-mono uppercase tracking-widest truncate" style={{ color: 'var(--md-outline)' }}>{idx.symbol}</div>
           </div>
         </div>
       </div>
@@ -86,7 +88,8 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
           <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-mono font-black text-[var(--text-color)] mb-2 tracking-tighter truncate">
             {idx.price ? idx.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
           </div>
-          <div className={cn("flex items-center gap-1.5 text-xs sm:text-base font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg w-fit", isUp ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+          <div className="flex items-center gap-1.5 text-xs sm:text-base font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg w-fit"
+               style={isUp ? { background: 'rgba(255,77,79,0.1)', color: 'var(--color-up)' } : { background: 'rgba(82,196,26,0.1)', color: 'var(--color-down)' }}>
             {isUp ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
             {isUp ? '+' : ''}{idx.changePct ? idx.changePct.toFixed(2) : '0.00'}%
           </div>
@@ -101,7 +104,7 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
                 </linearGradient>
               </defs>
               <YAxis domain={['dataMin', 'dataMax']} hide />
-              <Area type="monotone" dataKey="close" stroke={isUp?"#10b981":"#f43f5e"} strokeWidth={2} fill={`url(#g-${idx.symbol})`} isAnimationActive={false} />
+              <Area type="monotone" dataKey="close" stroke={isUp ? '#ff4d4f' : '#52c41a'} strokeWidth={2} fill={`url(#g-${idx.symbol})`} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -122,25 +125,32 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
       tabIndex={0}
       onClick={() => onSelect(s)}
       onKeyDown={e => e.key === 'Enter' && onSelect(s)}
-      className={cn('relative bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl p-3 sm:p-4 cursor-pointer transition-all hover:bg-[var(--bg-color)] group overflow-hidden',
-        isSelected ? 'border-emerald-500/40 bg-emerald-500/5' : '')}>
+      className="relative glass-card rounded-xl p-3 sm:p-4 cursor-pointer transition-all group overflow-hidden"
+      style={isSelected ? { borderColor: 'rgba(128,131,255,0.5)', background: 'rgba(128,131,255,0.06)' } : {}}
+      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = 'rgba(128,131,255,0.3)'; }}
+      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--md-outline-variant)'; }}>
       <button onClick={e => { e.stopPropagation(); onRemove(s.symbol); }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full bg-[var(--bg-color)] hover:bg-rose-500/30 text-[var(--text-color)] opacity-50 hover:text-rose-400 transition-all z-10 shrink-0">
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-all z-10 shrink-0"
+        style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-outline)' }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--md-error)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--md-outline)'; }}>
         <X size={12}/>
       </button>
       <div className="flex items-start justify-between mb-3 min-w-0">
         <div className="min-w-0 flex-1 pr-4">
-          <div className="text-base sm:text-lg font-black text-[var(--text-color)] tracking-tight truncate">{s.symbol}</div>
-          <div className="font-serif italic text-xs sm:text-sm text-[var(--text-color)] opacity-50 truncate">{s.shortName || s.name}</div>
+          <div className="text-base sm:text-lg font-black tracking-tight truncate" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{s.symbol}</div>
+          <div className="text-xs sm:text-sm truncate" style={{ color: 'var(--md-outline)' }}>{s.shortName || s.name}</div>
         </div>
-        <span className={cn('text-xs sm:text-sm px-2 py-0.5 sm:px-3 sm:py-1 rounded font-mono font-bold shrink-0', isUp ? 'text-emerald-400' : 'text-rose-400')}>
+        <span className="text-xs sm:text-sm px-2 py-0.5 sm:px-3 sm:py-1 rounded font-mono font-bold shrink-0"
+              style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
           {isUp ? '+' : ''}{s.changePct.toFixed(2)}%
         </span>
       </div>
-      <div className={cn('text-lg sm:text-xl md:text-2xl lg:text-3xl font-black font-mono tracking-tighter truncate', isUp ? 'text-emerald-400' : 'text-rose-400')}>
+      <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black font-mono tracking-tighter truncate"
+           style={{ color: isUp ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>
         {s.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
       </div>
-      <div className="flex justify-between text-[10px] sm:text-xs text-[var(--text-color)] opacity-50 mt-4 sm:mt-6 font-mono border-t border-white/5 pt-2">
+      <div className="flex justify-between text-[10px] sm:text-xs mt-4 sm:mt-6 font-mono border-t pt-2" style={{ color: 'var(--md-outline)', borderColor: 'var(--md-outline-variant)' }}>
         <span className="truncate mr-1">B {s.bid.toFixed(2)}</span>
         <span className="truncate">A {s.ask.toFixed(2)}</span>
       </div>
@@ -425,8 +435,8 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
   if (loading && marketData.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-4">
-        <Loader2 className="animate-spin text-emerald-400" size={32}/>
-        <div className="text-sm font-bold text-white tracking-widest">INITIALIZING MARKET DATA ENGINE...</div>
+        <Loader2 className="animate-spin" size={32} style={{ color: 'var(--md-primary)' }}/>
+        <div className="text-sm font-bold tracking-widest" style={{ color: 'var(--md-on-surface)' }}>INITIALIZING MARKET DATA ENGINE...</div>
         <div className="text-xs text-slate-500">正在與 Yahoo Finance 建立安全連線並獲取真實報價</div>
       </div>
     );
@@ -438,12 +448,13 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className={cn("h-full flex flex-col overflow-auto pb-10 pr-4 relative bg-[var(--bg-color)] text-[var(--text-color)]", compact ? "gap-2" : "gap-8")}
+      className={cn("h-full flex flex-col overflow-auto pb-10 pr-4 relative", compact ? "gap-2" : "gap-8")}
     >
       <PullToRefreshIndicator state={pullState} />
 
       {toast && (
-        <div className={cn("fixed top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xl z-50 whitespace-nowrap animate-in fade-in slide-in-from-top-4", toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500')}>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xl z-50 whitespace-nowrap"
+             style={{ background: toast.type === 'success' ? '#52c41a' : '#ff4d4f' }}>
           {toast.msg}
         </div>
       )}
@@ -454,12 +465,13 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           const hour = new Date().getHours();
           const isMorning = hour < 12;
           return (
-            <div className={cn("px-5 py-4 rounded-2xl border flex flex-col gap-4 shadow-lg overflow-hidden relative", isMorning ? "bg-amber-500/10 border-amber-500/30 text-amber-100" : "bg-indigo-500/10 border-indigo-500/30 text-indigo-100")}>
+            <div className="px-5 py-4 rounded-2xl border flex flex-col gap-4 shadow-lg overflow-hidden relative"
+               style={isMorning ? { background: 'rgba(255,183,131,0.08)', borderColor: 'rgba(255,183,131,0.3)', color: 'var(--md-tertiary)' } : { background: 'rgba(173,198,255,0.08)', borderColor: 'rgba(173,198,255,0.25)', color: 'var(--md-secondary)' }}>
               
               <div className="flex items-center justify-between z-10 relative">
                 <div className="flex items-center gap-3">
                    <div className={cn("p-2.5 rounded-xl border backdrop-blur-md", isMorning ? "bg-amber-500/20 border-amber-500/20" : "bg-indigo-500/20 border-indigo-500/20")}>
-                      {isMorning ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-indigo-400" />}
+                      {isMorning ? <Sun size={20} style={{ color: 'var(--md-tertiary)' }} /> : <Moon size={20} style={{ color: 'var(--md-secondary)' }} />}
                    </div>
                    <div>
                       <h3 className="text-base font-black tracking-widest uppercase">{isMorning ? '早安！早盤通勤摘要' : '晚安！收盤結算摘要'}</h3>
@@ -559,12 +571,14 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
       {/* ── 2. Watchlist & Deep Analysis ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between shrink-0">
-          <h2 className="font-serif italic text-lg text-zinc-100">Watchlist</h2>
+          <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>Watchlist</h2>
           <div className="flex items-center gap-2 flex-wrap">
             {BROKERS.map((b,i) => (
               <button key={i} onClick={() => setBroker(b)}
-                className={cn('px-3 py-1.5 sm:py-1 rounded text-[10px] font-mono uppercase transition-all border press-feedback',
-                  broker===b?'bg-emerald-500/10 text-emerald-400 border-emerald-500/30':'bg-zinc-950 text-zinc-500 border-zinc-800 hover:bg-zinc-900')}>
+                className="px-3 py-1.5 sm:py-1 rounded text-[10px] font-mono uppercase transition-all border"
+              style={broker === b
+                ? { background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', borderColor: 'rgba(128,131,255,0.3)' }
+                : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', borderColor: 'var(--md-outline-variant)' }}>
                 {b}
               </button>
             ))}
@@ -590,7 +604,10 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
               tabIndex={0}
               onClick={() => !showAdd && setShowAdd(true)}
               onKeyDown={e => e.key === 'Enter' && !showAdd && setShowAdd(true)}
-              className="liquid-glass rounded-2xl border-dashed border-zinc-800 p-4 cursor-pointer hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all flex flex-col items-center justify-center min-h-[160px] bg-zinc-900/50">
+              <div className="glass-card rounded-2xl border-dashed p-4 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px]"
+                   style={{ borderColor: 'var(--md-outline-variant)' }}
+                   onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.4)')}
+                   onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
               {showAdd ? (
                 <div className="w-full space-y-3" onClick={e => e.stopPropagation()}>
                   <div className="text-base font-bold text-zinc-100 mb-3">新增自選股</div>
@@ -602,16 +619,18 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   </div>
                   {addErr && <div className="text-sm text-rose-400 px-1">{addErr}</div>}
                   <div className="flex gap-3">
-                    <button onClick={handleAdd} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-emerald-950 text-emerald-400 text-sm border border-emerald-900/50 flex items-center justify-center">
+                    <button onClick={handleAdd} disabled={busy} className="flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center"
+                            style={{ background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)', border: '1px solid rgba(128,131,255,0.3)' }}>
                       {busy?<Loader2 size={14} className="animate-spin mr-1.5"/>:null} 確認
                     </button>
-                    <button onClick={() => { setShowAdd(false); setAddInput(''); setAddErr(''); }} className="flex-1 py-2.5 rounded-lg bg-zinc-800 text-zinc-400 text-sm border border-zinc-700 hover:bg-zinc-700">取消</button>
+                    <button onClick={() => { setShowAdd(false); setAddInput(''); setAddErr(''); }} className="flex-1 py-2.5 rounded-lg text-sm"
+                            style={{ background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>取消</button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3"><Plus size={24} className="text-zinc-500"/></div>
-                  <div className="text-sm text-zinc-500 font-semibold">新增標的</div>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--md-surface-container-high)' }}><Plus size={24} style={{ color: 'var(--md-outline)' }}/></div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--md-outline)' }}>新增標的</div>
                 </div>
               )}
             </div>
@@ -620,38 +639,20 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           {/* 右側：五檔與逐筆成交 (給已選取的標的) */}
           {selected && (
             <div className="w-full lg:w-[260px] flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
-              <div className="liquid-glass rounded-2xl p-4 flex-1 flex flex-col shadow-lg bg-zinc-900/50 border-zinc-800">
+              <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-100">報價詳情</h3>
+                    <h3 className="text-sm font-bold" style={{ color: 'var(--md-on-surface)' }}>報價詳情</h3>
                   </div>
-                  <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-950 px-2 py-0.5 rounded">{selected.symbol}</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(128,131,255,0.12)', color: 'var(--md-primary)' }}>{selected.symbol}</span>
                 </div>
                 <div className="text-xs font-mono space-y-2 mt-4">
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">開盤價</span>
-                    <span className="text-zinc-100">{selected.open?.toFixed(2) ?? '-'}</span>
+                  {[['開盤價', selected.open?.toFixed(2) ?? '-', ''], ['最高價', selected.high?.toFixed(2) ?? '-', 'up'], ['最低價', selected.low?.toFixed(2) ?? '-', 'down'], ['成交量', selected.volume?.toLocaleString() ?? '-', ''], ['買進價', selected.bid?.toFixed(2) ?? '-', ''], ['賣出價', selected.ask?.toFixed(2) ?? '-', '']].map(([label, val, dir]) => (
+                  <div key={label} className="flex justify-between py-1 border-b" style={{ borderColor: 'var(--md-outline-variant)' }}>
+                    <span style={{ color: 'var(--md-outline)' }}>{label}</span>
+                    <span style={{ color: dir === 'up' ? 'var(--color-up)' : dir === 'down' ? 'var(--color-down)' : 'var(--md-on-surface)' }}>{val}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">最高價</span>
-                    <span className="text-emerald-400">{selected.high?.toFixed(2) ?? '-'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">最低價</span>
-                    <span className="text-rose-400">{selected.low?.toFixed(2) ?? '-'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">成交量</span>
-                    <span className="text-zinc-100">{selected.volume?.toLocaleString() ?? '-'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">買進價</span>
-                    <span className="text-zinc-100">{selected.bid?.toFixed(2) ?? '-'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-500">賣出價</span>
-                    <span className="text-zinc-100">{selected.ask?.toFixed(2) ?? '-'}</span>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -662,10 +663,10 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
       {/* ── 3. 市場焦點與財經新聞 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-[250px]">
         {/* 左側：熱門交易標的 */}
-        <div className="lg:col-span-1 liquid-glass rounded-2xl p-5 flex flex-col shadow-lg bg-zinc-900/50 border-zinc-800">
+        <div className="lg:col-span-1 glass-card rounded-2xl p-5 flex flex-col shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              <Flame size={16} className="text-orange-400"/> 市場熱點 (Trending)
+            <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--md-on-surface)' }}>
+              <Flame size={16} style={{ color: 'var(--md-tertiary)' }}/> 市場熱點 (Trending)
             </h2>
           </div>
           <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-1 gap-3 overflow-x-auto pb-2 lg:pb-0 -mx-5 lg:mx-0 px-5 lg:px-0 snap-x snap-mandatory mobile-hide-scrollbar scroll-px-5 scroll-smooth">
@@ -677,19 +678,22 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   tabIndex={0}
                   onClick={() => onSelectSymbol(t.symbol)}
                   onKeyDown={e => e.key === 'Enter' && onSelectSymbol(t.symbol)}
-                  className="shrink-0 w-[72vw] sm:w-auto sm:min-w-0 flex items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 cursor-pointer group transition-colors snap-start sm:snap-center">
+                  className="shrink-0 w-[72vw] sm:w-auto sm:min-w-0 flex items-center justify-between gap-3 p-3.5 rounded-xl cursor-pointer group transition-colors snap-start sm:snap-center"
+                  style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(128,131,255,0.3)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
                   <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-black text-zinc-100 shrink-0">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shrink-0" style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface)' }}>
                       {t.symbol.slice(0, 2)}
                     </div>
                     <div className="min-w-0 overflow-hidden text-left">
-                      <div className="text-xs font-black text-white group-hover:text-emerald-300 transition-colors truncate">{t.symbol}</div>
-                      <div className="text-[10px] text-zinc-500 truncate whitespace-nowrap">{t.shortName || 'N/A'}</div>
+                      <div className="text-xs font-black truncate" style={{ color: 'var(--md-on-surface)' }}>{t.symbol}</div>
+                      <div className="text-[10px] truncate whitespace-nowrap" style={{ color: 'var(--md-outline)' }}>{t.shortName || 'N/A'}</div>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-mono text-zinc-100 font-bold">{t.price?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---'}</div>
-                    <div className={cn("text-[10px] font-black font-mono px-1.5 py-0.5 rounded bg-black/40 mt-1", isUp ? "text-emerald-400" : "text-rose-400")}>
+                    <div className="text-xs font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{t.price?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---'}</div>
+                    <div className="text-[10px] font-black font-mono px-1.5 py-0.5 rounded mt-1" style={{ background: 'rgba(0,0,0,0.4)', color: isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
                       {isUp ? '+' : ''}{(t.changePct || 0).toFixed(2)}%
                     </div>
                   </div>
@@ -700,23 +704,26 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         </div>
 
         {/* 右側：即時市場新聞 */}
-        <div className="lg:col-span-2 liquid-glass rounded-2xl p-5 flex flex-col shadow-lg bg-zinc-900/50 border-zinc-800">
+        <div className="lg:col-span-2 glass-card rounded-2xl p-5 flex flex-col shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-              <Newspaper size={16} className="text-indigo-400"/> 國際財經快訊 (News)
+            <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--md-on-surface)' }}>
+              <Newspaper size={16} style={{ color: 'var(--md-secondary)' }}/> 國際財經快訊 (News)
             </h2>
           </div>
           <div className="flex-1 overflow-auto grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pr-1">
             {news.length > 0 ? news.map((n: NewsItem, i: number) => (
               <a key={i} href={n.link} target="_blank" rel="noopener noreferrer"
-                className="flex flex-col p-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-indigo-500/30 transition-all group">
+                className="flex flex-col p-3 rounded-xl transition-all group"
+              style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(173,198,255,0.3)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--md-outline-variant)')}>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="text-xs font-bold text-zinc-300 group-hover:text-indigo-300 leading-relaxed line-clamp-2">
+                  <h3 className="text-xs font-bold leading-relaxed line-clamp-2" style={{ color: 'var(--md-on-surface-variant)' }}>
                     {n.title}
                   </h3>
-                  <ExternalLink size={12} className="text-zinc-600 shrink-0"/>
+                  <ExternalLink size={12} style={{ color: 'var(--md-outline)' }} className="shrink-0"/>
                 </div>
-                <div className="text-xs text-zinc-500 mt-auto flex items-center gap-1">
+                <div className="text-xs mt-auto flex items-center gap-1" style={{ color: 'var(--md-outline)' }}>
                   <span>{n.publisher || 'Yahoo Finance'}</span>
                   <span>·</span>
                   <span>{new Date((n.providerPublishTime || Date.now()/1000) * 1000).toLocaleString()}</span>
@@ -740,16 +747,16 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
             {/* Order Panel (Bottom Sheet on Mobile, Floating Card on Desktop) */}
             <div className={cn(
               "fixed md:absolute z-[70] transition-transform duration-300 ease-out",
-              "bottom-0 left-0 right-0 w-full bg-zinc-950 rounded-t-3xl p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t border-zinc-800",
-              "md:bottom-14 md:right-0 md:left-auto md:w-72 md:rounded-2xl md:p-5 md:shadow-2xl md:bg-zinc-900/90 md:backdrop-blur-md md:border md:border-zinc-800"
+              "fixed md:absolute z-[70] transition-transform duration-300 ease-out bottom-0 left-0 right-0 w-full rounded-t-3xl p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t md:bottom-14 md:right-0 md:left-auto md:w-72 md:rounded-2xl md:p-5 md:shadow-2xl",
+              ""
             )}>
               {/* Mobile Handle */}
               <div className="md:hidden w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-6" />
               
               <div className="flex items-center justify-between mb-4 md:mb-3">
                 <div>
-                  <h3 className="text-lg md:text-sm font-bold text-zinc-100">快速委託</h3>
-                  <div className="text-xs text-zinc-500">{selected.symbol}</div>
+                  <h3 className="text-lg md:text-sm font-bold" style={{ color: 'var(--md-on-surface)' }}>快速委託</h3>
+                  <div className="text-xs" style={{ color: 'var(--md-outline)' }}>{selected.symbol}</div>
                 </div>
                 <button onClick={() => setShowOrder(false)} className="p-2 md:p-1 rounded-full hover:bg-zinc-800 text-zinc-400">
                   <X size={18} className="md:w-3.5 md:h-3.5" />
@@ -760,7 +767,10 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                 {(['buy','sell'] as const).map(s => (
                   <button key={s} onClick={() => setOSide(s)}
                     className={cn('flex-1 py-3 md:py-2 rounded-xl text-base md:text-sm font-bold transition-colors', 
-                      oSide===s?(s==='buy'?'bg-emerald-500 text-zinc-950':'bg-rose-500 text-zinc-100'):'bg-zinc-900 text-zinc-400 hover:bg-zinc-800')}>
+                      '')}
+                  style={oSide === s
+                    ? (s === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' })
+                    : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
                     {s==='buy'?'買進':'賣出'}
                   </button>
                 ))}
@@ -768,11 +778,11 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
               
               <div className="space-y-4 md:space-y-3">
                 <div className="flex gap-2">
-                  <select value={tradeMode} onChange={e => setTradeMode(e.target.value as 'paper' | 'real')} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-zinc-100 text-sm md:text-xs">
+                  <select value={tradeMode} onChange={e => setTradeMode(e.target.value as 'paper' | 'real')} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="paper">模擬交易</option>
                     <option value="real">實際交易</option>
                   </select>
-                  <select value={broker} onChange={e => setBroker(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-zinc-100 text-sm md:text-xs">
+                  <select value={broker} onChange={e => setBroker(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="Fubon">富邦</option>
                     <option value="Cathay">國泰</option>
                     <option value="UB">聯邦</option>
@@ -781,12 +791,12 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                 </div>
                 
                 <div className="flex gap-2">
-                  <select value={orderType} onChange={e => setOrderType(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-zinc-100 text-sm md:text-xs">
+                  <select value={orderType} onChange={e => setOrderType(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="ROD">ROD</option>
                     <option value="IOC">IOC</option>
                     <option value="FOK">FOK</option>
                   </select>
-                  <select value={priceType} onChange={e => setPriceType(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-zinc-100 text-sm md:text-xs">
+                  <select value={priceType} onChange={e => setPriceType(e.target.value)} className="flex-1 rounded-xl px-3 py-2.5 md:px-2 md:py-2 text-sm md:text-xs" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
                     <option value="LMT">限價</option>
                     <option value="MKT">市價</option>
                   </select>
@@ -794,13 +804,13 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                 
                 <div className="flex justify-between text-sm md:text-xs py-1">
                   <span className="text-zinc-400">現價</span>
-                  <span className={cn('font-mono font-bold text-lg md:text-base', up(selected)?'text-emerald-400':'text-rose-400')}>{selected.price.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-lg md:text-base" style={{ color: up(selected) ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>{selected.price.toFixed(2)}</span>
                 </div>
                 
                 <div>
                   <div className="text-xs text-zinc-500 mb-1.5 md:mb-1">委託數量</div>
                   <input type="number" value={oQty} onChange={e => setOQty(Number(e.target.value))} min={1}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 md:px-3 md:py-2 text-zinc-100 font-mono text-base md:text-xs focus:outline-none focus:border-emerald-500/40"/>
+                    className="w-full rounded-xl px-4 py-3 md:px-3 md:py-2 font-mono text-base md:text-xs focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}/>
                 </div>
                 
                 <div className="flex justify-between text-sm md:text-xs pt-2 border-t border-zinc-800">
@@ -808,7 +818,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   <span className="text-zinc-100 font-mono text-lg md:text-base">${new Decimal(selected.price).times(oQty).toNumber().toLocaleString(undefined,{maximumFractionDigits:0})}</span>
                 </div>
                 
-                <button onClick={executeTrade} className={cn('w-full py-4 md:py-2.5 rounded-xl text-base md:text-sm font-bold mt-2', oSide==='buy'?'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)]':'bg-rose-500 text-zinc-100 hover:bg-rose-400 shadow-[0_0_15px_rgba(251,113,133,0.3)]')}>
+                <button onClick={executeTrade} className="w-full py-4 md:py-2.5 rounded-xl text-base md:text-sm font-bold mt-2" style={oSide === 'buy' ? { background: 'var(--color-up)', color: '#fff' } : { background: 'var(--color-down)', color: '#fff' }}>
                   確認{oSide==='buy'?'買進':'賣出'}
                 </button>
               </div>
@@ -816,7 +826,8 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           </>
         )}
         <button onClick={() => setShowOrder(v => !v)}
-          className="flex items-center gap-2 px-5 py-3 md:py-2.5 bg-emerald-500 text-zinc-950 font-bold rounded-full shadow-[0_0_20px_rgba(52,211,153,0.3)] hover:bg-emerald-400 transition-all text-base md:text-sm hover:scale-105 active:scale-95">
+          className="flex items-center gap-2 px-5 py-3 md:py-2.5 font-bold rounded-full transition-all text-base md:text-sm hover:scale-105 active:scale-95"
+          style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)', boxShadow: '0 0 20px rgba(128,131,255,0.35)' }}>
           <Zap size={18} className="md:w-4 md:h-4"/> <span className="hidden xs:inline">快速委託</span>
         </button>
       </div>
