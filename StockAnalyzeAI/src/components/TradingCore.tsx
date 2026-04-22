@@ -15,7 +15,8 @@ import { PriceBar } from './PriceBar';
 import { BacktestPanel } from './BacktestPanel';
 import { ChartSection } from './ChartSection';
 import { RightPanel } from './RightPanel';
-import { useWatchlist, useUpdateWatchlist } from '../hooks/useQueryHooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWatchlist } from '../hooks/useQueryHooks';
 import { useSettings } from '../contexts/SettingsContext';
 import { useStockAnalysis } from '../hooks/useStockAnalysis';
 import { Order, WatchlistItem, Alert } from '../types';
@@ -125,14 +126,22 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
     }
   }, [showToast]);
 
-  const updateWatchlist = useUpdateWatchlist();
+  const queryClient = useQueryClient();
 
   const addToWatchlist = useCallback(async (sym: string) => {
     const typedWatchlist = watchlist as WatchlistItem[];
     if (!sym || typedWatchlist.find((w: WatchlistItem) => w.symbol === sym)) return;
-    const newList = [...typedWatchlist, { symbol: sym, price: 0, changePct: 0 }];
-    updateWatchlist.mutate(newList);
-  }, [watchlist, updateWatchlist]);
+    try {
+      await api.addWatchlistItem(sym);
+      queryClient.invalidateQueries({ queryKey: [STORAGE_KEYS.WATCHLIST] });
+      setWlSearch('');
+      setWlAdding(false);
+      showToast(`已新增 ${sym} 至自選股`, 'success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '新增失敗';
+      showToast(`新增自選股失敗: ${msg}`, 'error');
+    }
+  }, [watchlist, queryClient, showToast]);
 
   const [focusMode,    setFocusMode]    = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'list' | 'chart' | 'panel'>('chart');
