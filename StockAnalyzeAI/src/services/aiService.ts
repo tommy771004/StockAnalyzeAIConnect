@@ -3,22 +3,17 @@ import Decimal from 'decimal.js';
 import * as api from './api';
 import { Quote, HistoricalData, AIAnalysisResult, MTFResult, SentimentData, TradingStrategy, NewsItem } from '../types';
 
-import { GoogleGenAI, Type } from '@google/genai';
-
 // ── Settings helpers ──────────────────────────────────────────────────────────
 function getSettings() {
   try { return JSON.parse(localStorage.getItem('llm_trader_settings') ?? '{}'); } catch { return {}; }
 }
-const getGeminiKey = async (): Promise<string> => {
-  // Use platform provided GEMINI_API_KEY
-  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-  // Fallbacks
+const getOpenRouterKey = async (): Promise<string> => {
   try {
     const v = await api.getSetting<string>('openrouterKey');
     if (v && typeof v === 'string' && v.trim()) return v.trim();
   } catch(e) { console.warn('[aiService] getSetting openrouterKey:', e); }
   const s = getSettings();
-  return s.openrouterKey?.trim() || s.openaiKey?.trim() || (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined) || '';
+  return s.openrouterKey?.trim() || (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined) || '';
 };
 const getOllamaBase = async (): Promise<string> => {
   try {
@@ -54,20 +49,46 @@ async function callOllama(prompt: string, model: string, jsonMode: boolean = tru
 }
 
 // ── OpenRouter call ───────────────────────────────────────────────────────────
-async function callOpenRouter(prompt: string, model: string, jsonMode: boolean = true): Promise<string> {
-  const apiKey = await getGeminiKey();
-  if (!apiKey) throw Object.assign(new Error('MISSING_API_KEY'), { code: 'MISSING_API_KEY' });
-  
-  const ai = new GoogleGenAI({ apiKey });
+const OPENROUTER_API_URL  = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_FALLBACK = 'mistralai/mistral-7b-instruct:free';
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: jsonMode ? { responseMimeType: "application/json" } : undefined,
+async function callOpenRouter(prompt: string, model: string, jsonMode: boolean = true): Promise<string> {
+  const apiKey = await getOpenRouterKey();
+  if (!apiKey) throw Object.assign(new Error('MISSING_API_KEY'), { code: 'MISSING_API_KEY' });
+
+  const res = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer':  'https://hermes-ai.trading',
+      'X-Title':       'Hermes AI Trading',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1024,
+      stream: false,
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+    }),
+    signal: AbortSignal.timeout(30000),
   });
 
-  if (!response.text) throw new Error('Gemini response missing text content');
-  return response.text;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const st = res.status;
+    if ((st === 429 || st === 503) && model !== OPENROUTER_FALLBACK) {
+      console.warn(`[aiService] ${model} 不可用 (${st})，切換至備援模型`);
+      return callOpenRouter(prompt, OPENROUTER_FALLBACK, jsonMode);
+    }
+    throw Object.assign(new Error(`OpenRouter ${st}: ${body.slice(0, 200)}`), { status: st });
+  }
+
+  const json = await res.json();
+  const content: string = json?.choices?.[0]?.message?.content ?? '';
+  if (!content) throw new Error('OpenRouter 回傳空內容');
+  return content;
 }
 
 // ── Router: Ollama vs OpenRouter ──────────────────────────────────────────────
