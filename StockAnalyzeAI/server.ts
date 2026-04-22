@@ -27,7 +27,118 @@ try {
   console.warn('[DB] Neon not available — set DATABASE_URL in .env to enable persistence:', (e as Error).message);
 }
 
-// --- Native Yahoo API Engine ---
+/** Auto-creates all DB tables (idempotent CREATE TABLE IF NOT EXISTS).
+ *  Runs once at startup so fresh Neon databases work without manual migration. */
+async function ensureSchema() {
+  if (!dbAvailable) return;
+  try {
+    const { db } = await import('./src/db/index.js');
+    const { sql } = await import('drizzle-orm');
+    // Run each statement separately to work around neon-http single-statement limit
+    const stmts = [
+      sql`CREATE TABLE IF NOT EXISTS users (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name TEXT,
+        subscription_tier TEXT NOT NULL DEFAULT 'free',
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+      sql`CREATE TABLE IF NOT EXISTS watchlist_items (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol TEXT NOT NULL,
+        name TEXT,
+        added_at BIGINT
+      )`,
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS watchlist_user_symbol_idx ON watchlist_items(user_id, symbol)`,
+      sql`CREATE TABLE IF NOT EXISTS positions (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol TEXT NOT NULL,
+        name TEXT,
+        shares NUMERIC NOT NULL,
+        avg_cost NUMERIC NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USD',
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS positions_user_symbol_idx ON positions(user_id, symbol)`,
+      sql`CREATE TABLE IF NOT EXISTS trades (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        ticker TEXT NOT NULL,
+        side TEXT NOT NULL,
+        entry NUMERIC NOT NULL,
+        exit NUMERIC,
+        qty NUMERIC NOT NULL,
+        pnl NUMERIC,
+        status TEXT,
+        notes TEXT,
+        mode TEXT NOT NULL DEFAULT 'real',
+        broker TEXT,
+        order_type TEXT,
+        ai_generated BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+      sql`CREATE TABLE IF NOT EXISTS alerts (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol TEXT NOT NULL,
+        condition TEXT NOT NULL,
+        target NUMERIC NOT NULL,
+        triggered BOOLEAN NOT NULL DEFAULT FALSE,
+        triggered_at TIMESTAMPTZ,
+        triggered_price NUMERIC,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+      sql`CREATE TABLE IF NOT EXISTS user_settings (
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        key TEXT NOT NULL,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        PRIMARY KEY (user_id, key)
+      )`,
+      sql`CREATE TABLE IF NOT EXISTS strategies (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        script TEXT NOT NULL,
+        auto_trade BOOLEAN NOT NULL DEFAULT FALSE,
+        max_daily_loss NUMERIC,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+      sql`DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agent_memory_type') THEN
+          CREATE TYPE agent_memory_type AS ENUM ('PREFERENCE', 'SKILL', 'CONTEXT');
+        END IF;
+      END $$`,
+      sql`CREATE TABLE IF NOT EXISTS agent_memories (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        memory_type agent_memory_type NOT NULL DEFAULT 'CONTEXT',
+        content JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )`,
+    ];
+    for (const stmt of stmts) {
+      await db.execute(stmt);
+    }
+    console.log('[DB] Schema ready ✓');
+  } catch (e) {
+    console.warn('[DB] ensureSchema failed (non-fatal):', (e as Error).message);
+  }
+}
+
+// Run schema init in background — don't block server startup
+ensureSchema();
+
+
 const UA_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 interface HistoricalData {
@@ -532,38 +643,71 @@ app.use(express.json());
     try {
       const stockNo = req.params.stockNo as string;
       const quote = await TWSE.realtimeQuote(stockNo);
-      if (!quote) { res.status(404).json({ error: 'TWSE quote not available' }); return; }
-      res.json({
-        Symbol: quote.symbol,
-        Name:   quote.name,
-        Price:  quote.price,
-        Change: quote.change,
-        ChangePercent: quote.changePercent,
-        Volume: quote.volume,
-        z: quote.price,
-        n: quote.name,
-        s: quote.symbol,
-      });
+      if (quote) {
+        return res.json({
+          Symbol: quote.symbol,
+          Name:   quote.name,
+          Price:  quote.price,
+          Change: quote.change,
+          ChangePercent: quote.changePercent,
+          Volume: quote.volume,
+          z: quote.price,
+          n: quote.name,
+          s: quote.symbol,
+        });
+      }
+
+      // TWSE unavailable (403/timeout) — fall back to Yahoo Finance for .TW symbol
+      try {
+        const yahooSym = stockNo.includes('.') ? stockNo : `${stockNo}.TW`;
+        const q = await NativeYahooApi.quote(yahooSym);
+        if (q?.regularMarketPrice) {
+          return res.json({
+            Symbol: stockNo,
+            Name:   q.shortName ?? q.longName ?? stockNo,
+            Price:  q.regularMarketPrice,
+            Change: q.regularMarketChange ?? 0,
+            ChangePercent: q.regularMarketChangePercent ?? 0,
+            Volume: q.regularMarketVolume ?? 0,
+            z: q.regularMarketPrice,
+            n: q.shortName ?? stockNo,
+            s: stockNo,
+          });
+        }
+      } catch (yErr: any) {
+        console.warn(`[TWSE] Yahoo fallback for ${stockNo} also failed:`, yErr.message);
+      }
+
+      res.status(404).json({ error: 'TWSE quote not available' });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+    if (!dbAvailable) { res.json([]); return; }
     try {
       const items = await watchlistRepo.getWatchlistByUser(req.userId!);
       res.json(items.map(i => ({ symbol: i.symbol, name: i.name, addedAt: i.addedAt })));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) {
+      console.error('[watchlist GET]', e.message);
+      res.json([]); // Return empty list rather than crashing client
+    }
   });
 
   app.put('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+    if (!dbAvailable) { res.status(503).json({ error: '資料庫服務暫時不可用，請稍後再試' }); return; }
     try {
+      if (!Array.isArray(req.body)) {
+        res.status(400).json({ error: 'Request body must be an array' }); return;
+      }
       const list: Array<{ symbol: string; name?: string; addedAt?: number }> = req.body;
       await watchlistRepo.replaceWatchlist(req.userId!, list);
       res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { console.error('[PUT /api/watchlist]', e); res.status(500).json({ error: e.message }); }
   });
 
   // Single-item add/upsert — avoids full-replace race conditions
   app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+    if (!dbAvailable) { res.status(503).json({ error: '資料庫服務暫時不可用，請稍後再試' }); return; }
     try {
       const { symbol, name } = req.body ?? {};
       if (!symbol || typeof symbol !== 'string') {
