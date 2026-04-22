@@ -20,13 +20,13 @@ import { ScreenerResult } from '../types';
 
 // ── Pre-built scan templates ──────────────────────────────────────────────────
 const TEMPLATES: { id: string; label: string; desc: string; filters: ScreenerFilters; color: string }[] = [
-  { id: 'oversold',     label: 'RSI 超賣反彈',   desc: 'RSI < 30，超賣區反彈機會',          filters: { rsiBelow: 30 },                              color: 'text-emerald-400' },
+  { id: 'oversold',     label: 'RSI 超賣反彈',   desc: 'RSI < 30，超賣區反彈機會',          filters: { rsiBelow: 30 },                              color: 'text-price-down' },
   { id: 'overbought',   label: 'RSI 超買警示',   desc: 'RSI > 70，超買區注意回檔',          filters: { rsiAbove: 70 },                              color: 'text-rose-400' },
   { id: 'golden_cross',  label: '均線金叉',       desc: 'SMA5 上穿 SMA20，趨勢轉多',        filters: { goldenCrossOnly: true },                      color: 'text-yellow-400' },
   { id: 'death_cross',   label: '均線死叉',       desc: 'SMA5 下穿 SMA20，趨勢轉空',        filters: { deathCrossOnly: true },                       color: 'text-red-400' },
-  { id: 'macd_bull',     label: 'MACD 多頭動能',  desc: 'MACD 柱狀由負轉正',               filters: { macdBullish: true },                          color: 'text-emerald-400' },
+  { id: 'macd_bull',     label: 'MACD 多頭動能',  desc: 'MACD 柱狀由負轉正',               filters: { macdBullish: true },                          color: 'text-price-down' },
   { id: 'vol_spike',     label: '異常爆量',       desc: '成交量 > 20 日均量 2 倍',           filters: { volumeSpikeMin: 2 },                          color: 'text-orange-400' },
-  { id: 'bullish_trend', label: '多頭排列',       desc: '價格 > SMA20，趨勢向上',           filters: { aboveSMA20: true, macdBullish: true },         color: 'text-emerald-400' },
+  { id: 'bullish_trend', label: '多頭排列',       desc: '價格 > SMA20，趨勢向上',           filters: { aboveSMA20: true, macdBullish: true },         color: 'text-price-down' },
   { id: 'bearish_trend', label: '空頭排列',       desc: '價格 < SMA20 且 MACD 空頭',        filters: { belowSMA20: true, macdBearish: true },         color: 'text-rose-400' },
 ];
 
@@ -105,15 +105,15 @@ export default function StockScreener({ onSelectSymbol }: Props) {
   });
 
   const signalColor = (sig: string) => {
-    if (sig.includes('超賣') || sig.includes('金叉') || sig.includes('多頭')) return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-    if (sig.includes('超買') || sig.includes('死叉') || sig.includes('空頭')) return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
-    return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    if (sig.includes('超賣') || sig.includes('金叉') || sig.includes('多頭')) return 'md3-signal-bull';
+    if (sig.includes('超買') || sig.includes('死叉') || sig.includes('空頭')) return 'md3-signal-bear';
+    return 'md3-signal-neutral';
   };
 
   const rsiColor = (rsi: number) => {
-    if (rsi > 70) return 'text-rose-400';
-    if (rsi < 30) return 'text-emerald-400';
-    return 'text-zinc-300';
+    if (rsi > 70) return 'text-price-up';
+    if (rsi < 30) return 'text-price-down';
+    return '';
   };
 
   return (
@@ -129,16 +129,17 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>
-          <h1 className={cn("font-black text-[var(--text-color)] tracking-tight", compact ? "text-xl" : "text-2xl")}>
-            <Target className="inline mr-2 text-emerald-400" size={compact ? 20 : 24} />
+          <h1 className={cn("font-black tracking-tight", compact ? "text-xl" : "text-2xl")} style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
+            <Target className="inline mr-2" size={compact ? 20 : 24} style={{ color: 'var(--md-primary)' }} />
             智慧選股器
           </h1>
-          <p className="text-xs text-zinc-500 mt-1">XQ-Style Technical Screener — 多條件批量掃描</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--md-outline)' }}>XQ-Style Technical Screener — 多條件批量揁描</p>
         </div>
         <button
           onClick={() => runScan()}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-black hover:bg-emerald-400 transition-all active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+          style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)' }}
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           {loading ? '掃描中...' : '開始掃描'}
@@ -154,8 +155,8 @@ export default function StockScreener({ onSelectSymbol }: Props) {
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-bold border transition-all active:scale-95",
               activeTemplate === t.id
-                ? 'bg-[var(--border-color)] border-[var(--border-color)] text-[var(--text-color)] shadow-lg'
-                : 'bg-[var(--bg-color)] border-[var(--border-color)] text-zinc-500 hover:bg-[var(--border-color)] hover:text-[var(--text-color)]'
+                ? { background: 'rgba(128,131,255,0.12)', borderColor: 'rgba(128,131,255,0.4)', color: 'var(--md-primary)' }
+                : { background: 'var(--md-surface-container)', borderColor: 'var(--md-outline-variant)', color: 'var(--md-outline)' }
             )}
             title={t.desc}
           >
@@ -168,7 +169,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       <div className="shrink-0">
         <button
           onClick={() => setShowFilters(v => !v)}
-          className="flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-[var(--text-color)] transition-colors"
+          className="flex items-center gap-2 text-xs font-bold transition-colors" style={{ color: 'var(--md-outline)' }}
         >
           <Filter size={13} />
           自訂篩選條件
@@ -182,68 +183,68 @@ export default function StockScreener({ onSelectSymbol }: Props) {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3 p-4 liquid-glass rounded-2xl border border-[var(--border-color)]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3 p-4 glass-card rounded-2xl">
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RSI 低於</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>RSI 低於</label>
                   <input
                     type="number" min={0} max={100} placeholder="30"
                     value={customFilters.rsiBelow ?? ''}
                     onChange={e => setCustomFilters(f => ({ ...f, rsiBelow: e.target.value ? Number(e.target.value) : undefined }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[var(--bg-color)] border border-[var(--border-color)] text-[var(--text-color)] text-base md:text-sm font-mono focus:outline-none focus:border-emerald-500/50"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl text-base md:text-sm font-mono focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RSI 高於</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>RSI 高於</label>
                   <input
                     type="number" min={0} max={100} placeholder="70"
                     value={customFilters.rsiAbove ?? ''}
                     onChange={e => setCustomFilters(f => ({ ...f, rsiAbove: e.target.value ? Number(e.target.value) : undefined }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[var(--bg-color)] border border-[var(--border-color)] text-[var(--text-color)] text-base md:text-sm font-mono focus:outline-none focus:border-emerald-500/50"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl text-base md:text-sm font-mono focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">量能倍數 ≥</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>量能倍數 ≥</label>
                   <input
                     type="number" min={1} step={0.5} placeholder="2"
                     value={customFilters.volumeSpikeMin ?? ''}
                     onChange={e => setCustomFilters(f => ({ ...f, volumeSpikeMin: e.target.value ? Number(e.target.value) : undefined }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[var(--bg-color)] border border-[var(--border-color)] text-[var(--text-color)] text-base md:text-sm font-mono focus:outline-none focus:border-emerald-500/50"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl text-base md:text-sm font-mono focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                   />
                 </div>
                 <div className="flex flex-col gap-2 justify-end">
-                  <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--md-outline)' }}>
                     <input type="checkbox" checked={!!customFilters.macdBullish}
                       onChange={e => setCustomFilters(f => ({ ...f, macdBullish: e.target.checked || undefined, macdBearish: undefined }))}
-                      className="accent-emerald-500" />
+                      className="accent-[var(--md-primary)]" />
                     MACD 多頭
                   </label>
-                  <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--md-outline)' }}>
                     <input type="checkbox" checked={!!customFilters.aboveSMA20}
                       onChange={e => setCustomFilters(f => ({ ...f, aboveSMA20: e.target.checked || undefined, belowSMA20: undefined }))}
-                      className="accent-emerald-500" />
+                      className="accent-[var(--md-primary)]" />
                     價格 &gt; SMA20
                   </label>
                 </div>
                 <div className="sm:col-span-2 lg:col-span-4">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">自訂代碼（逗號分隔，留空使用預設清單）</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>自訂代碼（逗號分隔，留空使用預設清單）</label>
                   <input
                     type="text"
                     value={customSymbols}
                     onChange={e => setCustomSymbols(e.target.value.toUpperCase())}
                     placeholder="AAPL, NVDA, 2330.TW, BTC-USD ..."
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[var(--bg-color)] border border-[var(--border-color)] text-[var(--text-color)] text-base md:text-sm font-mono focus:outline-none focus:border-emerald-500/50"
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl text-base md:text-sm font-mono focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                   />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-4 flex gap-2">
                   <button
                     onClick={() => { setActiveTemplate(null); runScan(); }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-black hover:bg-emerald-400 transition-all"
+                    className="px-4 py-2 rounded-xl text-xs font-bold transition-all" style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)' }}
                   >
                     執行自訂掃描
                   </button>
                   <button
                     onClick={() => { setCustomFilters({}); setActiveTemplate(null); }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--bg-color)] border border-[var(--border-color)] text-zinc-500 hover:bg-[var(--border-color)] transition-all"
+                    className="px-4 py-2 rounded-xl text-xs font-bold transition-all" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}
                   >
                     清除條件
                   </button>
@@ -256,15 +257,15 @@ export default function StockScreener({ onSelectSymbol }: Props) {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm rounded-xl p-3 shrink-0">
+        <div className="flex items-center gap-2 rounded-xl p-3 shrink-0 text-sm" style={{ background: 'rgba(255,77,79,0.08)', border: '1px solid rgba(255,77,79,0.3)', color: 'var(--color-up)' }}>
           <X size={13} />{error}
         </div>
       )}
 
       {/* Results Summary */}
       {results.length > 0 && (
-        <div className="text-xs text-zinc-500 shrink-0">
-          掃描 {scannedCount} 檔 → 符合條件 <span className="text-emerald-400 font-bold">{results.length}</span> 檔
+        <div className="text-xs shrink-0" style={{ color: 'var(--md-outline)' }}>
+          揁描 {scannedCount} 殔 → 符合條件 <span className="font-bold" style={{ color: 'var(--md-primary)' }}>{results.length}</span> 殔
         </div>
       )}
 
@@ -272,8 +273,8 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       {loading && (
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-            <span className="text-sm text-zinc-500">批量掃描技術指標中...</span>
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--md-primary)' }} />
+            <span className="text-sm" style={{ color: 'var(--md-outline)' }}>批量揁描技術指標中...</span>
           </div>
         </div>
       )}
@@ -282,9 +283,9 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       {!loading && results.length === 0 && !error && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Target className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">選擇篩選模板或自訂條件，開始掃描</p>
-            <p className="text-zinc-600 text-xs mt-1">預設掃描台股 + 美股 + 加密貨幣共 {DEFAULT_SYMBOLS.length} 檔</p>
+            <Target className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--md-outline-variant)' }} />
+            <p className="text-sm" style={{ color: 'var(--md-outline)' }}>選擇筛選模板或自訂條件，開始揁描</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--md-outline-variant)' }}>預設揁描台股 + 美股 + 加密貨幣共 {DEFAULT_SYMBOLS.length} 殔</p>
           </div>
         </div>
       )}
@@ -306,12 +307,12 @@ export default function StockScreener({ onSelectSymbol }: Props) {
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-[var(--text-color)] transition-colors select-none"
+                    className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest cursor-pointer transition-colors select-none" style={{ color: 'var(--md-outline)' }}
                   >
                     <span className="flex items-center gap-1">
                       {col.label}
                       {sortKey === col.key && (
-                        <ArrowUpDown size={10} className="text-emerald-400" />
+                        <ArrowUpDown size={10} style={{ color: 'var(--md-primary)' }} />
                       )}
                     </span>
                   </th>
@@ -333,25 +334,25 @@ export default function StockScreener({ onSelectSymbol }: Props) {
                 >
                   <td className="px-3 sm:px-4 py-3 min-w-[80px]">
                     <div className="font-black text-[var(--text-color)] text-xs sm:text-sm truncate">{r.symbol}</div>
-                    <div className="text-[10px] text-zinc-500 truncate max-w-[80px] sm:max-w-[120px]">{r.name}</div>
+                    <div className="text-[10px] truncate max-w-[80px] sm:max-w-[120px]" style={{ color: 'var(--md-outline)' }}>{r.name}</div>
                   </td>
                   <td className="px-3 sm:px-4 py-3 font-mono font-bold text-[var(--text-color)] text-xs sm:text-sm whitespace-nowrap">
                     {r.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </td>
-                  <td className={cn("px-3 sm:px-4 py-3 font-mono font-black text-xs sm:text-sm whitespace-nowrap", r.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                  <td className="px-3 sm:px-4 py-3 font-mono font-black text-xs sm:text-sm whitespace-nowrap" style={{ color: r.changePct >= 0 ? 'var(--color-up)' : 'var(--color-down)', fontFamily: 'var(--font-data)' }}>
                     {r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%
                   </td>
                   <td className={cn("px-3 sm:px-4 py-3 font-mono font-bold text-xs sm:text-sm", rsiColor(r.rsi))}>
                     {r.rsi.toFixed(1)}
                   </td>
                   <td className="px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm">
-                    <span className={cn("font-bold", r.volumeRatio >= 2 ? 'text-orange-400' : 'text-zinc-500')}>
+                    <span className="font-bold" style={{ color: r.volumeRatio >= 2 ? 'var(--md-tertiary)' : 'var(--md-outline)' }}>
                       {r.volumeRatio.toFixed(1)}x
                     </span>
                   </td>
                   <td className="px-3 sm:px-4 py-3 min-w-[120px]">
                     <div className="flex flex-wrap gap-1">
-                      {r.signals.length === 0 && <span className="text-[10px] text-zinc-600">—</span>}
+                      {r.signals.length === 0 && <span className="text-[10px]" style={{ color: 'var(--md-outline-variant)' }}>—</span>}
                       {r.signals.map(sig => (
                         <span
                           key={sig}
@@ -370,7 +371,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
             <div className="flex justify-center mt-3">
               <button
                 onClick={() => setVisibleCount(v => v + 50)}
-                className="px-4 py-2 text-xs rounded-lg bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10 transition-colors"
+                className="px-4 py-2 text-xs rounded-lg transition-colors" style={{ background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}
               >
                 載入更多 ({visibleCount}/{sorted.length})
               </button>
