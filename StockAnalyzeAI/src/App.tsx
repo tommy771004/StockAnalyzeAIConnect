@@ -597,17 +597,17 @@ export default function App() {
       <AuthProvider>
         <SettingsProvider>
           <NavigationProvider>
-            <MarketDataProvider>
-              <SubscriptionProvider>
-                <ToastProvider>
+            <ToastProvider>
+              <MarketDataProvider>
+                <SubscriptionProvider>
                   <NotificationProvider>
                     <AppErrorBoundary>
                       <MainApp />
                     </AppErrorBoundary>
                   </NotificationProvider>
-                </ToastProvider>
-              </SubscriptionProvider>
-            </MarketDataProvider>
+                </SubscriptionProvider>
+              </MarketDataProvider>
+            </ToastProvider>
           </NavigationProvider>
         </SettingsProvider>
       </AuthProvider>
