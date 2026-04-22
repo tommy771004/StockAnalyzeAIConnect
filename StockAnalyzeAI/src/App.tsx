@@ -78,10 +78,34 @@ const TOP_TABS:{id:TopTab;label:string}[] = [
 const QUICK_NAVS = NAV.filter(item => item.shortcut);
 const MOBILE_NAVS = NAV.filter(item => ['market', 'trading', 'backtest', 'portfolio', 'sentiment'].includes(item.id));
 
+/**
+ * AuthGate — blocks data-fetching providers from mounting until auth is confirmed.
+ * Shows a loading spinner while validating a stored token, or AuthPage when logged out.
+ */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center" style={{ background: 'var(--md-background, #0B0E14)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--md-primary, #34d399)', borderTopColor: 'transparent' }} />
+          <span className="text-sm font-medium" style={{ color: 'var(--md-on-surface-variant, #8B8FA8)' }}>驗證中…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return <AuthPage />;
+
+  return <>{children}</>;
+}
+
 function MainApp() {
   const { tickers, latency } = useMarketData();
   const { page, setPage, topTab, setTopTab } = useNavigation();
   const { settings, updateSetting } = useSettings();
+  const { user, logout } = useAuth();
   const set = (key: string, val: unknown) => updateSetting(key, val);
   const model = String(settings.defaultModel || MODELS[0].id);
   const setModel = (m: string) => set('defaultModel', m);
@@ -94,7 +118,8 @@ function MainApp() {
     }
     return window.innerWidth >= 768;
   });
-  const [notifOpen,  setNotifOpen]  = useState(false);
+  const [notifOpen,   setNotifOpen]  = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   
   // 🌟 修正：補上遺漏的搜尋框狀態變數
   const [searchOpen, setSearch]     = useState(false);
@@ -350,9 +375,86 @@ function MainApp() {
               <NotificationBell onClick={()=>setNotifOpen(v=>!v)} />
             </div>
 
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                 style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface-variant)' }}>
-              <User size={16} />
+            {/* ── Profile Button + Dropdown ─────────────────────────── */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen(v => !v)}
+                aria-label="個人檔案"
+                className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-all"
+                style={{ background: profileOpen ? 'var(--md-primary-container)' : 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: profileOpen ? 'var(--md-on-primary-container)' : 'var(--md-on-surface-variant)' }}>
+                <User size={16} />
+              </button>
+
+              {profileOpen && (
+                <>
+                  {/* Backdrop */}
+                  <div className="fixed inset-0 z-[199]" onClick={() => setProfileOpen(false)} />
+                  {/* Card */}
+                  <div
+                    className="absolute right-0 top-11 z-[200] w-72 rounded-2xl shadow-2xl overflow-hidden"
+                    style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)' }}>
+
+                    {/* Header */}
+                    <div className="px-5 py-4" style={{ background: 'var(--md-surface-container-highest)' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-lg font-black"
+                             style={{ background: 'var(--md-primary-container)', color: 'var(--md-on-primary-container)' }}>
+                          {(user?.name ?? user?.email ?? '?')[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold truncate" style={{ color: 'var(--md-on-surface)' }}>
+                            {user?.name ?? '未設定名稱'}
+                          </div>
+                          <div className="text-xs truncate" style={{ color: 'var(--md-outline)' }}>
+                            {user?.email}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-px" style={{ background: 'var(--md-outline-variant)' }}>
+                      <div className="flex flex-col items-center py-3" style={{ background: 'var(--md-surface-container-high)' }}>
+                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--md-outline)' }}>方案</span>
+                        <span className="mt-1 text-xs font-black px-2 py-0.5 rounded-full"
+                              style={{ background: user?.tier === 'pro' ? 'rgba(52,211,153,0.15)' : 'var(--md-surface-container)', color: user?.tier === 'pro' ? '#34d399' : 'var(--md-on-surface-variant)', border: `1px solid ${user?.tier === 'pro' ? 'rgba(52,211,153,0.3)' : 'var(--md-outline-variant)'}` }}>
+                          {(user?.tier ?? 'free').toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center py-3" style={{ background: 'var(--md-surface-container-high)' }}>
+                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--md-outline)' }}>狀態</span>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#52c41a' }} />
+                          <span className="text-xs font-bold" style={{ color: '#52c41a' }}>在線</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="p-2">
+                      <button
+                        onClick={() => { setProfileOpen(false); setPage('settings'); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left"
+                        style={{ color: 'var(--md-on-surface-variant)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,193,255,0.06)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <SettingsIcon size={15} style={{ color: 'var(--md-outline)' }} />
+                        設定
+                      </button>
+                      <div className="my-1 h-px" style={{ background: 'var(--md-outline-variant)' }} />
+                      <button
+                        onClick={() => { setProfileOpen(false); logout(); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left"
+                        style={{ color: '#f87171' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <span className="material-symbols-outlined text-[15px]">logout</span>
+                        登出
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -595,21 +697,23 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <SettingsProvider>
+        <ToastProvider>
           <NavigationProvider>
-            <ToastProvider>
-              <MarketDataProvider>
-                <SubscriptionProvider>
-                  <NotificationProvider>
-                    <AppErrorBoundary>
-                      <MainApp />
-                    </AppErrorBoundary>
-                  </NotificationProvider>
-                </SubscriptionProvider>
-              </MarketDataProvider>
-            </ToastProvider>
+            <AuthGate>
+              <SettingsProvider>
+                <MarketDataProvider>
+                  <SubscriptionProvider>
+                    <NotificationProvider>
+                      <AppErrorBoundary>
+                        <MainApp />
+                      </AppErrorBoundary>
+                    </NotificationProvider>
+                  </SubscriptionProvider>
+                </MarketDataProvider>
+              </SettingsProvider>
+            </AuthGate>
           </NavigationProvider>
-        </SettingsProvider>
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
