@@ -1,11 +1,5 @@
 /**
  * App.tsx — central nav + prop wiring
- *
- * Fixes vs previous:
- * - Portfolio receives onGoBacktest and onGoJournal callbacks
- * - TradingCore receives onGoBacktest callback
- * - All keyboard shortcuts intact
- * - FIXED: Added missing searchOpen and searchQ state variables
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -252,7 +246,6 @@ function MainApp() {
          </div>
       )}
       
-
 
       {/* ── Top Nav ── */}
       {!isLandscape && (
@@ -579,95 +572,45 @@ function MainApp() {
                 <button
                   onClick={()=>{goTrading(searchQ.trim());setSearch(false);setSearchQ('');}}
                   className="w-full flex items-center gap-3 px-2 py-2 rounded-xl transition-colors"
-                  style={{ background: 'rgba(128,131,255,0.08)', border: '1px solid rgba(128,131,255,0.2)' }}>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                       style={{ background: 'rgba(128,131,255,0.15)' }}>
-                    <Zap size={13} style={{ color: 'var(--md-primary)' }} />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold" style={{ color: 'var(--md-on-surface)' }}>查看 {searchQ}</div>
-                    <div className="text-xs" style={{ color: 'var(--md-outline)' }}>開啟 TradingCore 分析此代碼</div>
-                  </div>
-                  <kbd className="ml-auto text-[10px] rounded px-1.5 py-0.5 font-mono"
-                       style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>Enter</kbd>
+                  style={{ background: 'rgba(128,131,255,0.08)', border: '1px solid rgba(128,131,255,0.2)', color: 'var(--md-primary)' }}>
+                  <span className="text-sm font-bold truncate">搜尋與前往: {searchQ.trim()}</span>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(128,131,255,0.2)' }}>Enter ↵</span>
                 </button>
               </div>
             )}
           </div>
         </div>
-      {/* ── Notification Center ── */}
-      <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
-
-      {/* ── Footer (Desktop Only) ── */}
-      <footer className="hidden md:flex h-8 items-center justify-between px-6 border-t shrink-0 z-40"
-              style={{ background: 'rgba(7,13,31,0.8)', backdropFilter: 'blur(12px)', borderColor: 'var(--md-outline-variant)' }}
-              role="contentinfo">
-        <div className="flex items-center gap-4 text-[10px] font-bold tracking-widest uppercase">
-          <div className="flex items-center gap-2">
-            <span style={{ color: 'var(--md-outline-variant)' }}>LATENCY</span>
-            <span className="font-mono" style={{ color: 'var(--md-primary)' }}>{latency}MS</span>
-          </div>
-          <div className="w-px h-3" style={{ background: 'var(--md-outline-variant)' }} />
-          <div className="flex items-center gap-1.5" style={{ color: '#52c41a' }}>
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: '#52c41a' }} />
-            SYSTEM ONLINE
-          </div>
-        </div>
-        <div className="flex items-center gap-6">
-          {tickers.map(t=>{
-            const up=t.pct>=0;
-            return (
-              <button key={t.symbol} onClick={()=>goTrading(t.symbol)}
-                className="flex items-center gap-2 text-[10px] font-mono transition-opacity hover:opacity-80">
-                <span style={{ color: 'var(--md-outline)' }}>{t.symbol.replace('-USD','').replace('^','')}</span>
-                <span className="font-black" style={{ color: up ? 'var(--color-up)' : 'var(--color-down)' }}>{up?'+':''}{(t.pct||0).toFixed(1)}%</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="text-[10px] font-bold tracking-[0.2em] uppercase" style={{ color: 'var(--md-outline-variant)' }}>© 2026 HERMES AI</div>
-      </footer>
+      )}
     </div>
   );
 }
 
+// 建立 React Query 用戶端
 const queryClient = new QueryClient();
 
-function AuthGate() {
-  const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="w-screen h-screen flex items-center justify-center text-sm"
-         style={{ background: 'var(--md-background)', color: 'var(--md-outline)' }}>
-      載入中...
-    </div>
-  );
-  if (!user) return <AuthPage />;
-  return (
-    <SettingsProvider>
-      <MarketDataProvider>
-        <MainApp/>
-        <PricingModal />
-      </MarketDataProvider>
-    </SettingsProvider>
-  );
-}
-
+/**
+ * 最終匯出的 App 組件，封裝所有全域狀態 Provider
+ */
 export default function App() {
   return (
-    <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <SubscriptionProvider>
-            <ToastProvider>
-              <NotificationProvider>
-                <NavigationProvider>
-                  <AuthGate />
-                </NavigationProvider>
-              </NotificationProvider>
-            </ToastProvider>
-          </SubscriptionProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </AppErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <SettingsProvider>
+          <NavigationProvider>
+            <MarketDataProvider>
+              <SubscriptionProvider>
+                <ToastProvider>
+                  <NotificationProvider>
+                    <AppErrorBoundary>
+                      <MainApp />
+                    </AppErrorBoundary>
+                  </NotificationProvider>
+                </ToastProvider>
+              </SubscriptionProvider>
+            </MarketDataProvider>
+          </NavigationProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
