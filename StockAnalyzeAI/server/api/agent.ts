@@ -123,7 +123,7 @@ async function buildSystemPrompt(
   const watchlist = await watchlistRepo.getWatchlistByUser(userId).catch(() => []);
 
   // 3. 讀取最近 10 筆交易記錄
-  const trades = await tradesRepo.getTradesByUser(userId, { limit: 10 }).catch(() => []);
+  const trades = await tradesRepo.getTradesByUser(userId).catch(() => []);
 
   // 4. 技術指標 & 情緒（若有 marketSnap）
   let marketContext = '';
@@ -262,7 +262,7 @@ agentRouter.get('/memories', async (req: AuthRequest, res) => {
 
 agentRouter.delete('/memories/:id', async (req: AuthRequest, res) => {
   const userId = req.userId;
-  const id     = parseInt(req.params.id, 10);
+  const id     = parseInt(req.params['id'] as string, 10);
   if (!userId) { res.status(401).json({ error: '未授權' }); return; }
   if (isNaN(id)) { res.status(400).json({ error: '無效 id' }); return; }
   try {
