@@ -286,6 +286,11 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
 
       const wlSymbols = enrichedStocks.map(s => s.symbol);
 
+      // Fetch live quotes for watchlist symbols in parallel with bars
+      const liveQuotesPromise = wlSymbols.length > 0
+        ? api.getBatchQuotes(wlSymbols).catch(() => [] as Quote[])
+        : Promise.resolve([] as Quote[]);
+
       const fetchBarsConcurrently = async (symbols: string[], days: number, concurrency = 2) => {
         const results = new Map<string, number[]>();
         for (let i = 0; i < symbols.length; i += concurrency) {
@@ -298,11 +303,34 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
         return results;
       };
 
-      const barsMap = await fetchBarsConcurrently(wlSymbols, 7);
+      const [barsMap, liveQuotesResult] = await Promise.all([
+        fetchBarsConcurrently(wlSymbols, 7),
+        liveQuotesPromise,
+      ]);
+
+      // Build a price map from live quotes
+      const liveQuoteMap = new Map<string, Quote>(
+        (Array.isArray(liveQuotesResult) ? liveQuotesResult.filter(Boolean) : []).map((q: Quote) => [q.symbol, q])
+      );
 
       const stocksWithBars = enrichedStocks.map(s => {
         const bars = barsMap.get(s.symbol);
-        return bars && bars.length ? { ...s, bars } : s;
+        const q = liveQuoteMap.get(s.symbol);
+        return {
+          ...s,
+          price:     q?.regularMarketPrice           ?? s.price,
+          change:    q?.regularMarketChange          ?? s.change,
+          changePct: q?.regularMarketChangePercent   ?? s.changePct,
+          volume:    q?.regularMarketVolume          ?? s.volume,
+          open:      q?.regularMarketOpen            ?? s.open,
+          high:      q?.regularMarketDayHigh         ?? s.high,
+          low:       q?.regularMarketDayLow          ?? s.low,
+          bid:       q?.bid                          ?? q?.regularMarketPrice ?? s.bid,
+          ask:       q?.ask                          ?? q?.regularMarketPrice ?? s.ask,
+          name:      q?.shortName ?? q?.longName     ?? s.name,
+          shortName: q?.shortName                    ?? s.shortName,
+          ...(bars && bars.length ? { bars } : {}),
+        };
       });
       setStocks(stocksWithBars);
       setSelected(prev => stocksWithBars.find(e => e.symbol === prev?.symbol) ?? stocksWithBars[0] ?? null);
