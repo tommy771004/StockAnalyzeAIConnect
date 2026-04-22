@@ -401,6 +401,17 @@ app.use(express.json());
     });
   });
 
+  app.get('/api/stats', (_req, res) => {
+    const mem = process.memoryUsage();
+    res.json({
+      uptime: Math.floor(process.uptime()),
+      memoryMB: Math.round(mem.rss / 1024 / 1024),
+      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+      db: dbAvailable,
+      node: process.version,
+    });
+  });
+
   // ── Auth ────────────────────────────────────────────────────────────────────
   app.post('/api/auth/register', async (req, res) => {
     const { email, password, name } = req.body ?? {};
@@ -450,6 +461,39 @@ app.use(express.json());
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  app.get('/api/stock/:symbol/mtf', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const sym = req.params.symbol as string;
+      const period1Param = req.query.period1 as string | undefined;
+      const p1 = period1Param ? new Date(period1Param).toISOString() : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+      const computeTrend = (closes: number[]): 'bullish' | 'bearish' | 'neutral' => {
+        if (closes.length < 22) return 'neutral';
+        const k8 = 2 / (8 + 1), k21 = 2 / (21 + 1);
+        let ema8 = closes[0], ema21 = closes[0];
+        for (const c of closes) {
+          ema8  = c * k8  + ema8  * (1 - k8);
+          ema21 = c * k21 + ema21 * (1 - k21);
+        }
+        if (ema8 > ema21 * 1.005) return 'bullish';
+        if (ema8 < ema21 * 0.995) return 'bearish';
+        return 'neutral';
+      };
+
+      const [daily, weekly, monthly] = await Promise.all([
+        NativeYahooApi.chart(sym, { interval: '1d',  period1: p1 }),
+        NativeYahooApi.chart(sym, { interval: '1wk', period1: p1 }),
+        NativeYahooApi.chart(sym, { interval: '1mo', period1: new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString() }),
+      ]);
+
+      res.json({
+        '1d':  computeTrend(daily.quotes.map(q => q.close)),
+        '1wk': computeTrend(weekly.quotes.map(q => q.close)),
+        '1mo': computeTrend(monthly.quotes.map(q => q.close)),
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
     try {
       const syms = (req.query.symbols as string)?.split(',') || [];
@@ -482,6 +526,25 @@ app.use(express.json());
   app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
     try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/twse/stock/:stockNo', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const stockNo = req.params.stockNo as string;
+      const quote = await TWSE.realtimeQuote(stockNo);
+      if (!quote) { res.status(404).json({ error: 'TWSE quote not available' }); return; }
+      res.json({
+        Symbol: quote.symbol,
+        Name:   quote.name,
+        Price:  quote.price,
+        Change: quote.change,
+        ChangePercent: quote.changePercent,
+        Volume: quote.volume,
+        z: quote.price,
+        n: quote.name,
+        s: quote.symbol,
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
@@ -594,7 +657,7 @@ app.use(express.json());
           return null;
         } catch { return null; }
       }));
-      res.json(results.filter(r => r !== null));
+      res.json({ results: results.filter(r => r !== null) });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
