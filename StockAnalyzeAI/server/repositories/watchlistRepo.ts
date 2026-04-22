@@ -9,16 +9,17 @@ export async function getWatchlistByUser(userId: string): Promise<WatchlistItem[
   return db.select().from(watchlistItems).where(eq(watchlistItems.userId, userId));
 }
 
-/** Replace the whole watchlist for a user (bulk upsert via delete + insert). */
+/** Replace the whole watchlist for a user (bulk upsert via delete + insert).
+ *  NOTE: drizzle-orm/neon-http uses the HTTP protocol which does NOT support
+ *  real PostgreSQL transactions. We execute DELETE then INSERT sequentially;
+ *  the unique index prevents duplicates and the operation is idempotent. */
 export async function replaceWatchlist(userId: string, items: Array<{ symbol: string; name?: string; addedAt?: number }>): Promise<WatchlistItem[]> {
-  return db.transaction(async (tx) => {
-    await tx.delete(watchlistItems).where(eq(watchlistItems.userId, userId));
-    if (items.length === 0) return [];
-    return tx
-      .insert(watchlistItems)
-      .values(items.map((i) => ({ userId, symbol: i.symbol, name: i.name ?? null, addedAt: i.addedAt ?? Date.now() })))
-      .returning();
-  });
+  await db.delete(watchlistItems).where(eq(watchlistItems.userId, userId));
+  if (items.length === 0) return [];
+  return db
+    .insert(watchlistItems)
+    .values(items.map((i) => ({ userId, symbol: i.symbol, name: i.name ?? null, addedAt: i.addedAt ?? Date.now() })))
+    .returning();
 }
 
 export async function addWatchlistItem(data: NewWatchlistItem): Promise<WatchlistItem> {
