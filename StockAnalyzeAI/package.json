@@ -29,9 +29,10 @@
     "validate": "npm run type-check && npm run lint && npm run format:check && npm run test -- --run",
     "e:compile": "node scripts/build-electron.mjs",
     "e:dev": "concurrently \"tsx server.ts\" \"wait-on tcp:3000 && electron .\"",
-    "pack:win": "npm run build && npm run e:compile && electron-builder --win --x64",
-    "pack:mac": "npm run build && npm run e:compile && electron-builder --mac",
-    "pack:linux": "npm run build && npm run e:compile && electron-builder --linux"
+    "build:electron": "tsc && vite build --mode electron",
+    "pack:win": "npm run build:electron && npm run e:compile && electron-builder --win --x64",
+    "pack:mac": "npm run build:electron && npm run e:compile && electron-builder --mac",
+    "pack:linux": "npm run build:electron && npm run e:compile && electron-builder --linux"
   },
   "dependencies": {
     "@google/genai": "^1.46.0",
