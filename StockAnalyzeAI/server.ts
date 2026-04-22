@@ -465,8 +465,14 @@ app.use(express.json());
   });
 
   app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.quoteSummary(req.params.symbol as string, ['calendarEvents']); res.json(data.calendarEvents || {}); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const data = await NativeYahooApi.quoteSummary(req.params.symbol as string, ['calendarEvents']);
+      res.json(data.calendarEvents || {});
+    } catch (e: any) {
+      // Calendar data is non-critical; many non-US symbols lack this module
+      console.warn(`[Calendar] ${req.params.symbol}: ${e.message}`);
+      res.json({});
+    }
   });
 
   app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
@@ -486,6 +492,23 @@ app.use(express.json());
       const list: Array<{ symbol: string; name?: string; addedAt?: number }> = req.body;
       await watchlistRepo.replaceWatchlist(req.userId!, list);
       res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Single-item add/upsert — avoids full-replace race conditions
+  app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { symbol, name } = req.body ?? {};
+      if (!symbol || typeof symbol !== 'string') {
+        res.status(400).json({ error: 'symbol is required' }); return;
+      }
+      const item = await watchlistRepo.addWatchlistItem({
+        userId: req.userId!,
+        symbol: symbol.toUpperCase(),
+        name: name ?? null,
+        addedAt: Date.now(),
+      });
+      res.status(201).json({ symbol: item.symbol, name: item.name, addedAt: item.addedAt });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
