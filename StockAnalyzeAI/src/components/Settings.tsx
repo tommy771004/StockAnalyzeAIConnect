@@ -16,7 +16,8 @@ import { cn } from '../lib/utils';
 import { getSetting, setSetting, getDbStats } from '../services/api';
 import { motion } from 'motion/react';
 import { useSettings } from '../contexts/SettingsContext';
-import { MODELS } from '../constants';
+import { useSubscription, SubscriptionTier } from '../contexts/SubscriptionContext';
+import { MODELS, FREE_MODEL } from '../constants';
 import Decimal from 'decimal.js';
 
 const DEFAULT_SETTINGS = {
@@ -81,6 +82,8 @@ interface DbStats {
 export default function Settings() {
   const [settings, setSettings] = useState<S>({ ...DEFAULT_SETTINGS });
   const { updateSetting } = useSettings();
+  const { tier } = useSubscription();
+  const isFree = tier === SubscriptionTier.FREE;
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [active, setActive] = useState('api');
@@ -396,12 +399,23 @@ export default function Settings() {
                 </select>
               </Row>
               <Row label="預設 AI 模型" hint="AI 分析預設使用的模型">
-                <select value={String(settings.defaultModel || MODELS[0].id)} onChange={e => set('defaultModel', e.target.value)}
-                  className="rounded-xl px-3 py-2 text-sm focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
-                  {MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
+                {isFree ? (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+                      <span>免費模型：{FREE_MODEL}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,183,131,0.15)', color: 'var(--md-tertiary)', border: '1px solid rgba(255,183,131,0.3)' }}>FREE</span>
+                    </div>
+                    <p className="text-[11px]" style={{ color: 'var(--md-outline)' }}>升級為 Pro 或 Basic 方可自行選擇模型</p>
+                  </div>
+                ) : (
+                  <select value={String(settings.defaultModel || MODELS[0].id)} onChange={e => set('defaultModel', e.target.value)}
+                    className="rounded-xl px-3 py-2 text-sm focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}>
+                    {MODELS.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                )}
               </Row>
               <Row label="AI 系統指令" hint="客製 AI 分析的風格與行為">
                 <textarea value={String(settings.systemInstruction || '')} onChange={e => set('systemInstruction', e.target.value)}
