@@ -706,7 +706,7 @@ app.use(express.json());
   // Yahoo 為主要資料源（價格、歷史），TradingView 為補強（指標、想法、社群）。
   // 任一來源失敗不阻斷另一來源。
   app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    const input = req.params.symbol;
+    const input = req.params.symbol as string;
     const canonical = parseSymbol(input);
     const yahooSymbol = toYahoo(canonical);
 
