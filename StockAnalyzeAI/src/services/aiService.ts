@@ -49,12 +49,66 @@ async function callOllama(prompt: string, model: string, jsonMode: boolean = tru
 }
 
 // ── OpenRouter call ───────────────────────────────────────────────────────────
-const OPENROUTER_API_URL  = 'https://openrouter.ai/api/v1/chat/completions';
-const OPENROUTER_FALLBACK = 'mistralai/mistral-7b-instruct:free';
+const OPENROUTER_API_URL    = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+/** Emergency hardcoded fallback used only when models-list API also fails. */
+const OPENROUTER_FALLBACK   = 'meta-llama/llama-3.3-70b-instruct:free';
 
-async function callOpenRouter(prompt: string, model: string, jsonMode: boolean = true): Promise<string> {
+// ── Free-model list cache (30 min TTL, module-level) ─────────────────────────
+const _freeModelsCache: { list: string[]; ts: number } = { list: [], ts: 0 };
+const FREE_MODELS_TTL = 30 * 60 * 1000;
+
+/**
+ * Fetches all currently-available :free models from OpenRouter's models API.
+ * Results are cached for 30 minutes. Falls back to [OPENROUTER_FALLBACK] on error.
+ */
+async function getOpenRouterFreeModels(apiKey: string): Promise<string[]> {
+  if (_freeModelsCache.list.length > 0 && Date.now() - _freeModelsCache.ts < FREE_MODELS_TTL) {
+    return _freeModelsCache.list;
+  }
+  try {
+    const res = await fetch(OPENROUTER_MODELS_URL, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer':  'https://hermes-ai.trading',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`models API ${res.status}`);
+    const json = await res.json();
+    // A model is "free" when both prompt and completion pricing equal "0"
+    const list: string[] = (json?.data ?? [])
+      .filter((m: { id: string; pricing?: { prompt: string; completion: string } }) =>
+        m.pricing?.prompt === '0' && m.pricing?.completion === '0'
+      )
+      .map((m: { id: string }) => m.id)
+      .filter(Boolean);
+    if (list.length > 0) {
+      _freeModelsCache.list = list;
+      _freeModelsCache.ts   = Date.now();
+      console.log(`[aiService] 取得 ${list.length} 個可用免費模型`);
+    }
+    return list.length > 0 ? list : [OPENROUTER_FALLBACK];
+  } catch (e) {
+    console.warn('[aiService] 無法取得免費模型清單，使用預設備援:', e);
+    return [OPENROUTER_FALLBACK];
+  }
+}
+
+/**
+ * Calls OpenRouter with automatic free-model rotation on 429/503/404.
+ * `_tried` tracks models already attempted in this request to avoid loops.
+ */
+async function callOpenRouter(
+  prompt: string,
+  model: string,
+  jsonMode: boolean = true,
+  _tried: Set<string> = new Set(),
+): Promise<string> {
   const apiKey = await getOpenRouterKey();
   if (!apiKey) throw Object.assign(new Error('MISSING_API_KEY'), { code: 'MISSING_API_KEY' });
+
+  _tried.add(model);
 
   const res = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
@@ -78,9 +132,22 @@ async function callOpenRouter(prompt: string, model: string, jsonMode: boolean =
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     const st = res.status;
-    if ((st === 429 || st === 503) && model !== OPENROUTER_FALLBACK) {
-      console.warn(`[aiService] ${model} 不可用 (${st})，切換至備援模型`);
-      return callOpenRouter(prompt, OPENROUTER_FALLBACK, jsonMode);
+    // On rate-limit / overload / removed-endpoint, rotate to next free model
+    if (st === 429 || st === 503 || st === 404) {
+      // Invalidate cache on 404 so stale model list is refreshed
+      if (st === 404) _freeModelsCache.ts = 0;
+
+      const freeModels = await getOpenRouterFreeModels(apiKey);
+      const next = freeModels.find(m => !_tried.has(m));
+      if (next) {
+        console.warn(`[aiService] ${model} 限流/不可用 (${st})，自動切換至 ${next}`);
+        return callOpenRouter(prompt, next, jsonMode, _tried);
+      }
+      // All known free models exhausted in this request
+      throw Object.assign(
+        new Error('所有免費模型均已達限流或不可用，請稍後再試'),
+        { status: 429 },
+      );
     }
     throw Object.assign(new Error(`OpenRouter ${st}: ${body.slice(0, 200)}`), { status: st });
   }

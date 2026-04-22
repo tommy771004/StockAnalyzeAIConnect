@@ -49,7 +49,14 @@ async function fetchTWSE(codes: string[]): Promise<TWSeQuote[]> {
   const url = `${TWSE_REALTIME_URL}?ex_ch=${encodeURIComponent(queryStr)}&json=1&delay=0`;
 
   const res = await fetch(url, {
-    headers: { 'User-Agent': UA, 'Referer': 'https://mis.twse.com.tw/' },
+    headers: {
+      'User-Agent':      UA,
+      'Referer':         'https://mis.twse.com.tw/',
+      'Accept':          'application/json, text/javascript, */*; q=0.01',
+      'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Origin':          'https://mis.twse.com.tw',
+    },
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`TWSE HTTP ${res.status}`);
