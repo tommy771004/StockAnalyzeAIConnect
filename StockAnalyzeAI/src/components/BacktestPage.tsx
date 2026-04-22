@@ -90,8 +90,8 @@ const DEFAULT_SYMBOLS = ['AAPL','TSLA','NVDA','MSFT','BTC-USD','ETH-USD','2330.T
 const EquityTip = ({active,payload,label,color}: { active?: boolean; payload?: { dataKey: string; value: number }[]; label?: string; color?: string }) => {
   if (!active||!payload?.length) return null;
   return (
-    <div className="bg-[var(--card-bg)] border border-white/15 rounded-xl p-3 text-sm font-mono shadow-xl min-w-[160px]">
-      <div className="text-slate-400 mb-2 text-xs">{label}</div>
+    <div className="rounded-xl p-3 text-sm shadow-xl min-w-[160px]" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', fontFamily: 'var(--font-data)' }}>
+      <div className="mb-2 text-xs" style={{ color: 'var(--md-outline)' }}>{label}</div>
       {payload.map((p) => (
         <div key={p.dataKey} className="flex justify-between gap-4" style={{color:p.dataKey==='portfolio'?color:'#94a3b8'}}>
           <span>{p.dataKey==='portfolio'?'策略':'買進持有'}</span>
@@ -104,9 +104,9 @@ const EquityTip = ({active,payload,label,color}: { active?: boolean; payload?: {
 const DdTip = ({active,payload,label}: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
   if (!active||!payload?.length) return null;
   return (
-    <div className="bg-[var(--card-bg)] border border-white/15 rounded-xl p-2.5 text-xs font-mono shadow-xl">
-      <div className="text-slate-400 mb-1">{label}</div>
-      <div className="text-rose-400">最大回撤: -{Number(payload[0]?.value||0).toFixed(2)}%</div>
+    <div className="rounded-xl p-2.5 text-xs shadow-xl" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', fontFamily: 'var(--font-data)' }}>
+      <div className="mb-1" style={{ color: 'var(--md-outline)' }}>{label}</div>
+      <div style={{ color: 'var(--color-up)' }}>最大回撤: -{Number(payload[0]?.value||0).toFixed(2)}%</div>
     </div>
   );
 };
@@ -237,18 +237,17 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
 
       {/* ── Header: Title & Controls ── */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6 liquid-glass-strong rounded-2xl md:rounded-[2.5rem] p-4 md:p-6 lg:p-8 border border-zinc-800 shadow-2xl shrink-0 relative z-10 overflow-hidden bg-zinc-950/50">
-        {/* Subtle highlight effect */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
+      <div className="glass-card flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6 rounded-2xl md:rounded-[2.5rem] p-4 md:p-6 lg:p-8 shadow-2xl shrink-0 relative z-10 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-primary-container)] to-transparent opacity-40" />
 
         <div className="flex items-center gap-3 md:gap-5">
-          <div className="w-10 h-10 md:w-14 md:h-14 bg-emerald-500 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0">
-            <Play size={20} className="text-zinc-950 fill-current md:hidden" />
-            <Play size={28} className="text-zinc-950 fill-current hidden md:block" />
+          <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'var(--md-primary-container)' }}>
+            <Play size={20} className="fill-current md:hidden" style={{ color: 'var(--md-on-primary)' }} />
+            <Play size={28} className="fill-current hidden md:block" style={{ color: 'var(--md-on-primary)' }} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl md:text-3xl font-black text-zinc-100 tracking-tighter">回測引擎 <span className="text-emerald-400 text-[10px] md:text-sm font-bold ml-1 bg-emerald-400/10 px-1.5 md:px-2 py-0.5 rounded-lg border border-emerald-400/20">V4.2</span></h1>
-            <p className="label-meta font-black text-zinc-500 uppercase tracking-[0.2em] md:tracking-[0.3em] mt-0.5 md:mt-1 opacity-70 truncate">Quantum Backtesting Lab</p>
+            <h1 className="text-xl md:text-3xl font-black tracking-tighter" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>回測引擎 <span className="text-[10px] md:text-sm font-bold ml-1 px-1.5 md:px-2 py-0.5 rounded-lg" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.2)' }}>V4.2</span></h1>
+            <p className="label-meta font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-0.5 md:mt-1 truncate" style={{ color: 'var(--md-outline)' }}>Quantum Backtesting Lab</p>
           </div>
         </div>
 
@@ -259,7 +258,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
               value={symbol}
               onChange={e => setSymbol(e.target.value.toUpperCase())}
               placeholder="代碼 (AAPL, 2330.TW)"
-              className="relative w-full bg-zinc-950 border border-zinc-800 rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-700"
+              className="relative w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none transition-all" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
+              {...{} as object}
             />
             <datalist id="bt-symbols">{symbolsList.map(s=><option key={s} value={s}/>)}</datalist>
           </div>
@@ -268,18 +268,18 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             <select
               value={strategy}
               onChange={e => setStrategy(e.target.value as StratId)}
-              className="relative w-full bg-zinc-950 border border-zinc-800 rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all appearance-none cursor-pointer"
+              className="relative w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none transition-all appearance-none cursor-pointer" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
             >
-              {STRATEGIES.map(s => <option key={s.id} value={s.id} className="bg-zinc-950">{s.label}</option>)}
+              {STRATEGIES.map(s => <option key={s.id} value={s.id} style={{ background: 'var(--md-surface-container)' }}>{s.label}</option>)}
             </select>
-            <ChevronDown size={14} className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--md-outline)' }} />
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 w-full lg:w-auto">
             <button
               onClick={handleCompare}
               disabled={comparing || running}
-              className="flex-1 lg:flex-none px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 press-feedback transition-all flex items-center justify-center gap-2"
+              className="flex-1 lg:flex-none px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest press-feedback transition-all flex items-center justify-center gap-2" style={{ background: 'rgba(128,131,255,0.1)', border: '1px solid rgba(128,131,255,0.3)', color: 'var(--md-primary)' }}
             >
               {comparing ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
               比較績效
@@ -287,7 +287,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             {result && (
               <button
                 onClick={() => buildBacktestPdf(symbol, strat.label, metrics, result.trades ?? [])}
-                className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface-variant)' }}
               >
                 <Download size={16} /> 匯出 PDF
               </button>
@@ -298,9 +298,10 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
               className={cn(
                 "flex-1 lg:flex-none px-6 md:px-10 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-2xl press-feedback",
                 running
-                  ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                  : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-emerald-500/30"
+                  ? "cursor-not-allowed opacity-50"
+                  : "shadow-lg"
               )}
+              style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)' }}
             >
               {running ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} className="fill-current" />}
               {running ? '執行中' : '開始回測'}
@@ -311,68 +312,68 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 shrink-0 relative z-10">
         {/* Settings Card */}
-        <div className="md:col-span-2 xl:col-span-1 liquid-glass rounded-2xl md:rounded-[2rem] p-4 md:p-6 lg:p-8 border border-zinc-800 space-y-6 md:space-y-8 shadow-xl bg-zinc-900/50">
+        <div className="md:col-span-2 xl:col-span-1 glass-card rounded-2xl md:rounded-[2rem] p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8 shadow-xl">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 border border-zinc-700">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
               <Settings size={18} />
             </div>
-            <h3 className="text-xs md:text-sm font-black text-zinc-100 uppercase tracking-[0.15em] md:tracking-[0.2em]">回測設定</h3>
+            <h3 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.2em]" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>回測設定</h3>
           </div>
 
           <div className="space-y-4 md:space-y-6">
             <div className="space-y-2 md:space-y-3">
-              <label className="label-meta font-black text-zinc-500 uppercase tracking-widest ml-1 opacity-80">初始資金 (USD)</label>
+              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>初始資金 (USD)</label>
               <div className="relative group">
                 <input
                   type="text"
                   value={capital}
                   onChange={e => setCapital(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all font-mono"
+                  className="w-full rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none transition-all" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}
                 />
-                <div className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-600 font-black text-xs">$</div>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-xs" style={{ color: 'var(--md-outline)' }}>$</div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
               <div className="space-y-3">
-                <label className="label-meta font-black text-zinc-500 uppercase tracking-widest ml-1 opacity-80">開始日期</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>開始日期</label>
                 <input
                   type="date"
                   value={period1}
                   onChange={e => setPeriod1(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-base md:text-xs font-bold text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  className="w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-base md:text-xs font-bold focus:outline-none transition-all" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                 />
               </div>
               <div className="space-y-2 md:space-y-3">
-                <label className="label-meta font-black text-zinc-500 uppercase tracking-widest ml-1 opacity-80">結束日期</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>結束日期</label>
                 <input
                   type="date"
                   value={period2}
                   onChange={e => setPeriod2(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-base md:text-xs font-bold text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  className="w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-base md:text-xs font-bold focus:outline-none transition-all" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
                 />
               </div>
             </div>
           </div>
 
           {/* Strategy Parameters Panel */}
-          <div className="pt-6 border-t border-zinc-800 space-y-4">
-            <label className="label-meta font-black text-zinc-500 uppercase tracking-widest ml-1 opacity-80">策略參數</label>
+          <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
+            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>策略參數</label>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="label-meta text-zinc-400">參數 A</label>
-                <input type="number" defaultValue={10} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100" />
+                <label className="label-meta" style={{ color: 'var(--md-outline)' }}>參數 A</label>
+                <input type="number" defaultValue={10} className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }} />
               </div>
               <div className="space-y-2">
-                <label className="label-meta text-zinc-400">參數 B</label>
-                <input type="number" defaultValue={30} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100" />
+                <label className="label-meta" style={{ color: 'var(--md-outline)' }}>參數 B</label>
+                <input type="number" defaultValue={30} className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }} />
               </div>
             </div>
           </div>
         </div>
 
         {/* Strategy explanation box */}
-        <div className="md:col-span-2 xl:col-span-3 liquid-glass rounded-[2rem] p-6 lg:p-8 border border-zinc-800 transition-all relative overflow-hidden shadow-xl bg-zinc-900/50" style={{borderColor: strat.color + '30'}}>
+        <div className="glass-card md:col-span-2 xl:col-span-3 rounded-[2rem] p-6 lg:p-8 transition-all relative overflow-hidden shadow-xl" style={{ borderColor: strat.color + '40' }}>
           
           <div className="flex flex-col h-full relative z-10">
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
@@ -382,42 +383,42 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                 </div>
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <h2 className="text-2xl font-black text-zinc-100 tracking-tight">{strat.label}</h2>
-                    <span className="label-meta px-3 py-1 rounded-full font-black uppercase tracking-widest bg-zinc-950 border border-zinc-800" style={{color: strat.color}}>{strat.type}</span>
+                    <h2 className="text-2xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{strat.label}</h2>
+                    <span className="label-meta px-3 py-1 rounded-full font-black uppercase tracking-widest" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: strat.color }}>{strat.type}</span>
                   </div>
-                  <p className="text-sm text-zinc-400 font-medium max-w-2xl leading-relaxed">{strat.desc}</p>
+                  <p className="text-sm font-medium max-w-2xl leading-relaxed" style={{ color: 'var(--md-outline)' }}>{strat.desc}</p>
                 </div>
               </div>
               
               <div className="hidden md:flex flex-col items-end text-right">
-                <span className="label-meta font-black text-zinc-500 uppercase tracking-widest mb-1">Strategy ID</span>
-                <span className="text-xs font-mono font-bold text-zinc-400">{strat.en}</span>
+                <span className="label-meta font-black uppercase tracking-widest mb-1" style={{ color: 'var(--md-outline)' }}>Strategy ID</span>
+                <span className="text-xs font-mono font-bold" style={{ color: 'var(--md-on-surface-variant)' }}>{strat.en}</span>
               </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 flex-1">
-              <div className="p-6 rounded-3xl bg-emerald-500/[0.03] border border-emerald-500/10 hover:bg-emerald-500/[0.06] transition-all duration-500">
-                <div className="label-meta font-black text-emerald-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <div className="p-6 rounded-3xl transition-all duration-500" style={{ background: 'rgba(82,196,26,0.04)', border: '1px solid rgba(82,196,26,0.15)' }}>
+                <div className="label-meta font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-down)' }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-down)' }} />
                   買進訊號 (Entry)
                 </div>
-                <div className="text-sm text-zinc-300 leading-relaxed font-medium">{strat.buyDesc}</div>
+                <div className="text-sm leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{strat.buyDesc}</div>
               </div>
-              <div className="p-6 rounded-3xl bg-rose-500/[0.03] border border-rose-500/10 hover:bg-rose-500/[0.06] transition-all duration-500">
-                <div className="label-meta font-black text-rose-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              <div className="p-6 rounded-3xl transition-all duration-500" style={{ background: 'rgba(255,77,79,0.04)', border: '1px solid rgba(255,77,79,0.15)' }}>
+                <div className="label-meta font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-up)' }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-up)' }} />
                   賣出訊號 (Exit)
                 </div>
-                <div className="text-sm text-zinc-300 leading-relaxed font-medium">{strat.sellDesc}</div>
+                <div className="text-sm leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{strat.sellDesc}</div>
               </div>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-bold text-zinc-400">
-                <span className="text-emerald-400">📈</span> {strat.suitable}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+                <span>📈</span> {strat.suitable}
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-bold text-zinc-400">
-                <span className="text-rose-400">⚠️</span> {strat.avoid}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+                <span>⚠️</span> {strat.avoid}
               </div>
             </div>
           </div>
@@ -426,7 +427,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
       {/* Error */}
       {error && (
-        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm rounded-xl p-4 shrink-0 flex items-start gap-3">
+        <div className="rounded-xl p-4 shrink-0 flex items-start gap-3" style={{ background: 'rgba(255,77,79,0.08)', border: '1px solid rgba(255,77,79,0.25)', color: 'var(--md-error)' }}>
           <AlertCircle size={18} className="shrink-0 mt-0.5"/>
           <div>
             <div className="font-bold mb-0.5">回測失敗</div>
@@ -437,8 +438,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
       {/* ══════════════════ 多策略比較結果 ══════════════════ */}
       {compareMode && Object.keys(compareResults).length > 0 && (
-        <div className="shrink-0 liquid-glass-strong rounded-[2.5rem] p-6 lg:p-10 border border-white/10 shadow-2xl animate-in zoom-in-95 duration-500 relative z-10 overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+        <div className="shrink-0 glass-card rounded-[2.5rem] p-6 lg:p-10 shadow-2xl animate-in zoom-in-95 duration-500 relative z-10 overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-primary-container)] to-transparent opacity-50" />
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10">
             <div className="flex items-center gap-4">
@@ -446,13 +447,13 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                 <Trophy size={28} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-white tracking-tight">多策略績效矩陣</h3>
-                <p className="label-meta font-black text-slate-500 uppercase tracking-[0.2em] mt-1">{symbol} · {period1} ～ {period2}</p>
+                <h3 className="text-2xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>多策略績效矩陣</h3>
+                <p className="label-meta font-black uppercase tracking-[0.2em] mt-1" style={{ color: 'var(--md-outline)' }}>{symbol} · {period1} ～ {period2}</p>
               </div>
             </div>
             <button 
               onClick={() => { setCompareMode(false); setCompareResults({}); }}
-              className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white px-6 py-3 bg-white/5 rounded-2xl border border-white/10 transition-all hover:bg-rose-500/10 hover:border-rose-500/20 active:scale-95"
+              className="text-xs font-black uppercase tracking-widest px-6 py-3 rounded-2xl active:scale-95 transition-all" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}
             >
               關閉比較
             </button>
@@ -461,7 +462,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
           <div className="overflow-x-auto custom-scrollbar -mx-2 px-2">
             <table className="w-full text-sm mb-6 min-w-[800px]">
               <thead>
-                <tr className="border-b border-white/5 label-meta font-black text-slate-500 uppercase tracking-[0.2em]">
+                <tr className="border-b label-meta font-black uppercase tracking-[0.2em]" style={{ borderColor: 'var(--md-outline-variant)', color: 'var(--md-outline)' }}>
                   <th className="pb-6 text-left pl-4">策略名稱</th>
                   <th className="pb-6 text-right">總報酬率 (ROI)</th>
                   <th className="pb-6 text-right">夏普比率 (Sharpe)</th>
@@ -478,31 +479,31 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   const best = Object.values(compareResults).reduce((max, x) => (x.metrics?.roi ?? 0) > (max.metrics?.roi ?? 0) ? x : max, Object.values(compareResults)[0]);
                   const isBest = r === best;
                   return (
-                    <tr key={s.id} className={cn('group transition-all duration-300 hover:bg-white/[0.03]', isBest ? 'bg-emerald-500/[0.03]' : '')}>
+                    <tr key={s.id} className={cn('group transition-all duration-300', isBest ? '' : '')} style={isBest ? { background: 'rgba(128,131,255,0.05)' } : {}}>
                       <td className="py-6 pl-4 flex items-center gap-4">
                         <div className="w-2.5 h-10 rounded-full shadow-lg" style={{ backgroundColor: s.color }} />
                         <div>
-                          <div className="font-black text-white text-base tracking-tight">{s.label}</div>
+                          <div className="font-black text-base tracking-tight" style={{ color: 'var(--md-on-surface)' }}>{s.label}</div>
                           {isBest && (
                             <div className="flex items-center gap-1 mt-1">
-                              <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20">Top Performer</span>
+                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.2)' }}>Top Performer</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className={cn('py-6 text-right font-mono font-black text-lg', (m?.roi ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                      <td className="py-6 text-right font-mono font-black text-lg" style={{ color: (m?.roi ?? 0) >= 0 ? 'var(--color-down)' : 'var(--color-up)' }}>
                         {(m?.roi ?? 0) >= 0 ? '+' : ''}{m?.roi ?? 0}%
                       </td>
-                      <td className={cn('py-6 text-right font-mono font-bold text-base', (m?.sharpe ?? 0) >= 1 ? 'text-emerald-400' : (m?.sharpe ?? 0) >= 0 ? 'text-amber-400' : 'text-rose-400')}>
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: (m?.sharpe ?? 0) >= 1 ? 'var(--color-down)' : (m?.sharpe ?? 0) >= 0 ? 'var(--md-tertiary)' : 'var(--color-up)' }}>
                         {m?.sharpe ?? 0}
                       </td>
-                      <td className="py-6 text-right font-mono font-bold text-base text-rose-400">
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: 'var(--color-up)' }}>
                         -{m?.maxDrawdown ?? 0}%
                       </td>
-                      <td className={cn('py-6 text-right font-mono font-bold text-base', (m?.winRate ?? 0) >= 50 ? 'text-emerald-400' : 'text-rose-400')}>
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: (m?.winRate ?? 0) >= 50 ? 'var(--color-down)' : 'var(--color-up)' }}>
                         {m?.winRate ?? 0}%
                       </td>
-                      <td className="py-6 text-right font-mono font-bold text-slate-400 pr-4">
+                      <td className="py-6 text-right font-mono font-bold pr-4" style={{ color: 'var(--md-on-surface-variant)' }}>
                         {m?.totalTrades ?? 0}
                       </td>
                     </tr>
@@ -518,33 +519,33 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
       {result ? (
         <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
           {/* 結果標題列 */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 liquid-glass rounded-[2.5rem] p-8 border border-zinc-800 shadow-2xl relative overflow-hidden bg-zinc-900/50">
+          <div className="glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
             
             <div className="flex items-center gap-5 relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
                 <Activity size={32} />
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-2xl font-black text-zinc-100 tracking-tight">{resultStrat.label}</h3>
-                  <span className="px-3 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-500">Strategy Report</span>
+                  <h3 className="text-2xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{resultStrat.label}</h3>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>Strategy Report</span>
                 </div>
-                <p className="text-sm font-bold text-zinc-400 flex items-center gap-2">
-                  <span className="text-indigo-400">{symbol}</span>
-                  <span className="w-1 h-1 rounded-full bg-zinc-600" />
+                <p className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--md-outline)' }}>
+                  <span style={{ color: 'var(--md-primary)' }}>{symbol}</span>
+                  <span className="w-1 h-1 rounded-full" style={{ background: 'var(--md-outline-variant)' }} />
                   <span>{period1} ～ {period2}</span>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-none px-8 py-4 rounded-2xl bg-zinc-950 border border-zinc-800 flex flex-col items-center sm:items-end justify-center">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Total Return</span>
-                <span className={cn('text-3xl font-black tracking-tighter tabular-nums', metrics.roi >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+              <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-none px-8 py-4 rounded-2xl flex flex-col items-center sm:items-end justify-center" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{ color: 'var(--md-outline)' }}>Total Return</span>
+                <span className="text-3xl font-black tracking-tighter tabular-nums" style={{ color: metrics.roi >= 0 ? 'var(--color-down)' : 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
                   {metrics.roi >= 0 ? '+' : ''}{metrics.roi}%
                 </span>
               </div>
-              <button className="w-14 h-14 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-all active:scale-90">
+              <button className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all active:scale-90" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
                 <Download size={24} />
               </button>
             </div>
@@ -552,24 +553,24 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
           {/* ── 圖表 + 指標 ── */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-3 liquid-glass-strong rounded-[2.5rem] p-8 border border-white/10 shadow-2xl flex flex-col min-h-[500px] relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+            <div className="lg:col-span-3 glass-card rounded-[2.5rem] p-8 shadow-2xl flex flex-col min-h-[500px] relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-primary-container)] to-transparent opacity-40" />
               
               {/* Chart header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full" style={{backgroundColor:resultStrat.color}}/>
-                    <span className="text-xs font-black text-white uppercase tracking-[0.2em]">{resultStrat.label}</span>
+                    <span className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: 'var(--md-on-surface)' }}>{resultStrat.label}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-slate-600"/>
-                    <span className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Buy & Hold</span>
+                    <div className="w-3 h-3 rounded-full" style={{ background: 'var(--md-outline-variant)' }}/>
+                    <span className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: 'var(--md-outline)' }}>Buy &amp; Hold</span>
                   </div>
                 </div>
                 <button onClick={()=>setShowDd(v=>!v)}
-                  className={cn('text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-2xl border transition-all active:scale-95',
-                    showDd?'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-lg':'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10')}>
+                  className="text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2.5 rounded-2xl transition-all active:scale-95"
+                  style={showDd ? { background: 'rgba(255,77,79,0.1)', color: 'var(--color-up)', border: '1px solid rgba(255,77,79,0.25)' } : { background: 'var(--md-surface-container-high)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
                   {showDd ? 'Hide Drawdown' : 'Show Drawdown'}
                 </button>
               </div>
@@ -606,8 +607,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
                 {/* Drawdown sub-chart */}
                 {showDd && ddData.length>0 && (
-                  <div className="mt-6 pt-6 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
-                    <div className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <div className="mt-6 pt-6 animate-in slide-in-from-top-4 duration-500" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
+                    <div className="text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--color-up)' }}>
                       <Info size={12}/> Drawdown Analysis (Risk Exposure)
                     </div>
                     <div className="h-20">
@@ -668,27 +669,25 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   icon: <Target size={20} />,
                   color: metrics.winRate >= 50 ? 'emerald' : 'amber'
                 },
-              ].map(c=>(
-                <div key={c.label} className="liquid-glass rounded-[2rem] p-6 border border-white/10 relative overflow-hidden hover:border-white/20 transition-all duration-300 hover:-translate-y-1">
-                  <div className={cn('absolute top-0 right-0 w-32 h-32 opacity-5 blur-3xl', 
-                    c.color === 'emerald' ? 'bg-emerald-500' : c.color === 'rose' ? 'bg-rose-500' : 'bg-amber-500')} />
-                  
-                  <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 relative z-10">
-                    <div className={cn('p-1.5 rounded-lg border', 
-                      c.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
-                      c.color === 'rose' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
-                      'bg-amber-500/10 text-amber-400 border-amber-500/20')}>
+              ].map(c=>{
+                const metricColor = c.color === 'emerald' ? 'var(--color-down)' : c.color === 'rose' ? 'var(--color-up)' : 'var(--md-tertiary)';
+                const iconBg = c.color === 'emerald' ? 'rgba(82,196,26,0.1)' : c.color === 'rose' ? 'rgba(255,77,79,0.1)' : 'rgba(255,183,131,0.1)';
+                const iconBorder = c.color === 'emerald' ? 'rgba(82,196,26,0.25)' : c.color === 'rose' ? 'rgba(255,77,79,0.25)' : 'rgba(255,183,131,0.25)';
+                return (
+                <div key={c.label} className="glass-card rounded-[2rem] p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] mb-3 relative z-10" style={{ color: 'var(--md-outline)' }}>
+                    <div className="p-1.5 rounded-lg" style={{ background: iconBg, border: `1px solid ${iconBorder}`, color: metricColor }}>
                       {c.icon}
                     </div>
                     {c.label}
                   </div>
-                  <div className={cn('text-3xl font-black mb-1 tracking-tight tabular-nums relative z-10', 
-                    c.color === 'emerald' ? 'text-emerald-400' : c.color === 'rose' ? 'text-rose-400' : 'text-amber-400')}>
+                  <div className="text-3xl font-black mb-1 tracking-tight tabular-nums relative z-10" style={{ color: metricColor, fontFamily: 'var(--font-data)' }}>
                     {c.value}
                   </div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest relative z-10">{c.sub}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest relative z-10" style={{ color: 'var(--md-outline)' }}>{c.sub}</div>
                 </div>
-              ))}
+                );
+              })}
 
               {/* 額外指標小表格 */}
               <div className="liquid-glass rounded-[2rem] p-8 border border-white/10 shadow-xl relative overflow-hidden">
@@ -716,35 +715,35 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
           </div>
           {/* ── 策略說明 + 成交記錄 ── */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-1 liquid-glass rounded-[2rem] p-8 border border-white/10 space-y-8 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-              <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+            <div className="lg:col-span-1 glass-card rounded-[2rem] p-8 space-y-8 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-primary-container)] to-transparent opacity-40" />
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-3" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(128,131,255,0.1)', border: '1px solid rgba(128,131,255,0.25)', color: 'var(--md-primary)' }}>
                   <Info size={16} />
                 </div>
                 策略邏輯回顧
               </h3>
               <div className="space-y-6">
-                <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 group hover:bg-emerald-500/10 transition-colors">
-                  <div className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(82,196,26,0.04)', border: '1px solid rgba(82,196,26,0.12)' }}>
+                  <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-down)' }}>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-down)' }} />
                     買進觸發
                   </div>
-                  <div className="text-xs text-slate-300 leading-relaxed font-medium">{resultStrat.buyDesc}</div>
+                  <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{resultStrat.buyDesc}</div>
                 </div>
-                <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/10 group hover:bg-rose-500/10 transition-colors">
-                  <div className="text-[9px] font-black text-rose-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(255,77,79,0.04)', border: '1px solid rgba(255,77,79,0.12)' }}>
+                  <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-up)' }}>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-up)' }} />
                     賣出觸發
                   </div>
-                  <div className="text-xs text-slate-300 leading-relaxed font-medium">{resultStrat.sellDesc}</div>
+                  <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{resultStrat.sellDesc}</div>
                 </div>
-                <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 group hover:bg-amber-500/10 transition-colors">
-                  <div className="text-[9px] font-black text-amber-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(255,183,131,0.05)', border: '1px solid rgba(255,183,131,0.12)' }}>
+                  <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--md-tertiary)' }}>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--md-tertiary)' }} />
                     專家筆記
                   </div>
-                  <div className="text-xs text-slate-300 leading-relaxed font-medium italic opacity-80">
+                  <div className="text-xs leading-relaxed font-medium italic opacity-80" style={{ color: 'var(--md-on-surface-variant)' }}>
                     {resultStrat.beginner.replace('💡 新手說明：','')}
                   </div>
                 </div>
@@ -752,23 +751,23 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             </div>
 
             {/* 成交記錄表格 */}
-            <div className="xl:col-span-3 liquid-glass-strong rounded-[2.5rem] p-8 border border-white/10 shadow-2xl flex flex-col min-h-[500px] relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-slate-500/20 to-transparent" />
+            <div className="xl:col-span-3 glass-card rounded-[2.5rem] p-8 shadow-2xl flex flex-col min-h-[500px] relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-outline-variant)] to-transparent opacity-40" />
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 shadow-inner">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
                     <FileText size={28} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
+                    <h3 className="text-xl font-black tracking-tight flex items-center gap-3" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
                       成交明細 
-                      <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-slate-500 uppercase tracking-widest">Total {tradesRaw.length} Trades</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>Total {tradesRaw.length} Trades</span>
                     </h3>
                     <div className="flex items-center gap-3 mt-2">
-                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-lg border border-emerald-400/20">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {tradesRaw.filter((t)=>t.result==='WIN').length} Wins
+                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" style={{ color: 'var(--color-down)', background: 'rgba(82,196,26,0.1)', border: '1px solid rgba(82,196,26,0.25)' }}>
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-down)' }} /> {tradesRaw.filter((t)=>t.result==='WIN').length} Wins
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-400 bg-rose-500/10 px-3 py-1 rounded-lg border border-rose-500/20">
+                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg" style={{ color: 'var(--color-up)', background: 'rgba(255,77,79,0.1)', border: '1px solid rgba(255,77,79,0.25)' }}>
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-400" /> {tradesRaw.filter((t)=>t.result==='LOSS').length} Losses
                       </div>
                     </div>
@@ -778,14 +777,14 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   <div className="flex bg-white/5 rounded-2xl p-1.5 border border-white/10 shadow-inner">
                     {(['date','pnl'] as const).map(s=>(
                       <button key={s} onClick={()=>setTradeSort(s)}
-                        className={cn('text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-xl transition-all duration-300',
-                          tradeSort===s?'bg-white/10 text-white shadow-lg border border-white/10':'text-slate-500 hover:text-slate-300')}>
+                        className="text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-xl transition-all duration-300"
+                          style={tradeSort===s ? { background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface)', border: '1px solid var(--md-outline-variant)' } : { color: 'var(--md-outline)' }}>
                         {s==='date'?'Time':'PnL'}
                       </button>
                     ))}
                   </div>
                   <button onClick={exportCSV} disabled={!trades.length}
-                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 px-6 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 disabled:opacity-40 transition-all ml-auto sm:ml-0 active:scale-95 shadow-lg">
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl disabled:opacity-40 transition-all ml-auto sm:ml-0 active:scale-95" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.25)' }}>
                     <Download size={16}/> Export
                   </button>
                 </div>
@@ -795,21 +794,21 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                 {/* Mobile: Horizontal scrollable cards */}
                 <div className="flex md:hidden gap-3 pb-4 overflow-x-auto">
                   {trades.map((t, i) => (
-                    <div key={i} className="min-w-[200px] liquid-glass rounded-xl p-4 border border-white/5 space-y-2">
+                    <div key={i} className="min-w-[200px] glass-card rounded-xl p-4 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-white">{t.entryTime}</span>
-                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded', (t.pnlPct ?? 0) >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400')}>
+                        <span className="text-xs font-bold" style={{ color: 'var(--md-on-surface)' }}>{t.entryTime}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={(t.pnlPct ?? 0) >= 0 ? { background: 'rgba(82,196,26,0.15)', color: 'var(--color-down)' } : { background: 'rgba(255,77,79,0.15)', color: 'var(--color-up)' }}>
                           {(t.pnlPct ?? 0) >= 0 ? '+' : ''}{Number(t.pnlPct ?? 0).toFixed(2)}%
                         </span>
                       </div>
-                      <div className="text-[10px] text-slate-500">PnL: {Number(t.pnl).toLocaleString()}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--md-outline)' }}>PnL: {Number(t.pnl).toLocaleString()}</div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">進場</span>
-                        <span className="font-mono font-bold text-white">{Number(t.entryPrice).toFixed(2)}</span>
+                        <span style={{ color: 'var(--md-outline)' }}>進場</span>
+                        <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.entryPrice).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">出場</span>
-                        <span className="font-mono font-bold text-white">{Number(t.exitPrice).toFixed(2)}</span>
+                        <span style={{ color: 'var(--md-outline)' }}>出場</span>
+                        <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.exitPrice).toFixed(2)}</span>
                       </div>
                     </div>
                   ))}
@@ -817,8 +816,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                 {/* Desktop: Table */}
                 <div className="hidden md:block overflow-x-auto custom-scrollbar">
                   <table className="w-full text-sm min-w-[800px]">
-                    <thead className="sticky top-0 bg-[var(--card-bg)] backdrop-blur-md z-10">
-                      <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5">
+                    <thead className="sticky top-0 backdrop-blur-md z-10" style={{ background: 'var(--md-surface-container)' }}>
+                      <tr className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--md-outline)', borderBottom: '1px solid var(--md-outline-variant)' }}>
                         <th className="pb-4 text-left">Entry Date</th>
                         <th className="pb-4 text-left">Exit Date</th>
                         <th className="pb-4 text-right">Entry</th>
@@ -830,27 +829,27 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                         <th className="pb-4 text-center">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.02]">
+                    <tbody className="divide-y" style={{ borderColor: 'var(--md-outline-variant)' }}>
                       {trades.map((t,i) => (
-                        <tr key={i} className="group hover:bg-white/[0.02] transition-colors">
-                          <td className="py-4 text-slate-400 font-mono text-xs">{t.entryTime}</td>
-                          <td className="py-4 text-slate-400 font-mono text-xs">{t.exitTime}</td>
-                          <td className="py-4 text-white font-mono text-xs text-right font-bold">{Number(t.entryPrice).toLocaleString(undefined,{maximumFractionDigits:2})}</td>
-                          <td className="py-4 text-white font-mono text-xs text-right font-bold">{Number(t.exitPrice).toLocaleString(undefined,{maximumFractionDigits:2})}</td>
-                          <td className="py-4 text-slate-300 font-mono text-xs text-right">{Number(t.amount).toLocaleString()}</td>
-                          <td className="py-4 text-slate-400 font-mono text-xs text-right">{t.holdDays}d</td>
-                          <td className={cn('py-4 font-mono font-black text-sm text-right',(t.pnlPct ?? 0)>=0?'text-emerald-400':'text-rose-400')}>
+                        <tr key={i} className="group transition-colors">
+                          <td className="py-4 font-mono text-xs" style={{ color: 'var(--md-on-surface-variant)', fontFamily: 'var(--font-data)' }}>{t.entryTime}</td>
+                          <td className="py-4 font-mono text-xs" style={{ color: 'var(--md-on-surface-variant)', fontFamily: 'var(--font-data)' }}>{t.exitTime}</td>
+                          <td className="py-4 font-mono text-xs text-right font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.entryPrice).toLocaleString(undefined,{maximumFractionDigits:2})}</td>
+                          <td className="py-4 font-mono text-xs text-right font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.exitPrice).toLocaleString(undefined,{maximumFractionDigits:2})}</td>
+                          <td className="py-4 font-mono text-xs text-right" style={{ color: 'var(--md-on-surface-variant)', fontFamily: 'var(--font-data)' }}>{Number(t.amount).toLocaleString()}</td>
+                          <td className="py-4 font-mono text-xs text-right" style={{ color: 'var(--md-outline)', fontFamily: 'var(--font-data)' }}>{t.holdDays}d</td>
+                          <td className="py-4 font-mono font-black text-sm text-right" style={{ color: (t.pnlPct ?? 0)>=0 ? 'var(--color-down)' : 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
                             {(t.pnlPct ?? 0)>=0?'+':''}{Number(t.pnlPct ?? 0).toFixed(2)}%
                           </td>
-                          <td className={cn('py-4 font-mono font-black text-sm text-right',(t.pnl ?? 0)>=0?'text-emerald-400':'text-rose-400')}>
+                          <td className="py-4 font-mono font-black text-sm text-right" style={{ color: (t.pnl ?? 0)>=0 ? 'var(--color-down)' : 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
                             {(t.pnl ?? 0)>=0?'+':''}{Number(t.pnl ?? 0).toLocaleString(undefined,{maximumFractionDigits:0})}
                           </td>
                           <td className="py-4 text-center">
                             {t.result==='WIN'
-                              ? <span className="inline-flex items-center gap-1 text-[0.55rem] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                              ? <span className="inline-flex items-center gap-1 text-[0.55rem] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ color: 'var(--color-down)', background: 'rgba(82,196,26,0.1)', border: '1px solid rgba(82,196,26,0.25)' }}>
                                   <TrendingUp size={10}/> Profit
                                 </span>
-                              : <span className="inline-flex items-center gap-1 text-[0.55rem] font-black uppercase tracking-widest text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20">
+                              : <span className="inline-flex items-center gap-1 text-[0.55rem] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg" style={{ color: 'var(--color-up)', background: 'rgba(255,77,79,0.1)', border: '1px solid rgba(255,77,79,0.25)' }}>
                                   <TrendingDown size={10}/> Loss
                                 </span>}
                           </td>
@@ -867,12 +866,12 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
         /* 空白狀態 */
         <div className="flex-1 flex flex-col items-center justify-center gap-12 py-20 animate-in fade-in zoom-in-95 duration-1000">
           <div className="text-center space-y-6 max-w-2xl px-6">
-            <div className="w-24 h-24 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center mx-auto border border-emerald-500/20 relative">
-              <Play className="text-emerald-400 relative z-10" size={40} fill="currentColor" />
+            <div className="w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto relative" style={{ background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.25)' }}>
+              <Play style={{ color: 'var(--md-primary)' }} className="relative z-10" size={40} fill="currentColor" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-3xl font-black text-white tracking-tight">準備好驗證你的交易策略了嗎？</h3>
-              <p className="text-slate-400 font-medium leading-relaxed">
+              <h3 className="text-3xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>準備好驗證你的交易策略了嗎？</h3>
+              <p className="font-medium leading-relaxed" style={{ color: 'var(--md-outline)' }}>
                 回測引擎允許你使用歷史市場數據來模擬交易表現。雖然過去的績效不保證未來結果，但它是優化策略、建立信心的關鍵步驟。
               </p>
             </div>
@@ -882,26 +881,23 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-5xl px-6">
             {STRATEGIES.map(s=>(
               <button key={s.id} onClick={()=>setStrategy(s.id)}
-                className={cn(
-                  "p-6 rounded-[2rem] border text-left transition-all hover:scale-[1.03] active:scale-95 relative overflow-hidden",
-                  strategy===s.id 
-                    ? "bg-white/10 border-white/20 shadow-xl" 
-                    : "bg-white/5 border-white/5 hover:border-white/10"
-                )}
-                style={strategy===s.id ? {borderColor: s.color + '40'} : {}}>
+                  className="p-6 rounded-[2rem] text-left transition-all hover:scale-[1.03] active:scale-95 relative overflow-hidden"
+                style={strategy===s.id
+                  ? { background: 'rgba(128,131,255,0.12)', border: `1px solid ${s.color}40` }
+                  : { background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}>
                 <div className="w-3 h-3 rounded-full mb-4" style={{backgroundColor:s.color}}/>
-                <div className="text-base font-black text-white mb-2">{s.label}</div>
-                <div className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-3">{s.desc}</div>
+                <div className="text-base font-black mb-2" style={{ color: 'var(--md-on-surface)' }}>{s.label}</div>
+                <div className="text-xs leading-relaxed font-medium line-clamp-3" style={{ color: 'var(--md-outline)' }}>{s.desc}</div>
                 <div className="label-meta mt-4 font-black uppercase tracking-widest" style={{color:s.color}}>{s.type}</div>
               </button>
             ))}
           </div>
 
-          <div className="liquid-glass rounded-3xl p-6 max-w-2xl w-full mx-6 border border-amber-500/10 bg-amber-500/5">
-            <div className="flex items-center gap-3 text-amber-400 text-sm font-black uppercase tracking-widest mb-3">
+          <div className="rounded-3xl p-6 max-w-2xl w-full mx-6" style={{ background: 'rgba(255,183,131,0.05)', border: '1px solid rgba(255,183,131,0.15)' }}>
+            <div className="flex items-center gap-3 text-sm font-black uppercase tracking-widest mb-3" style={{ color: 'var(--md-tertiary)' }}>
               <AlertCircle size={18} /> 投資風險免責聲明
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">
+            <p className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-outline)' }}>
               本工具提供的回測結果僅供學術研究與策略開發參考。市場環境瞬息萬變，歷史數據無法完全預測未來走勢。所有交易決策應由投資者自行評估，本平台不承擔任何因使用本工具而產生的投資損失。
             </p>
           </div>
