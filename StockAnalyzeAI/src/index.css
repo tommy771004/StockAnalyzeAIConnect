@@ -230,29 +230,9 @@ body.light-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: 
 }
 
 /* ── Background Blobs ──────────────────────────────────────────── */
-.bg-blob {
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  filter: blur(120px);
-  pointer-events: none;
-  animation: blob-float 20s ease-in-out infinite;
-  z-index: 0;
-}
-
-@media (max-width: 767px) {
-  .bg-blob { width: 200px; height: 200px; filter: blur(60px); opacity: 0.6; }
-}
-
-.animation-delay-2000 { animation-delay: -7s; }
-.animation-delay-4000 { animation-delay: -14s; }
-
-@keyframes blob-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -30px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-}
+/* Removed: large continuously-animated blur surfaces violate
+   baseline-ui performance rule (NEVER animate large blur() or
+   backdrop-filter surfaces). Use static radial gradients instead. */
 
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
