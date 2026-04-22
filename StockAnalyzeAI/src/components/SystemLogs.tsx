@@ -35,35 +35,43 @@ const DEFAULT_BROKERS: Broker[] = [
   { id:'futu',   name:'Futu Bull',            nameZh:'富途牛牛',       status:'standby',   protocol:'OpenAPI',  latency:0,  avatar:'富' },
 ];
 
-const statusColor = (s: Broker['status']) =>
-  s==='connected'?'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-  :s==='standby' ?'text-amber-400 bg-amber-500/10 border-amber-500/30'
-  :'text-rose-400 bg-rose-500/10 border-rose-500/30';
+const statusStyle = (s: Broker['status']): React.CSSProperties =>
+  s==='connected'
+    ? { color: 'var(--color-down)', background: 'rgba(82,196,26,0.12)', border: '1px solid rgba(82,196,26,0.3)' }
+    : s==='standby'
+    ? { color: 'var(--md-tertiary)', background: 'rgba(255,183,131,0.12)', border: '1px solid rgba(255,183,131,0.3)' }
+    : { color: 'var(--color-up)', background: 'rgba(255,77,79,0.12)', border: '1px solid rgba(255,77,79,0.3)' };
 
-const logColor: Record<string,string> = {
-  SYSTEM:'text-emerald-400', API:'text-blue-400', AI:'text-slate-300',
-  TRADE:'text-emerald-300 font-bold', NET:'text-cyan-400', WARN:'text-rose-400 font-bold',
+const logStyle = (type: string): React.CSSProperties => {
+  switch(type) {
+    case 'SYSTEM': return { color: 'var(--color-down)', fontWeight: 600 };
+    case 'API':    return { color: 'var(--md-secondary)' };
+    case 'AI':     return { color: 'var(--md-on-surface-variant)' };
+    case 'TRADE':  return { color: 'var(--color-down)', fontWeight: 700 };
+    case 'NET':    return { color: 'var(--md-primary)' };
+    case 'WARN':   return { color: 'var(--color-up)', fontWeight: 700 };
+    default:       return { color: 'var(--md-outline)' };
+  }
 };
 
 interface MetricBarProps {
   label: string;
   value: number;
   max: number;
-  color: string;
+  barColor: string;
   unit?: string;
   desc?: string;
 }
 
-const MetricBar = ({ label, value, max, color, unit='%', desc }: MetricBarProps) => (
+const MetricBar = ({ label, value, max, barColor, unit='%', desc }: MetricBarProps) => (
   <div>
     <div className="flex justify-between items-center mb-1">
-      <span className="text-sm text-slate-400 font-semibold">{label}</span>
-      <span className="text-base font-bold font-mono text-white">{value}{unit}</span>
+      <span className="text-sm font-semibold" style={{ color: 'var(--md-on-surface-variant)' }}>{label}</span>
+      <span className="text-base font-bold font-mono" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{value}{unit}</span>
     </div>
-    {desc && <div className="text-xs text-slate-600 mb-1">{desc}</div>}
-    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-      <div className={cn('h-full rounded-full transition-all duration-500', color)}
-        style={{width:`${Math.min(100, (value/max)*100)}%`}}/>
+    {desc && <div className="text-xs mb-1" style={{ color: 'var(--md-outline)' }}>{desc}</div>}
+    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--md-surface-container-high)' }}>
+      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (value/max)*100)}%`, background: barColor }}/>
     </div>
   </div>
 );
@@ -231,8 +239,10 @@ export default function SystemLogs() {
           {id:'system', label:'💻 系統資源'},
         ].map(t => (
           <button key={t.id} onClick={() => { const validTabs = ['broker','logs','alerts','system'] as const; if (validTabs.includes(t.id as typeof validTabs[number])) setTab(t.id as typeof validTabs[number]); }}
-            className={cn('px-4 py-2 rounded-xl text-base font-semibold transition-all whitespace-nowrap',
-              tab===t.id?'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30':'bg-white/5 text-slate-400 border border-white/8 hover:bg-white/10')}>
+            className="px-4 py-2 rounded-xl text-base font-semibold transition-all whitespace-nowrap"
+            style={tab===t.id
+              ? { background: 'rgba(192,193,255,0.12)', color: 'var(--md-primary)', border: '1px solid rgba(192,193,255,0.4)' }
+              : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
             {t.label}
           </button>
         ))}
@@ -241,47 +251,51 @@ export default function SystemLogs() {
       {/* ══════ BROKER TAB ══════ */}
       {tab === 'broker' && (
         <div className="flex-1 overflow-auto">
-          <div className="text-xs text-slate-500 mb-3">連接券商 API 後，未來可進行真實委託。目前為模擬模式。</div>
+          <div className="text-xs mb-3" style={{ color: 'var(--md-outline)' }}>連接券商 API 後，未來可進行真實委託。目前為模擬模式。</div>
           <div className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto pb-2 md:pb-0">
             {brokers.map(b => {
               const on = b.status === 'connected';
               return (
-                <div key={b.id} className={cn('liquid-glass rounded-2xl p-5 transition-all min-w-[240px]',
-                  on?'border-emerald-500/30':'b.status==="standby"?border-amber-500/20:border-white/8')}>
+                <div key={b.id} className="glass-card rounded-2xl p-5 transition-all min-w-[240px]">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-base font-black',
-                        on?'bg-emerald-500/20 text-emerald-300':'bg-white/5 text-slate-400')}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-black"
+                      style={on
+                        ? { background: 'rgba(82,196,26,0.12)', color: 'var(--color-down)' }
+                        : { background: 'var(--md-surface-container-high)', color: 'var(--md-outline)' }}>
                         {b.avatar}
                       </div>
                       <div>
-                        <div className="text-base font-bold text-white">{b.name}</div>
-                        <div className="text-sm text-slate-500">{b.nameZh}</div>
+                        <div className="text-base font-bold" style={{ color: 'var(--md-on-surface)' }}>{b.name}</div>
+                        <div className="text-sm" style={{ color: 'var(--md-outline)' }}>{b.nameZh}</div>
                       </div>
                     </div>
-                    <span className={cn('text-sm px-2 py-1 rounded-full font-bold border', statusColor(b.status))}>
-                      <span className={cn('w-1.5 h-1.5 rounded-full inline-block mr-1', on?'bg-emerald-400 animate-pulse':b.status==='standby'?'bg-amber-400':'bg-rose-400')}/>
+                    <span className="text-sm px-2 py-1 rounded-full font-bold" style={statusStyle(b.status)}>
+                      <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{
+                        background: on ? 'var(--color-down)' : b.status==='standby' ? 'var(--md-tertiary)' : 'var(--color-up)'
+                      }}/>
                       {b.status==='connected'?'已連接':b.status==='standby'?'待機':'錯誤'}
                     </span>
                   </div>
-                  <div className="space-y-2 text-sm font-mono text-slate-500 mb-4">
-                    <div className="flex justify-between"><span>協定</span><span className="text-white">{b.protocol}</span></div>
+                  <div className="space-y-2 text-sm mb-4" style={{ color: 'var(--md-outline)', fontFamily: 'var(--font-data)' }}>
+                    <div className="flex justify-between"><span>協定</span><span style={{ color: 'var(--md-on-surface)' }}>{b.protocol}</span></div>
                     <div className="flex justify-between">
                       <span>延遲</span>
-                      <span className={on?'text-emerald-400':'text-slate-600'}>{on?`${b.latency}ms`:'—'}</span>
+                      <span style={{ color: on ? 'var(--color-down)' : 'var(--md-outline)' }}>{on?`${b.latency}ms`:'—'}</span>
                     </div>
                   </div>
                   <button onClick={() => toggleBroker(b.id)}
-                    className={cn('w-full py-2 rounded-xl text-base font-bold transition-all border',
-                      on?'bg-rose-500/20 text-rose-300 border-rose-500/30 hover:bg-rose-500/30'
-                        :'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30')}>
+                    className="w-full py-2 rounded-xl text-base font-bold transition-all"
+                    style={on
+                      ? { background: 'rgba(255,77,79,0.12)', color: 'var(--color-up)', border: '1px solid rgba(255,77,79,0.3)' }
+                      : { background: 'rgba(82,196,26,0.12)', color: 'var(--color-down)', border: '1px solid rgba(82,196,26,0.3)' }}>
                     {on?'🔴 中斷連接':'🟢 建立連接'}
                   </button>
                 </div>
               );
             })}
           </div>
-          <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs text-slate-400">
+          <div className="mt-4 p-3 rounded-xl text-xs" style={{ background: 'rgba(255,183,131,0.05)', border: '1px solid rgba(255,183,131,0.2)', color: 'var(--md-on-surface-variant)' }}>
             ⚠️ 目前為 UI 展示模式，連接按鈕不會觸發真實 API 呼叫。實際券商 API 整合需要額外設定。
           </div>
         </div>
@@ -289,27 +303,27 @@ export default function SystemLogs() {
 
       {/* ══════ LOGS TAB ══════ */}
       {tab === 'logs' && (
-        <div className="flex-1 flex flex-col min-h-0 liquid-glass rounded-2xl overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 glass-card rounded-2xl overflow-hidden">
           {/* Filter bar */}
-          <div className="flex items-center gap-2 p-3 border-b border-white/5 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 p-3 shrink-0 flex-wrap" style={{ borderBottom: '1px solid var(--md-outline-variant)' }}>
             {['ALL','SYSTEM','API','TRADE','AI','NET','WARN'].map(f => (
               <button key={f} onClick={() => setLogFilter(f)}
-                className={cn('px-2 py-1 rounded-lg text-sm font-mono font-bold transition-all',
-                  logFilter===f?'bg-white/10 text-white':'text-slate-600 hover:text-slate-300')}>
+                className="px-2 py-1 rounded-lg text-sm font-bold transition-all"
+                style={{ fontFamily: 'var(--font-data)', color: logFilter===f ? 'var(--md-on-surface)' : 'var(--md-outline)', background: logFilter===f ? 'var(--md-surface-container-high)' : 'transparent' }}>
                 {f}
               </button>
             ))}
-            <div className="ml-auto flex items-center gap-1.5 text-sm text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"/>
+            <div className="ml-auto flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-down)' }}>
+              <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: 'var(--color-down)' }}/>
               即時串流
             </div>
           </div>
-          <div ref={logRef} className="flex-1 overflow-y-auto p-3 font-mono text-sm space-y-0.5">
+          <div ref={logRef} className="flex-1 overflow-y-auto p-3 text-sm space-y-0.5" style={{ fontFamily: 'var(--font-data)' }}>
             {filteredLogs.map((l, i) => (
-              <div key={i} className="flex gap-3 py-0.5 hover:bg-white/[0.02] px-1 rounded">
-                <span className="text-slate-700 shrink-0 w-16">{l.time}</span>
-                <span className={cn('shrink-0 w-14 font-bold', logColor[l.type]||'text-slate-500')}>{l.type}</span>
-                <span className="text-slate-400">{l.text}</span>
+              <div key={i} className="flex gap-3 py-0.5 px-1 rounded">
+                <span className="shrink-0 w-16" style={{ color: 'var(--md-outline)' }}>{l.time}</span>
+                <span className="shrink-0 w-14" style={logStyle(l.type)}>{l.type}</span>
+                <span style={{ color: 'var(--md-on-surface-variant)' }}>{l.text}</span>
               </div>
             ))}
           </div>
@@ -319,18 +333,19 @@ export default function SystemLogs() {
       {/* ══════ PRICE ALERTS TAB ══════ */}
       {tab === 'alerts' && (
         <div className="flex-1 overflow-auto">
-          <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 mb-4 text-xs text-slate-400">
-            <div className="text-blue-400 font-bold mb-1">🔔 價格警報說明</div>
+          <div className="rounded-xl p-3 mb-4 text-xs" style={{ background: 'rgba(173,198,255,0.05)', border: '1px solid rgba(173,198,255,0.2)', color: 'var(--md-on-surface-variant)' }}>
+            <div className="font-bold mb-1" style={{ color: 'var(--md-secondary)' }}>🔔 價格警報說明</div>
             設定目標價格，當股票達到您設定的條件時，系統會在日誌中記錄警報。
             下一版本將支援系統通知推播。
           </div>
 
           {/* Add Alert */}
-          <div className="liquid-glass rounded-2xl p-4 mb-4">
+          <div className="glass-card rounded-2xl p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white">新增價格警報</h3>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>新增價格警報</h3>
               <button onClick={() => setAddingAlert(v => !v)}
-                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-3 py-1.5 border border-emerald-500/30 bg-emerald-500/10 rounded-xl transition-colors">
+                className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-xl transition-colors"
+                style={{ color: 'var(--md-primary)', border: '1px solid rgba(192,193,255,0.3)', background: 'rgba(192,193,255,0.08)' }}>
                 <Plus size={11}/> 新增警報
               </button>
             </div>
@@ -361,14 +376,16 @@ export default function SystemLogs() {
                       className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-base sm:text-sm font-mono focus:outline-none focus:border-emerald-500/50"/>
                   </div>
                 </div>
-                {alertErr && <div className="text-xs text-rose-400">{alertErr}</div>}
+                {alertErr && <div className="text-xs" style={{ color: 'var(--color-up)' }}>{alertErr}</div>}
                 <div className="flex gap-2">
                   <button onClick={handleAddAlert}
-                    className="px-5 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm border border-emerald-500/30 hover:bg-emerald-500/30 font-semibold transition-colors">
+                    className="px-5 py-2 rounded-xl text-sm font-semibold transition-colors"
+                    style={{ background: 'rgba(82,196,26,0.12)', color: 'var(--color-down)', border: '1px solid rgba(82,196,26,0.3)' }}>
                     ✓ 確認新增
                   </button>
                   <button onClick={() => { setAddingAlert(false); setAlertErr(''); }}
-                    className="px-5 py-2 rounded-xl bg-white/5 text-slate-400 text-sm border border-white/10 hover:bg-white/10 transition-colors">
+                    className="px-5 py-2 rounded-xl text-sm transition-colors"
+                    style={{ background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
                     取消
                   </button>
                 </div>
@@ -377,46 +394,51 @@ export default function SystemLogs() {
           </div>
 
           {/* Alerts list */}
-          <div className="liquid-glass rounded-2xl p-4">
-            <h3 className="text-sm font-bold text-white mb-3">
-              已設定警報 <span className="text-slate-500 font-normal">（{alerts.length} 條）</span>
+          <div className="glass-card rounded-2xl p-4">
+            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
+              已設定警報 <span className="font-normal" style={{ color: 'var(--md-outline)' }}>（{alerts.length} 條）</span>
             </h3>
             {alertLoading ? (
-              <div className="flex items-center justify-center py-8 text-slate-500">
+              <div className="flex items-center justify-center py-8" style={{ color: 'var(--md-outline)' }}>
                 <RefreshCw size={16} className="animate-spin mr-2"/> 載入中…
               </div>
             ) : alerts.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
+              <div className="text-center py-8" style={{ color: 'var(--md-outline)' }}>
                 <Bell size={24} className="mx-auto mb-2 opacity-40"/>
                 <div className="text-sm">尚未設定任何價格警報</div>
               </div>
             ) : (
               <div className="flex md:grid md:grid-cols-1 gap-3 overflow-x-auto pb-2 md:pb-0">
                 {alerts.map(a => (
-                  <div key={a.id} className={cn('min-w-[200px] md:min-w-0 flex items-center gap-3 p-3 rounded-xl border transition-all',
-                    a.triggered?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/5')}>
-                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                      a.condition==='above'?'bg-emerald-500/20':'bg-rose-500/20')}>
+                  <div key={a.id} className="min-w-[200px] md:min-w-0 flex items-center gap-3 p-3 rounded-xl transition-all"
+                    style={a.triggered
+                      ? { background: 'rgba(255,183,131,0.06)', border: '1px solid rgba(255,183,131,0.25)' }
+                      : { background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)' }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                      style={a.condition==='above'
+                        ? { background: 'rgba(82,196,26,0.12)' }
+                        : { background: 'rgba(255,77,79,0.12)' }}>
                       {a.condition==='above'
-                        ? <TrendingUp size={14} className="text-emerald-400"/>
-                        : <TrendingDown size={14} className="text-rose-400"/>}
+                        ? <TrendingUp size={14} style={{ color: 'var(--color-down)' }}/>
+                        : <TrendingDown size={14} style={{ color: 'var(--color-up)' }}/>}
                     </div>
                     <div className="flex-1">
-                      <div className="text-sm font-bold text-white">{a.symbol}</div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-sm font-bold" style={{ color: 'var(--md-on-surface)' }}>{a.symbol}</div>
+                      <div className="text-xs" style={{ color: 'var(--md-on-surface-variant)' }}>
                         {a.condition==='above'?'當價格高於':'當價格低於'}{' '}
-                        <span className="font-mono font-bold text-white">{a.target}</span>
+                        <span className="font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{a.target}</span>
                         {' '}時觸發
                       </div>
                     </div>
-                    <span className={cn('text-xs px-2 py-1 rounded-full font-bold border',
-                      a.triggered
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                        : 'bg-slate-500/20 text-slate-400 border-slate-500/30')}>
+                    <span className="text-xs px-2 py-1 rounded-full font-bold"
+                      style={a.triggered
+                        ? { background: 'rgba(255,183,131,0.12)', color: 'var(--md-tertiary)', border: '1px solid rgba(255,183,131,0.3)' }
+                        : { background: 'var(--md-surface-container-high)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
                       {a.triggered ? '🔔 已觸發' : '⏳ 監控中'}
                     </span>
                     <button onClick={() => handleDeleteAlert(a.id)}
-                      className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors shrink-0">
+                      className="p-1.5 rounded-lg transition-colors shrink-0"
+                      style={{ background: 'rgba(255,77,79,0.10)', color: 'var(--color-up)' }}>
                       <Trash2 size={12}/>
                     </button>
                   </div>
@@ -433,11 +455,11 @@ export default function SystemLogs() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Real stats */}
-            <div className="liquid-glass rounded-2xl p-5">
+            <div className="glass-card rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-white">應用程式資源</h3>
-                <div className="text-sm text-slate-500 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"/>
+                <h3 className="text-base font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>應用程式資源</h3>
+                <div className="text-sm flex items-center gap-1" style={{ color: 'var(--md-outline)' }}>
+                  <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: 'var(--color-down)' }}/>
                   每 3 秒更新
                 </div>
               </div>
@@ -447,14 +469,14 @@ export default function SystemLogs() {
                     label="CPU 使用率"
                     value={cpuPct}
                     max={100}
-                    color={cpuPct>80?'bg-rose-400':cpuPct>50?'bg-amber-400':'bg-emerald-400'}
+                    barColor={cpuPct>80?'var(--color-up)':cpuPct>50?'var(--md-tertiary)':'var(--color-down)'}
                     desc="本程式佔用的 CPU 比例"
                   />
                   <MetricBar
                     label="記憶體（Heap 使用）"
                     value={sysStats.heapUsed}
                     max={sysStats.heapTotal}
-                    color="bg-blue-400"
+                    barColor="var(--md-secondary)"
                     unit="MB"
                     desc={`已用 ${sysStats.heapUsed}MB / 分配 ${sysStats.heapTotal}MB`}
                   />
@@ -462,11 +484,11 @@ export default function SystemLogs() {
                     label="RSS 記憶體"
                     value={Math.round(sysStats.rss)}
                     max={512}
-                    color="bg-indigo-400"
+                    barColor="var(--md-primary)"
                     unit="MB"
                     desc="程式實際佔用的系統記憶體"
                   />
-                  <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-3 text-sm">
+                  <div className="pt-2 grid grid-cols-2 gap-3 text-sm" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
                     {[
                       ['運行時間', sysStats.uptimeStr],
                       ['平台', sysStats.platform],
@@ -474,14 +496,14 @@ export default function SystemLogs() {
                       ['Electron', sysStats.electronVersion ? `v${sysStats.electronVersion}` : '—'],
                     ].map(([k,v]) => (
                       <div key={k}>
-                        <div className="text-slate-600">{k}</div>
-                        <div className="text-white font-mono font-bold">{v}</div>
+                        <div style={{ color: 'var(--md-outline)' }}>{k}</div>
+                        <div className="font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{v}</div>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="text-slate-500 text-sm text-center py-8">
+                <div className="text-sm text-center py-8" style={{ color: 'var(--md-outline)' }}>
                   <Cpu size={24} className="mx-auto mb-2 opacity-40"/>
                   正在取得系統資訊…
                 </div>
@@ -489,32 +511,34 @@ export default function SystemLogs() {
             </div>
 
             {/* AI Risk Controls */}
-            <div className="liquid-glass rounded-2xl p-5">
+            <div className="glass-card rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
-                <Shield size={20} className="text-amber-400"/>
-                <h3 className="text-base font-bold text-white">AI 風控面板</h3>
+                <Shield size={20} style={{ color: 'var(--md-tertiary)' }}/>
+                <h3 className="text-base font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>AI 風控面板</h3>
               </div>
-              <div className="text-sm text-slate-500 mb-4">
+              <div className="text-sm mb-4" style={{ color: 'var(--md-outline)' }}>
                 以下控制項影響 AI 的交易決策行為。調整後即時生效（模擬模式）。
               </div>
               <div className="space-y-4">
                 {[
-                  { label:'最大回撤上限', value:5, color:'bg-rose-400', desc:'超過此回撤比例時停止交易' },
-                  { label:'AI 信心門檻',  value:70, color:'bg-amber-400', desc:'低於此信心分數時不下單' },
-                  { label:'市場流動性', value:85, color:'bg-emerald-400', desc:'流動性評分（越高越安全）' },
+                  { label:'最大回撤上限', value:5, barColor:'var(--color-up)', desc:'超過此回撤比例時停止交易' },
+                  { label:'AI 信心門檻',  value:70, barColor:'var(--md-tertiary)', desc:'低於此信心分數時不下單' },
+                  { label:'市場流動性', value:85, barColor:'var(--color-down)', desc:'流動性評分（越高越安全）' },
                 ].map(r => (
                   <MetricBar key={r.label} {...r} max={100} unit="%" />
                 ))}
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {['保守', '均衡', '積極'].map((m, i) => (
                     <button key={m}
-                      className={cn('py-2 rounded-xl text-xs font-bold border transition-all',
-                        i===1?'bg-amber-500/20 text-amber-300 border-amber-500/30':'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10')}>
+                      className="py-2 rounded-xl text-xs font-bold transition-all"
+                      style={i===1
+                        ? { background: 'rgba(255,183,131,0.12)', color: 'var(--md-tertiary)', border: '1px solid rgba(255,183,131,0.3)' }
+                        : { background: 'var(--md-surface-container)', color: 'var(--md-outline)', border: '1px solid var(--md-outline-variant)' }}>
                       {m}
                     </button>
                   ))}
                 </div>
-                <div className="text-xs text-slate-600">⚠️ 風控參數調整會影響 AI 策略建議，請謹慎操作</div>
+                <div className="text-xs" style={{ color: 'var(--md-outline)' }}>⚠️ 風控參數調整會影響 AI 策略建議，請謹慎操作</div>
               </div>
             </div>
           </div>
