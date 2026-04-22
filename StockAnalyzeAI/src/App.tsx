@@ -246,10 +246,7 @@ function MainApp() {
          </div>
       )}
       
-      {/* ── Background Blobs ── */}
-      <div className="bg-blob bg-emerald-500/20 top-[-10%] left-[-10%]" />
-      <div className="bg-blob bg-blue-500/20 bottom-[-10%] right-[-10%] animation-delay-2000" />
-      <div className="bg-blob bg-purple-500/10 top-[20%] right-[10%] animation-delay-4000" />
+
 
       {/* ── Top Nav ── */}
       {!isLandscape && (
@@ -259,7 +256,7 @@ function MainApp() {
               <Menu size={18}/>
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(52,211,153,0.4)]">
+              <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center">
                 <Zap size={18} className="text-black fill-current" />
               </div>
               <span className="text-lg font-black tracking-tighter text-white hidden sm:block">QUANTUM<span className="text-emerald-400">AI</span></span>
@@ -328,10 +325,8 @@ function MainApp() {
             <NotificationBell onClick={() => setNotifOpen(v => !v)} />
           </div>
 
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 p-0.5 shadow-lg shadow-emerald-500/10">
-            <div className="w-full h-full rounded-[10px] bg-[#0A0E14] flex items-center justify-center">
-              <User size={16} className="text-white" />
-            </div>
+          <div className="w-8 h-8 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+            <User size={16} className="text-zinc-400" />
           </div>
         </div>
       </header>
@@ -359,7 +354,7 @@ function MainApp() {
             {sidebar&&(
               <div className="px-4 py-4 border-b border-white/[0.08]">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-indigo-500 flex items-center justify-center text-xs font-black text-white shrink-0 shadow-lg shadow-emerald-500/20">A</div>
+                  <div className="w-9 h-9 rounded-2xl bg-emerald-500 flex items-center justify-center text-xs font-black text-zinc-950 shrink-0">A</div>
                   <div className="min-w-0">
                     <div className="text-sm font-black text-white truncate">Alpha Trader</div>
                     <div className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 tracking-widest uppercase">
@@ -378,7 +373,7 @@ function MainApp() {
                   <button key={item.id} onClick={() => handleNav(item)} title={!sidebar?item.label:undefined}
                     className={cn('w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-sm font-bold transition-all group',
                       active 
-                        ? 'bg-emerald-500 text-black shadow-[0_0_20px_rgba(52,211,153,0.2)]' 
+                        ? 'bg-emerald-500 text-black' 
                         : 'text-slate-500 hover:bg-white/5 hover:text-slate-200')}>
                     <Icon size={18} className={cn("shrink-0 transition-transform group-hover:scale-110", active ? 'text-black' : '')}/>
                     {(sidebar || isMobile) && <span className="flex-1 truncate text-left tracking-tight">{item.label}</span>}
