@@ -5,11 +5,12 @@ import { defineConfig, loadEnv } from 'vite';
 
 
 export default defineConfig(({ mode }) => {
-  const env    = loadEnv(mode, '.', '');
-  const isProd = mode === 'production';
+  const env      = loadEnv(mode, '.', '');
+  const isElectron = mode === 'electron';
+  const isProd   = mode === 'production' || isElectron;
 
   return {
-    base:    isProd ? './' : '/',
+    base:    isElectron ? './' : '/',
     root:    '.',
     publicDir: 'public',
     plugins: [react(), tailwindcss()],
