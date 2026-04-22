@@ -57,7 +57,33 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
   });
 
   const [portfolio, setPortfolio] = useState<Order[]>(() => loadFromStorage(STORAGE_KEYS.PORTFOLIO, []));
-  const { data: watchlist = [] } = useWatchlist();
+  const { data: rawWatchlist = [] } = useWatchlist();
+  // Enrich watchlist items with live quote prices
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+
+  useEffect(() => {
+    const base = rawWatchlist as WatchlistItem[];
+    setWatchlist(base); // show symbols immediately while quotes load
+    if (!base.length) return;
+    const symbols = base.map(w => w.symbol);
+    api.getBatchQuotes(symbols).then(quotes => {
+      const qMap = new Map<string, typeof quotes[number]>(
+        (Array.isArray(quotes) ? quotes.filter(Boolean) : []).map(q => [q.symbol, q])
+      );
+      setWatchlist(base.map(w => {
+        const q = qMap.get(w.symbol);
+        if (!q) return w;
+        return {
+          ...w,
+          price:     q.regularMarketPrice           ?? w.price,
+          change:    q.regularMarketChange          ?? w.change,
+          changePct: q.regularMarketChangePercent   ?? w.changePct,
+          name:      q.shortName ?? q.longName      ?? w.name,
+          shortName: q.shortName                    ?? w.shortName,
+        };
+      }));
+    }).catch(() => { /* keep base items displayed */ });
+  }, [rawWatchlist]);
 
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PORTFOLIO, portfolio);
