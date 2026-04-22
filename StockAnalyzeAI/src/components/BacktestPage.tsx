@@ -234,10 +234,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
       transition={{ duration: 0.5 }}
       className="h-full flex flex-col gap-6 p-2 sm:p-4 overflow-y-auto custom-scrollbar relative"
     >
-      {/* Background Blobs for iOS/macOS Depth */}
-      <div className="bg-blob bg-emerald-500/20 top-[-10%] left-[-10%] animate-pulse" />
-      <div className="bg-blob bg-indigo-500/20 bottom-[-10%] right-[-10%] [animation-delay:2s]" />
-      <div className="bg-blob bg-rose-500/10 top-[40%] left-[30%] [animation-delay:5s]" />
+
 
       {/* ── Header: Title & Controls ── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6 liquid-glass-strong rounded-2xl md:rounded-[2.5rem] p-4 md:p-6 lg:p-8 border border-zinc-800 shadow-2xl shrink-0 relative z-10 overflow-hidden bg-zinc-950/50">
@@ -245,7 +242,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
 
         <div className="flex items-center gap-3 md:gap-5">
-          <div className="w-10 h-10 md:w-14 md:h-14 bg-emerald-500 rounded-xl md:rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(52,211,153,0.4)] shrink-0">
+          <div className="w-10 h-10 md:w-14 md:h-14 bg-emerald-500 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0">
             <Play size={20} className="text-zinc-950 fill-current md:hidden" />
             <Play size={28} className="text-zinc-950 fill-current hidden md:block" />
           </div>
@@ -256,8 +253,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
         </div>
 
         <div className="flex flex-wrap items-center gap-3 md:gap-4 w-full lg:w-auto">
-          <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[160px] relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-indigo-500/20 rounded-xl md:rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
+          <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[160px] relative">
             <input
               list="bt-symbols"
               value={symbol}
@@ -268,8 +264,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             <datalist id="bt-symbols">{symbolsList.map(s=><option key={s} value={s}/>)}</datalist>
           </div>
 
-          <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[180px] relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/20 to-rose-500/20 rounded-xl md:rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
+          <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[180px] relative">
             <select
               value={strategy}
               onChange={e => setStrategy(e.target.value as StratId)}
@@ -377,8 +372,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
         </div>
 
         {/* Strategy explanation box */}
-        <div className="md:col-span-2 xl:col-span-3 liquid-glass rounded-[2rem] p-6 lg:p-8 border border-zinc-800 transition-all relative overflow-hidden group shadow-xl bg-zinc-900/50" style={{borderColor: strat.color + '30'}}>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br opacity-10 blur-[100px] pointer-events-none transition-all duration-1000 group-hover:opacity-20" style={{backgroundColor: strat.color}} />
+        <div className="md:col-span-2 xl:col-span-3 liquid-glass rounded-[2rem] p-6 lg:p-8 border border-zinc-800 transition-all relative overflow-hidden shadow-xl bg-zinc-900/50" style={{borderColor: strat.color + '30'}}>
           
           <div className="flex flex-col h-full relative z-10">
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
@@ -404,14 +398,14 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 flex-1">
               <div className="p-6 rounded-3xl bg-emerald-500/[0.03] border border-emerald-500/10 hover:bg-emerald-500/[0.06] transition-all duration-500">
                 <div className="label-meta font-black text-emerald-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   買進訊號 (Entry)
                 </div>
                 <div className="text-sm text-zinc-300 leading-relaxed font-medium">{strat.buyDesc}</div>
               </div>
               <div className="p-6 rounded-3xl bg-rose-500/[0.03] border border-rose-500/10 hover:bg-rose-500/[0.06] transition-all duration-500">
                 <div className="label-meta font-black text-rose-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                   賣出訊號 (Exit)
                 </div>
                 <div className="text-sm text-zinc-300 leading-relaxed font-medium">{strat.sellDesc}</div>
@@ -524,11 +518,10 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
       {result ? (
         <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
           {/* 結果標題列 */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 liquid-glass rounded-[2.5rem] p-8 border border-zinc-800 shadow-2xl relative overflow-hidden group bg-zinc-900/50">
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 liquid-glass rounded-[2.5rem] p-8 border border-zinc-800 shadow-2xl relative overflow-hidden bg-zinc-900/50">
             
             <div className="flex items-center gap-5 relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center text-indigo-400 border border-zinc-800 shadow-inner">
+              <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400">
                 <Activity size={32} />
               </div>
               <div>
@@ -566,7 +559,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full shadow-[0_0_10px_rgba(var(--color-primary),0.5)]" style={{backgroundColor:resultStrat.color}}/>
+                    <div className="w-3 h-3 rounded-full" style={{backgroundColor:resultStrat.color}}/>
                     <span className="text-xs font-black text-white uppercase tracking-[0.2em]">{resultStrat.label}</span>
                   </div>
                   <div className="flex items-center gap-3">
@@ -676,8 +669,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   color: metrics.winRate >= 50 ? 'emerald' : 'amber'
                 },
               ].map(c=>(
-                <div key={c.label} className="liquid-glass rounded-[2rem] p-6 border border-white/10 relative overflow-hidden group hover:border-white/20 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                  <div className={cn('absolute top-0 right-0 w-32 h-32 opacity-10 blur-3xl group-hover:opacity-20 transition-opacity', 
+                <div key={c.label} className="liquid-glass rounded-[2rem] p-6 border border-white/10 relative overflow-hidden hover:border-white/20 transition-all duration-300 hover:-translate-y-1">
+                  <div className={cn('absolute top-0 right-0 w-32 h-32 opacity-5 blur-3xl', 
                     c.color === 'emerald' ? 'bg-emerald-500' : c.color === 'rose' ? 'bg-rose-500' : 'bg-amber-500')} />
                   
                   <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 relative z-10">
@@ -734,21 +727,21 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
               <div className="space-y-6">
                 <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 group hover:bg-emerald-500/10 transition-colors">
                   <div className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     買進觸發
                   </div>
                   <div className="text-xs text-slate-300 leading-relaxed font-medium">{resultStrat.buyDesc}</div>
                 </div>
                 <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/10 group hover:bg-rose-500/10 transition-colors">
                   <div className="text-[9px] font-black text-rose-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                     賣出觸發
                   </div>
                   <div className="text-xs text-slate-300 leading-relaxed font-medium">{resultStrat.sellDesc}</div>
                 </div>
                 <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 group hover:bg-amber-500/10 transition-colors">
                   <div className="text-[9px] font-black text-amber-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     專家筆記
                   </div>
                   <div className="text-xs text-slate-300 leading-relaxed font-medium italic opacity-80">
@@ -874,8 +867,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
         /* 空白狀態 */
         <div className="flex-1 flex flex-col items-center justify-center gap-12 py-20 animate-in fade-in zoom-in-95 duration-1000">
           <div className="text-center space-y-6 max-w-2xl px-6">
-            <div className="w-24 h-24 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center mx-auto border border-emerald-500/20 shadow-[0_0_50px_rgba(52,211,153,0.1)] relative">
-              <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+            <div className="w-24 h-24 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center mx-auto border border-emerald-500/20 relative">
               <Play className="text-emerald-400 relative z-10" size={40} fill="currentColor" />
             </div>
             <div className="space-y-2">
@@ -891,14 +883,13 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             {STRATEGIES.map(s=>(
               <button key={s.id} onClick={()=>setStrategy(s.id)}
                 className={cn(
-                  "p-6 rounded-[2rem] border text-left transition-all hover:scale-[1.05] active:scale-95 group relative overflow-hidden",
+                  "p-6 rounded-[2rem] border text-left transition-all hover:scale-[1.03] active:scale-95 relative overflow-hidden",
                   strategy===s.id 
-                    ? "bg-white/10 border-white/20 shadow-2xl" 
+                    ? "bg-white/10 border-white/20 shadow-xl" 
                     : "bg-white/5 border-white/5 hover:border-white/10"
                 )}
                 style={strategy===s.id ? {borderColor: s.color + '40'} : {}}>
-                <div className={`absolute top-0 right-0 w-24 h-24 opacity-5 blur-2xl group-hover:opacity-10 transition-opacity`} style={{backgroundColor: s.color}} />
-                <div className="w-3 h-3 rounded-full mb-4 shadow-lg" style={{backgroundColor:s.color}}/>
+                <div className="w-3 h-3 rounded-full mb-4" style={{backgroundColor:s.color}}/>
                 <div className="text-base font-black text-white mb-2">{s.label}</div>
                 <div className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-3">{s.desc}</div>
                 <div className="label-meta mt-4 font-black uppercase tracking-widest" style={{color:s.color}}>{s.type}</div>
