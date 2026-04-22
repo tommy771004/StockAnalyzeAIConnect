@@ -48,7 +48,25 @@ class NativeYahooApi {
   private static crumbTtl = 25 * 60 * 1000;
   private static isFetchingCrumb = false;
   private static lastFailedAt = 0;
-  private static failureCooldown = 60 * 1000; // 60s backoff after failure
+  private static failureCooldown = 5 * 60 * 1000; // 5 min backoff after 429
+
+  // --- In-memory response cache (survives 429 outages) ---
+  private static cache = new Map<string, { data: unknown; ts: number }>();
+  private static CACHE_TTL = 10 * 60 * 1000; // 10 min fresh data
+  private static STALE_TTL = 60 * 60 * 1000; // 1 hr stale-while-error
+
+  private static getCached(key: string): { data: unknown; stale: boolean } | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    const age = Date.now() - entry.ts;
+    if (age < this.CACHE_TTL) return { data: entry.data, stale: false };
+    if (age < this.STALE_TTL) return { data: entry.data, stale: true };
+    return null;
+  }
+
+  private static setCache(key: string, data: unknown) {
+    this.cache.set(key, { data, ts: Date.now() });
+  }
 
   public static async ensureAuth() {
     if (this.crumb && Date.now() - this.crumbFetchedAt < this.crumbTtl) return;
@@ -131,10 +149,22 @@ class NativeYahooApi {
 
   public static async quote(symbols: string | string[]) {
     const syms = Array.isArray(symbols) ? symbols.join(',') : symbols;
+    const cacheKey = `quote:${syms}`;
     const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}`;
-    const data = await this.fetchApi(url);
-    const results = data?.quoteResponse?.result || [];
-    return Array.isArray(symbols) ? results : (results[0] || null);
+    try {
+      const data = await this.fetchApi(url);
+      const results = data?.quoteResponse?.result || [];
+      this.setCache(cacheKey, results);
+      return Array.isArray(symbols) ? results : (results[0] || null);
+    } catch (err) {
+      const cached = this.getCached(cacheKey);
+      if (cached) {
+        if (cached.stale) console.warn(`[NativeYF] quote: serving stale cache for ${syms}`);
+        const results = cached.data as unknown[];
+        return Array.isArray(symbols) ? results : (results[0] || null);
+      }
+      throw err;
+    }
   }
 
   public static async chart(symbol: string, opts: ChartOptions = {}): Promise<{ quotes: HistoricalData[] }> {
@@ -146,20 +176,31 @@ class NativeYahooApi {
     } else {
       url += `&period2=${Math.floor(Date.now()/1000)}`;
     }
-    const data = await this.fetchApi(url);
-    const result = data?.chart?.result?.[0];
-    if (!result || !result.timestamp) return { quotes: [] };
-    const timestamps = result.timestamp;
-    const quote = result.indicators.quote[0];
-    const quotes: HistoricalData[] = timestamps.map((ts: number, i: number) => ({
-      date: new Date(ts * 1000),
-      open:   quote.open[i],
-      high:   quote.high[i],
-      low:    quote.low[i],
-      close:  quote.close[i],
-      volume: quote.volume[i]
-    })).filter((q: any): q is HistoricalData => q.close !== null && q.close !== undefined);
-    return { quotes };
+    const cacheKey = `chart:${symbol}:${interval}:${p1}`;
+    try {
+      const data = await this.fetchApi(url);
+      const result = data?.chart?.result?.[0];
+      if (!result || !result.timestamp) return { quotes: [] };
+      const timestamps = result.timestamp;
+      const quote = result.indicators.quote[0];
+      const quotes: HistoricalData[] = timestamps.map((ts: number, i: number) => ({
+        date: new Date(ts * 1000),
+        open:   quote.open[i],
+        high:   quote.high[i],
+        low:    quote.low[i],
+        close:  quote.close[i],
+        volume: quote.volume[i]
+      })).filter((q: any): q is HistoricalData => q.close !== null && q.close !== undefined);
+      this.setCache(cacheKey, quotes);
+      return { quotes };
+    } catch (err) {
+      const cached = this.getCached(cacheKey);
+      if (cached) {
+        if (cached.stale) console.warn(`[NativeYF] chart: serving stale cache for ${symbol}`);
+        return { quotes: cached.data as HistoricalData[] };
+      }
+      throw err;
+    }
   }
 
   public static async search(query: string) {
@@ -394,13 +435,13 @@ app.use(express.json());
 
   // --- API Routes ---
   app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const q = await NativeYahooApi.quote(req.params.symbol); res.json(q); }
+    try { const q = await NativeYahooApi.quote(req.params.symbol as string); res.json(q); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
     try {
-      const q = await NativeYahooApi.chart(req.params.symbol, req.query);
+      const q = await NativeYahooApi.chart(req.params.symbol as string, req.query);
       res.json(q.quotes);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -414,22 +455,22 @@ app.use(express.json());
   });
 
   app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.search(req.params.symbol); res.json(data.news || []); }
+    try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.search(req.params.query); res.json(data.quotes || []); }
+    try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.quoteSummary(req.params.symbol, ['calendarEvents']); res.json(data.calendarEvents || {}); }
+    try { const data = await NativeYahooApi.quoteSummary(req.params.symbol as string, ['calendarEvents']); res.json(data.calendarEvents || {}); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
-    try { const q = await NativeYahooApi.quote(req.params.pair); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
+    try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -670,7 +711,7 @@ app.use(express.json());
     const yahooSymbol = toYahoo(canonical);
 
     const [quote, tvOverview, tvIndicators, tvNews] = await Promise.allSettled([
-      NativeYahooApi.quote(yahooSymbol),
+      NativeYahooApi.quote(yahooSymbol as string),
       TV.getOverview(canonical),
       TV.getIndicators(canonical, (req.query.timeframe as any) || '1d'),
       TV.getNewsHeadlines(canonical),
