@@ -1,5 +1,8 @@
 export const IS_AI_ENABLED = true;
 
+/** OpenRouter 免費模型，供 Free 用戶自動使用 */
+export const FREE_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+
 export const MODELS = [
   {id:'openai/gpt-4o-mini',                  label:'GPT-4o Mini'},
   {id:'anthropic/claude-3.5-sonnet',         label:'Claude 3.5 Sonnet'},

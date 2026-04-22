@@ -35,7 +35,6 @@
     "pack:linux": "npm run build:electron && npm run e:compile && electron-builder --linux"
   },
   "dependencies": {
-    "@google/genai": "^1.46.0",
     "@monaco-editor/react": "^4.7.0",
     "@neondatabase/serverless": "^0.10.4",
     "@tailwindcss/vite": "^4.1.14",

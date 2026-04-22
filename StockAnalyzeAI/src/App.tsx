@@ -10,7 +10,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { vibrate } from './utils/helpers';
-import { MODELS } from './constants';
+import { MODELS, FREE_MODEL } from './constants';
 import { useDeviceType } from './hooks/useDeviceType';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -29,7 +29,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { MarketDataProvider, useMarketData } from './contexts/MarketDataContext';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
-import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { SubscriptionProvider, useSubscription, SubscriptionTier } from './contexts/SubscriptionContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthPage       from './components/auth/AuthPage';
 import PricingModal  from './components/PricingModal';
@@ -106,8 +106,10 @@ function MainApp() {
   const { page, setPage, topTab, setTopTab } = useNavigation();
   const { settings, updateSetting } = useSettings();
   const { user, logout } = useAuth();
+  const { tier } = useSubscription();
+  const isFree = tier === SubscriptionTier.FREE;
   const set = (key: string, val: unknown) => updateSetting(key, val);
-  const model = String(settings.defaultModel || MODELS[0].id);
+  const model = isFree ? FREE_MODEL : String(settings.defaultModel || MODELS[0].id);
   const setModel = (m: string) => set('defaultModel', m);
   const [modelOpen,  setModelOpen]  = useState(false);
   const [symbol,     setSymbol]     = useState('2330.TW');
@@ -331,28 +333,39 @@ function MainApp() {
 
             {/* AI Model selector */}
             <div className="relative hidden sm:block">
-              <button onClick={()=>setModelOpen(v=>!v)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all"
-                style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface-variant)' }}>
-                <Cpu size={12} style={{ color: 'var(--md-primary)' }}/>
-                <span className="max-w-[100px] truncate uppercase tracking-wider">{String(MODELS.find(m=>m.id===model)?.label??model)}</span>
-                <ChevronDown size={10} style={{ color: 'var(--md-outline)' }}/>
-              </button>
-              {modelOpen&&(
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
-                     style={{ background: 'var(--md-surface-container-lowest)', border: '1px solid var(--md-outline-variant)' }}>
-                  {MODELS.map(m=>(
-                    <button key={m.id} onClick={()=>{setModel(m.id);setModelOpen(false);}}
-                      className="w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between transition-colors"
-                      style={model===m.id
-                        ? { color: 'var(--md-primary)', background: 'rgba(192,193,255,0.06)' }
-                        : { color: 'var(--md-on-surface-variant)' }}>
-                      {m.label}
-                      {model===m.id&&<span className="text-[10px] px-1.5 py-0.5 rounded"
-                        style={{ background: 'rgba(192,193,255,0.15)', color: 'var(--md-primary)' }}>ACTIVE</span>}
-                    </button>
-                  ))}
+              {isFree ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold"
+                  style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+                  <Cpu size={12} style={{ color: 'var(--md-outline)' }}/>
+                  <span className="uppercase tracking-wider">免費模型</span>
+                  <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: 'rgba(255,183,131,0.15)', color: 'var(--md-tertiary)', border: '1px solid rgba(255,183,131,0.3)' }}>FREE</span>
                 </div>
+              ) : (
+                <>
+                  <button onClick={()=>setModelOpen(v=>!v)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all"
+                    style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface-variant)' }}>
+                    <Cpu size={12} style={{ color: 'var(--md-primary)' }}/>
+                    <span className="max-w-[100px] truncate uppercase tracking-wider">{String(MODELS.find(m=>m.id===model)?.label??model)}</span>
+                    <ChevronDown size={10} style={{ color: 'var(--md-outline)' }}/>
+                  </button>
+                  {modelOpen&&(
+                    <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+                         style={{ background: 'var(--md-surface-container-lowest)', border: '1px solid var(--md-outline-variant)' }}>
+                      {MODELS.map(m=>(
+                        <button key={m.id} onClick={()=>{setModel(m.id);setModelOpen(false);}}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between transition-colors"
+                          style={model===m.id
+                            ? { color: 'var(--md-primary)', background: 'rgba(192,193,255,0.06)' }
+                            : { color: 'var(--md-on-surface-variant)' }}>
+                          {m.label}
+                          {model===m.id&&<span className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ background: 'rgba(192,193,255,0.15)', color: 'var(--md-primary)' }}>ACTIVE</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
