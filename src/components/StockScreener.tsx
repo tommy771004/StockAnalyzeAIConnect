@@ -8,9 +8,9 @@
  * - Click to navigate to TradingCore for deep analysis
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { Filter, Loader2, ArrowUpDown, ChevronDown, X, RefreshCw, Target as TargetIcon } from 'lucide-react';
+import { Filter as FilterIcon, Loader2 as Loader2Icon, ArrowUpDown as ArrowUpDownIcon, ChevronDown as ChevronDownIcon, X as XIcon, RefreshCw as RefreshCwIcon, Target as TargetIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence as AnimatePresenceWrapper } from 'motion/react';
 import * as api from '../services/api';
 import type { ScreenerFilters } from '../services/api';
 import { useSettings } from '../contexts/SettingsContext';
@@ -143,7 +143,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition active:scale-95 disabled:opacity-50 uppercase tracking-widest shadow-lg shadow-indigo-500/20"
           style={{ background: 'var(--md-primary)', color: 'var(--md-on-primary)' }}
         >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {loading ? <Loader2Icon size={14} className="animate-spin" /> : <RefreshCwIcon size={14} />}
           {loading ? '掃描中 SCANNING...' : '開始掃描 RUN SCAN'}
         </button>
       </div>
@@ -170,11 +170,11 @@ export default function StockScreener({ onSelectSymbol }: Props) {
         <button type="button" onClick={() => setShowFilters(!showFilters)}
           className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors hover:text-white active:scale-95" style={{ color: 'var(--md-outline)' }}
         >
-          <Filter size={13} />
+          <FilterIcon size={13} />
           自訂篩選條件 FILTERS
-          <ChevronDown size={12} className={cn("transition-transform", showFilters && "rotate-180")} />
+          <ChevronDownIcon size={12} className={cn("transition-transform", showFilters && "rotate-180")} />
         </button>
-        <AnimatePresence>
+        <AnimatePresenceWrapper>
           {showFilters && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
@@ -249,13 +249,13 @@ export default function StockScreener({ onSelectSymbol }: Props) {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresenceWrapper>
       </div>
 
       {/* Error */}
       {error && (
         <div className="flex items-center gap-2 rounded-xl p-3 shrink-0 text-sm" style={{ background: 'rgba(255,77,79,0.08)', border: '1px solid rgba(255,77,79,0.3)', color: 'var(--color-up)' }}>
-          <X size={13} />{error}
+          <XIcon size={13} />{error}
         </div>
       )}
 
@@ -270,7 +270,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       {loading && (
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--md-primary)' }} />
+            <Loader2Icon className="w-8 h-8 animate-spin" style={{ color: 'var(--md-primary)' }} />
             <span className="text-sm" style={{ color: 'var(--md-outline)' }}>批量揁描技術指標中…</span>
           </div>
         </div>
@@ -309,7 +309,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
                     <span className="flex items-center gap-1">
                       {col.label}
                       {sortKey === col.key && (
-                        <ArrowUpDown size={10} style={{ color: 'var(--md-primary)' }} />
+                        <ArrowUpDownIcon size={10} style={{ color: 'var(--md-primary)' }} />
                       )}
                     </span>
                   </th>

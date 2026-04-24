@@ -72,7 +72,7 @@ export function DashboardPage() {
 }
 
 // ─── WatchlistPanel ────────────────────────────────────────────────────────────
-function WatchlistPanel({
+export function WatchlistPanel({
   rows,
   selected,
   onSelect,
@@ -221,7 +221,7 @@ function WatchlistPanel({
 }
 
 // ─── TopMoversPanel ────────────────────────────────────────────────────────────
-function TopMoversPanel({
+export function TopMoversPanel({
   gainers,
   losers,
   loading,
@@ -284,7 +284,7 @@ function TopMoversPanel({
 }
 
 // ─── MarketPulsePanel ──────────────────────────────────────────────────────────
-function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+export function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   return (
     <Panel
       title="MARKET PULSE (WATCHLIST)"
@@ -303,7 +303,7 @@ function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], 
 }
 
 // ─── Dynamic Heatmap ────────────────────────────────────────────────────────
-function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+export function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   if (!watchlist || watchlist.length === 0) {
     return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">Pulse unavailable</div>;
   }
@@ -332,7 +332,7 @@ function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect:
   );
 }
 
-function HeatCell({
+export function HeatCell({
   cell,
   className,
   onSelect,
@@ -376,7 +376,7 @@ function HeatCell({
 }
 
 // ─── SelectedChartPanel ────────────────────────────────────────────────────────
-function SelectedChartPanel({
+export function SelectedChartPanel({
   row,
   candles,
   range,
@@ -471,7 +471,7 @@ function SelectedChartPanel({
 
 
 // ─── MarketNewsPanel ───────────────────────────────────────────────────────────
-function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
+export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
   const [filter, setFilter] = useState<NewsCategory['id'] | 'ALL'>('ALL');
   
   const filteredNews = useMemo(() => {
@@ -552,7 +552,7 @@ function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: 
 // ─── QuickTradePanel ──────────────────────────────────────────────────────────
 type TradeStatus = 'idle' | 'submitting' | 'success' | 'error';
 
-function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
+export function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
   const [qty, setQty]           = useState(100);
   const [orderPrice, setOrderPrice] = useState(price);
   const [side, setSide]         = useState<'buy' | 'sell'>('buy');
@@ -675,7 +675,7 @@ function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       {label && (
@@ -688,7 +688,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function LabeledInput({
+export function LabeledInput({
   label,
   value,
   onChange,

@@ -172,7 +172,7 @@ export function PortfolioPage() {
   );
 }
 
-function EquityPanel({ history, currentEquity }: { history: any[], currentEquity: number }) {
+export function EquityPanel({ history, currentEquity }: { history: any[], currentEquity: number }) {
   const [range, setRange] = useState('1M');
   
   const chartPoints = useMemo(() => {
@@ -249,7 +249,7 @@ function EquityPanel({ history, currentEquity }: { history: any[], currentEquity
   );
 }
 
-function HoldingsPanel({ 
+export function HoldingsPanel({ 
   positions, 
   onDelete, 
   onUpdate,
@@ -432,7 +432,7 @@ function HoldingsPanel({
     </Panel>
   );
 }
-function AllocationPanel({ positions }: { positions: any[] }) {
+export function AllocationPanel({ positions }: { positions: any[] }) {
   const allocation = useMemo(() => {
     if (positions.length === 0) return [{ label: 'CASH', pct: 100, color: '#374151' }];
     
@@ -471,7 +471,7 @@ function AllocationPanel({ positions }: { positions: any[] }) {
   );
 }
 
-function Donut({ sectors }: { sectors: any[] }) {
+export function Donut({ sectors }: { sectors: any[] }) {
   const size = 160;
   const r = 58;
   const stroke = 18;
@@ -511,7 +511,7 @@ function Donut({ sectors }: { sectors: any[] }) {
   );
 }
 
-function TradeLogPanel({ trades }: { trades: any[] }) {
+export function TradeLogPanel({ trades }: { trades: any[] }) {
   return (
     <Panel
       title="交易歷史紀錄"

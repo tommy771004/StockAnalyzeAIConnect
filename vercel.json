@@ -6,11 +6,9 @@
   "installCommand": "npm install",
   "functions": {
     "api/index.ts": {
-      "memory": 1024,
       "maxDuration": 60
     },
     "api/python.py": {
-      "memory": 1024,
       "maxDuration": 60
     }
   },
