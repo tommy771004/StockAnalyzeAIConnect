@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import * as TV from './server/services/TradingViewService.js';
 import * as TWSE from './server/services/TWSeService.js';
 import { parseSymbol, toYahoo } from './src/utils/symbolParser.js';
-import { authMiddleware, signToken, type AuthRequest } from './server/middleware/auth.js';
+import { authMiddleware, setTokenCookie, clearTokenCookie, type AuthRequest } from './server/middleware/auth.js';
 import * as usersRepo from './server/repositories/usersRepo.js';
 import * as watchlistRepo from './server/repositories/watchlistRepo.js';
 import * as positionsRepo from './server/repositories/positionsRepo.js';
@@ -498,8 +498,8 @@ app.use(express.json());
       if (existing) { res.status(409).json({ error: 'Email already registered' }); return; }
       const passwordHash = await bcrypt.hash(password, 12);
       const user = await usersRepo.createUser({ email, passwordHash, name: name ?? null });
-      const token = signToken(user.id);
-      res.status(201).json({ token, user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
+      setTokenCookie(res, user.id);
+      res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -511,8 +511,8 @@ app.use(express.json());
       if (!user) { res.status(401).json({ error: 'Invalid credentials' }); return; }
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
-      const token = signToken(user.id);
-      res.json({ token, user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
+      setTokenCookie(res, user.id);
+      res.json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -522,6 +522,11 @@ app.use(express.json());
       if (!user) { res.status(404).json({ error: 'User not found' }); return; }
       res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/auth/logout', (_req, res) => {
+    clearTokenCookie(res);
+    res.json({ ok: true });
   });
 
   // --- API Routes ---

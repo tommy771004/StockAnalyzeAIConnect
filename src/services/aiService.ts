@@ -612,3 +612,132 @@ export async function analyzeNewsSentiment(news: NewsItem[], model = 'meta-llama
     return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 4 GenUI: SSE streaming client + Tool Call interceptor
+// Rule: skills/02_Agent_GenUI.md §2 "串流與生成式 UI (Streaming & GenUI)"
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Maps backend tool names to the React component name to render */
+const TOOL_COMPONENT_MAP: Record<string, string> = {
+  show_stock_chart:            'ChartWidget',
+  show_news_sentiment:         'NewsSentimentCard',
+  get_portfolio_performance:   'PortfolioSummary',
+  execute_backtest:            'BacktestResult',
+};
+
+/** A GenUI component descriptor returned by the stream */
+export interface GenUIComponent {
+  componentName: string;
+  props:         Record<string, unknown>;
+  toolCallId:    string;
+}
+
+/** A single streamed chunk from the agent */
+export type AgentStreamChunk =
+  | { kind: 'text';        delta: string }
+  | { kind: 'ui_component'; component: GenUIComponent }
+  | { kind: 'done' }
+  | { kind: 'error';       message: string };
+
+/**
+ * Streams a chat response from POST /api/agent/stream.
+ * Calls `onChunk` for each SSE event — callers append text deltas to a ref
+ * and render GenUI component descriptors directly without setState.
+ *
+ * Example usage:
+ *   const textRef = useRef('');
+ *   const [components, setComponents] = useState<GenUIComponent[]>([]);
+ *   await streamAgentChat({ message, onChunk: (chunk) => {
+ *     if (chunk.kind === 'text')         textRef.current += chunk.delta;
+ *     if (chunk.kind === 'ui_component') setComponents(prev => [...prev, chunk.component]);
+ *   }});
+ */
+export async function streamAgentChat(params: {
+  message:     string;
+  symbol?:     string;
+  history?:    Array<{ role: 'user' | 'assistant'; content: string }>;
+  locale?:     string;
+  onChunk:     (chunk: AgentStreamChunk) => void;
+}): Promise<void> {
+  const { message, symbol, history = [], locale = 'zh-TW', onChunk } = params;
+
+  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/api/agent/stream`, {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'include', // send HttpOnly cookie (Phase 1 rule)
+      body: JSON.stringify({ message, symbol, history, locale }),
+    });
+  } catch (err: unknown) {
+    onChunk({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' });
+    return;
+  }
+
+  if (!response.ok) {
+    onChunk({ kind: 'error', message: `Server ${response.status}: ${response.statusText}` });
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    onChunk({ kind: 'error', message: 'No response body' });
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE lines from buffer
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? ''; // last incomplete line stays in buffer
+
+    let currentEvent = '';
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEvent = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+        let payload: Record<string, unknown>;
+        try {
+          payload = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+
+        // ── GenUI Tool Call marker ─────────────────────────────────────────
+        if (currentEvent === 'ui_component') {
+          const rawName  = (payload['name'] as string | undefined) ?? '';
+          const toolName = (payload['type'] === 'ui_component' ? rawName : '') || rawName;
+          const componentName = TOOL_COMPONENT_MAP[toolName] ?? toolName;
+          onChunk({
+            kind: 'ui_component',
+            component: {
+              componentName,
+              props:      (payload['props'] as Record<string, unknown>) ?? {},
+              toolCallId: (payload['tool_call_id'] as string) ?? '',
+            },
+          });
+        } else if (currentEvent === 'text') {
+          onChunk({ kind: 'text', delta: (payload['delta'] as string) ?? '' });
+        } else if (currentEvent === 'done') {
+          onChunk({ kind: 'done' });
+        } else if (currentEvent === 'error') {
+          onChunk({ kind: 'error', message: (payload['message'] as string) ?? 'Unknown error' });
+        }
+
+        currentEvent = '';
+      }
+    }
+  }
+}

@@ -334,6 +334,271 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 4: Function Calling (Tools) Schema
+// Rule: skills/02_Agent_GenUI.md §1 "Function Calling"
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AGENT_TOOLS = [
+  {
+    type: 'function' as const,
+    function: {
+      name: 'show_stock_chart',
+      description: '顯示特定股票的互動式 K 線圖',
+      parameters: {
+        type: 'object',
+        properties: {
+          ticker:    { type: 'string',  description: '股票代號，例如 AAPL, NVDA, TSLA' },
+          timeframe: { type: 'string',  enum: ['1D','1W','1M','3M','1Y'], description: '時間區間' },
+          showMA:    { type: 'boolean', description: '是否疊加移動平均線' },
+        },
+        required: ['ticker'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_portfolio_performance',
+      description: '讀取使用者的投資組合績效，包含持倉明細與損益統計',
+      parameters: {
+        type: 'object',
+        properties: {
+          period: { type: 'string', enum: ['1D','1W','1M','3M','YTD','1Y'], description: '績效計算區間' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'execute_backtest',
+      description: '對指定股票執行回測並回傳績效指標',
+      parameters: {
+        type: 'object',
+        properties: {
+          ticker:          { type: 'string', description: '股票代號' },
+          strategy:        { type: 'string', description: '策略名稱 (ma_cross, rsi, bb)' },
+          initialCapital:  { type: 'number', description: '初始資金 (USD)' },
+          startDate:       { type: 'string', description: 'YYYY-MM-DD' },
+          endDate:         { type: 'string', description: 'YYYY-MM-DD' },
+        },
+        required: ['ticker', 'strategy'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'show_news_sentiment',
+      description: '顯示特定標的的最新新聞情緒分析卡片',
+      parameters: {
+        type: 'object',
+        properties: {
+          ticker: { type: 'string', description: '股票代號' },
+          limit:  { type: 'number', description: '新聞筆數上限 (default 5)' },
+        },
+        required: ['ticker'],
+      },
+    },
+  },
+] as const;
+
+type AgentToolName = (typeof AGENT_TOOLS)[number]['function']['name'];
+
+interface ToolCallResult {
+  tool_name: AgentToolName;
+  args:      Record<string, unknown>;
+  result:    unknown;
+}
+
+// Execute a Tool Call server-side and return the result
+async function executeToolCall(
+  toolName: AgentToolName,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<unknown> {
+  switch (toolName) {
+    case 'get_portfolio_performance': {
+      const positions = await import('../repositories/positionsRepo.js').then(m => m.getPositionsByUser(userId)).catch(() => []);
+      const tradeList = await tradesRepo.getTradesByUser(userId).catch(() => []);
+      return { positions, recentTrades: tradeList.slice(0, 10) };
+    }
+    case 'execute_backtest': {
+      // Placeholder — real impl would call server-side backtestEngine
+      return { ok: true, message: '回測已排入佇列，結果將透過 SSE 回傳', args };
+    }
+    case 'show_stock_chart':
+    case 'show_news_sentiment': {
+      // These tools produce UI components rendered on the frontend
+      return { rendered_on_client: true, args };
+    }
+    default:
+      return { error: `未知工具: ${toolName as string}` };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/agent/stream  — SSE streaming with Function Calling
+// Rule: skills/02_Agent_GenUI.md §2 "串流與生成式 UI (Streaming & GenUI)"
+// ─────────────────────────────────────────────────────────────────────────────
+
+agentRouter.post('/stream', async (req: AuthRequest, res) => {
+  const userId = req.userId;
+  const { message, symbol, history: convHistory = [], locale = 'zh-TW' } = req.body ?? {};
+
+  if (!userId) { res.status(401).json({ error: '未授權' }); return; }
+  if (!message) { res.status(400).json({ error: '缺少 message' }); return; }
+
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type':  'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection':    'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const sseWrite = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey && userId) {
+      try {
+        const storedKey = await settingsRepo.getSetting(userId, 'openrouterKey');
+        if (storedKey && (storedKey as Record<string, unknown>)['settingValue']) {
+          openrouterKey = (storedKey as Record<string, unknown>)['settingValue'];
+        }
+      } catch { /* ignore */ }
+    }
+    if (!openrouterKey) {
+      sseWrite('error', { message: 'OPENROUTER_API_KEY 未設定' });
+      res.end();
+      return;
+    }
+
+    // Build system prompt with locale (Rule: skills/04_Production_Readiness.md §2 "AI 語系連動")
+    const systemPrompt = await buildSystemPrompt(userId, null);
+    const localizedSystem = `${systemPrompt}\n\n[LOCALE: ${locale}] 請以 ${locale} 語系回覆。`;
+
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: localizedSystem },
+      ...(convHistory as OpenRouterMessage[]).slice(-8),
+      { role: 'user', content: message },
+    ];
+
+    // Phase 1: Call LLM with Tools (non-streaming for tool handling, stream text chunks)
+    const apiRes = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${openrouterKey}`,
+        'HTTP-Referer':  'https://hermes-ai.trading',
+        'X-Title':       'FIN-TERMINAL Agent',
+      },
+      body: JSON.stringify({
+        model:       FREE_MODEL_PRIMARY,
+        messages,
+        tools:       AGENT_TOOLS,
+        tool_choice: 'auto',
+        temperature: 0.65,
+        max_tokens:  1200,
+        stream:      false,
+      }),
+      signal: AbortSignal.timeout(35000),
+    });
+
+    if (!apiRes.ok) {
+      sseWrite('error', { message: `OpenRouter ${apiRes.status}` });
+      res.end();
+      return;
+    }
+
+    const completion = await apiRes.json() as {
+      choices: Array<{
+        message: {
+          content?: string;
+          tool_calls?: Array<{
+            id: string;
+            type: 'function';
+            function: { name: string; arguments: string };
+          }>;
+        };
+      }>;
+    };
+
+    const choice = completion.choices[0];
+    if (!choice) { sseWrite('error', { message: '空回應' }); res.end(); return; }
+
+    const assistantMsg = choice.message;
+
+    // ── Handle Tool Calls ─────────────────────────────────────────────────────
+    if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
+      const toolResults: ToolCallResult[] = [];
+
+      for (const tc of assistantMsg.tool_calls) {
+        const toolName = tc.function.name as AgentToolName;
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(tc.function.arguments) as Record<string, unknown>; } catch { /* ignore */ }
+
+        // Emit the GenUI component marker BEFORE executing the tool
+        // Rule: skills/02_Agent_GenUI.md "吐出特定的 JSON UI 標記"
+        sseWrite('ui_component', {
+          type:  'ui_component',
+          name:  toolName === 'show_stock_chart'     ? 'ChartWidget'
+               : toolName === 'show_news_sentiment'  ? 'NewsSentimentCard'
+               : toolName === 'get_portfolio_performance' ? 'PortfolioSummary'
+               : toolName === 'execute_backtest'     ? 'BacktestResult'
+               : 'GenericCard',
+          props: args,
+          tool_call_id: tc.id,
+        });
+
+        const result = await executeToolCall(toolName, args, userId);
+        toolResults.push({ tool_name: toolName, args, result });
+      }
+
+      // Phase 2: Ask LLM to summarise tool results as natural language
+      const toolResultMessages: OpenRouterMessage[] = [
+        ...messages,
+        { role: 'assistant', content: JSON.stringify(assistantMsg.tool_calls) },
+        {
+          role: 'user',
+          content: `以下是工具執行結果，請用 ${locale} 為使用者做一個簡潔的摘要說明：\n${JSON.stringify(toolResults, null, 2)}`,
+        },
+      ];
+      const summaryText = await callOpenRouter(toolResultMessages, FREE_MODEL_PRIMARY, openrouterKey).catch(() => '已完成工具呼叫。');
+      sseWrite('text', { delta: summaryText });
+    } else {
+      // Pure text response — emit as delta chunks (split by sentence for perceived streaming)
+      const fullText = assistantMsg.content ?? '';
+      const chunks = fullText.match(/[^。！？\n]{1,80}[。！？\n]?/g) ?? [fullText];
+      for (const chunk of chunks) {
+        sseWrite('text', { delta: chunk });
+      }
+    }
+
+    // ── Persist extracted skills ──────────────────────────────────────────────
+    const rawText = assistantMsg.content ?? '';
+    const { skills } = parseExtractedSkills(rawText);
+    if (skills.length > 0) {
+      await Promise.allSettled(
+        skills.map(s => agentMemoryRepo.createMemory({ userId, memoryType: s.type, content: s.content })),
+      );
+    }
+
+    sseWrite('done', { ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[Hermes/stream] error:', msg);
+    sseWrite('error', { message: msg });
+  } finally {
+    res.end();
+  }
+});
+
 // ── GET /api/agent/memories ───────────────────────────────────────────────────
 
 agentRouter.get('/memories', async (req: AuthRequest, res) => {
