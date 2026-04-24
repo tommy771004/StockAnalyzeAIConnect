@@ -5,7 +5,7 @@ import { TickerTape } from './TickerTape';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { AgentPanel } from './AgentPanel';
-import { useMarketData } from '../hooks/useMarketData';
+import { useMarketData, TICKER_LABEL_MAP } from '../hooks/useMarketData';
 import { BarChart3, Bell, LayoutDashboard, Target, Globe } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -32,13 +32,25 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
   const toggleAgent = () => setIsAgentOpen((prev) => !prev);
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
-  const { indices } = useMarketData();
+  const { tickerQuotes } = useMarketData();
 
-  const tickerItems = indices.map((idx) => ({
-    label: idx.symbol.replace('^', ''),
-    value: idx.regularMarketPrice?.toLocaleString() || '---',
-    changePct: idx.regularMarketChangePercent || 0,
+  const tickerItems = tickerQuotes.map((q: any) => ({
+    symbol: q.symbol,
+    label: TICKER_LABEL_MAP[q.symbol] ?? q.symbol.replace(/[\^=].*$/, '').replace('-USD', ''),
+    value: q.regularMarketPrice != null
+      ? q.regularMarketPrice >= 1000
+        ? q.regularMarketPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })
+        : q.regularMarketPrice >= 1
+        ? q.regularMarketPrice.toFixed(2)
+        : q.regularMarketPrice.toFixed(4)
+      : '---',
+    changePct: q.regularMarketChangePercent ?? 0,
   }));
+
+  const handleTickerSelect = (symbol: string) => {
+    window.dispatchEvent(new CustomEvent('symbol-search', { detail: symbol }));
+    onChange('research');
+  };
 
   return (
     <div className="flex h-screen w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
@@ -56,8 +68,9 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
         items={
           tickerItems.length > 0
             ? tickerItems
-            : [{ label: 'MARKET', value: 'LOADING...', changePct: 0 }]
+            : [{ symbol: '', label: 'MARKET', value: 'LOADING...', changePct: 0 }]
         }
+        onSelect={handleTickerSelect}
       />
 
       {/* Main content area */}

@@ -954,7 +954,136 @@ app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) =
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Stock Screener ─────────────────────────────────────────────────────────────
+// Batch-scans a list of symbols against technical criteria.
+// Uses Yahoo Finance for quotes + 90-day price history for indicator computation.
+app.post('/api/screener', authMiddleware, async (req: AuthRequest, res) => {
+  const { symbols = [], filters = {} } = req.body ?? {};
+  if (!Array.isArray(symbols) || symbols.length === 0) {
+    return res.status(400).json({ error: 'symbols array required' });
+  }
+
+  const results: any[] = [];
+
+  await Promise.allSettled(
+    symbols.map(async (sym: string) => {
+      try {
+        const [quoteRaw, histRaw] = await Promise.allSettled([
+          NativeYahooApi.quote(sym),
+          NativeYahooApi.chart(sym, { interval: '1d', period1: String(Date.now() - 120 * 24 * 3600 * 1000) }),
+        ]);
+
+        const quote: any = quoteRaw.status === 'fulfilled' ? quoteRaw.value : null;
+        const hist = histRaw.status === 'fulfilled' ? (histRaw.value as any).quotes ?? [] : [];
+
+        const price = quote?.regularMarketPrice ?? 0;
+        const changePct = quote?.regularMarketChangePercent ?? 0;
+        const name = quote?.shortName ?? quote?.longName ?? sym;
+
+        // ── Technical indicators ──────────────────────────────────────────────
+        const closes: number[] = hist.map((h: any) => Number(h.close)).filter((v: number) => !isNaN(v));
+        const vols: number[] = hist.map((h: any) => Number(h.volume)).filter((v: number) => !isNaN(v));
+
+        // RSI(14)
+        let rsi = 50;
+        if (closes.length >= 15) {
+          let avgUp = 0, avgDn = 0;
+          for (let i = closes.length - 14; i < closes.length; i++) {
+            const d = closes[i] - closes[i - 1];
+            if (d > 0) avgUp += d; else avgDn -= d;
+          }
+          avgUp /= 14; avgDn /= 14;
+          rsi = avgDn === 0 ? 100 : 100 - 100 / (1 + avgUp / avgDn);
+        }
+
+        // SMA5, SMA20, SMA60
+        const last = (arr: number[], n: number) => arr.slice(-n);
+        const mean = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const sma5  = closes.length >= 5  ? mean(last(closes, 5))  : price;
+        const sma20 = closes.length >= 20 ? mean(last(closes, 20)) : null;
+        const sma60 = closes.length >= 60 ? mean(last(closes, 60)) : null;
+
+        // MACD(12,26,9)
+        const ema = (arr: number[], p: number) => {
+          const k = 2 / (p + 1); let e = arr[0];
+          for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
+          return e;
+        };
+        let macdHistogram = 0;
+        if (closes.length >= 26) {
+          const e12 = ema(closes, 12);
+          const e26 = ema(closes, 26);
+          const macdLine = e12 - e26;
+          // For signal, use last 9 MACD values approximation
+          const slice = closes.slice(-35);
+          const macdSlice = slice.map((_, i, arr) => {
+            if (i < 26) return 0;
+            return ema(arr.slice(0, i + 1), 12) - ema(arr.slice(0, i + 1), 26);
+          }).filter((v) => v !== 0);
+          const signalLine = macdSlice.length >= 9 ? ema(macdSlice, 9) : macdLine;
+          macdHistogram = macdLine - signalLine;
+        }
+
+        // Volume ratio (current / 20-day avg)
+        const avgVol20 = vols.length >= 20 ? mean(last(vols, 20)) : (vols.length ? mean(vols) : 1);
+        const currentVol = vols[vols.length - 1] ?? 0;
+        const volumeRatio = avgVol20 > 0 ? currentVol / avgVol20 : 1;
+
+        // ── Signal detection ──────────────────────────────────────────────────
+        const signals: string[] = [];
+        if (rsi < 30) signals.push('RSI 超賣');
+        if (rsi > 70) signals.push('RSI 超買');
+        if (sma20 && sma5 > sma20 && closes.length >= 6) {
+          const prevSma5 = mean(last(closes.slice(0, -1), 5));
+          const prevSma20 = mean(last(closes.slice(0, -1), 20));
+          if (prevSma5 <= prevSma20) signals.push('均線金叉');
+        }
+        if (sma20 && sma5 < sma20 && closes.length >= 6) {
+          const prevSma5 = mean(last(closes.slice(0, -1), 5));
+          const prevSma20 = mean(last(closes.slice(0, -1), 20));
+          if (prevSma5 >= prevSma20) signals.push('均線死叉');
+        }
+        if (macdHistogram > 0) signals.push('MACD 多頭');
+        if (macdHistogram < 0) signals.push('MACD 空頭');
+        if (volumeRatio >= 2) signals.push('異常爆量');
+        if (sma20 && price > sma20) signals.push('強勢多頭');
+
+        // ── Apply filters ─────────────────────────────────────────────────────
+        if (filters.rsiBelow !== undefined && rsi >= filters.rsiBelow) return;
+        if (filters.rsiAbove !== undefined && rsi <= filters.rsiAbove) return;
+        if (filters.macdBullish && macdHistogram <= 0) return;
+        if (filters.macdBearish && macdHistogram >= 0) return;
+        if (filters.goldenCrossOnly && !signals.includes('均線金叉')) return;
+        if (filters.deathCrossOnly && !signals.includes('均線死叉')) return;
+        if (filters.volumeSpikeMin !== undefined && volumeRatio < filters.volumeSpikeMin) return;
+        if (filters.aboveSMA20 && sma20 && price <= sma20) return;
+        if (filters.belowSMA20 && sma20 && price >= sma20) return;
+
+        results.push({
+          symbol: sym,
+          name,
+          price,
+          changePct,
+          rsi: Number(rsi.toFixed(1)),
+          macdHistogram: Number(macdHistogram.toFixed(4)),
+          sma5: Number(sma5.toFixed(2)),
+          sma20: sma20 !== null ? Number(sma20.toFixed(2)) : null,
+          sma60: sma60 !== null ? Number(sma60.toFixed(2)) : null,
+          volumeRatio: Number(volumeRatio.toFixed(2)),
+          signals,
+          marketCap: quote?.marketCap ?? null,
+        });
+      } catch (err) {
+        console.warn(`[Screener] Skipping ${sym}:`, (err as Error).message);
+      }
+    })
+  );
+
+  res.json({ results, scanned: symbols.length });
+});
+
 app.use('/api/agent', authMiddleware, agentRouter);
+
 
 app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const rawSymbol = req.params.symbol as string, isTWStock = /^\d{4,5}$/.test(rawSymbol), yahooSymbol = isTWStock ? `${rawSymbol}.TW` : rawSymbol;
