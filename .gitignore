@@ -89,3 +89,6 @@ skills-lock.json
 .agents/skills/vercel-react-best-practices/rules/server-parallel-fetching.md
 .agents/skills/vercel-react-best-practices/rules/server-parallel-nested-fetching.md
 .agents/skills/vercel-react-best-practices/rules/server-serialization.md
+.agents/skills/ui-ux-pro-max/SKILL.md
+.agents/skills/ui-ux-pro-max/data
+.agents/skills/ui-ux-pro-max/scripts
