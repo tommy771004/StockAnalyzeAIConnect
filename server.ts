@@ -124,7 +124,9 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
 
   for (const modelId of modelsToTry) {
     try {
-      console.log(`[AI] Attempting request with model: ${modelId}...`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout per attempt
+
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -139,7 +141,10 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
           temperature: 0.3,
           ...(jsonMode && { response_format: { type: 'json_object' } })
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errText = await res.text();
@@ -153,8 +158,8 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
         console.log(`[AI] Success with model: ${modelId}`);
         return content;
       }
-    } catch (err) {
-      console.warn(`[AI] Error calling ${modelId}:`, (err as Error).message);
+    } catch (err: any) {
+      console.warn(`[AI] Error calling ${modelId}:`, err.message);
       lastError = err;
     }
   }
@@ -594,13 +599,16 @@ app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, re
     ]);
 
     const quote = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
-    const news = newsRes.status === 'fulfilled' ? (newsRes.value as any).news : [];
+    const newsData = newsRes.status === 'fulfilled' ? (newsRes.value as any) : null;
+    const news = Array.isArray(newsData?.news) ? newsData.news : [];
     
     // Flatten nested TV responses
     const tvO = tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null;
     const tvI = tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null;
 
-    const newsText = news.slice(0, 3).map((n: any) => `- ${n.title}`).join('\n');
+    const newsText = news.length > 0 
+      ? news.slice(0, 3).map((n: any) => `- ${n.title || n.headline || '無標題'}`).join('\n')
+      : '無近期相關新聞';
     const techText = tvI ? JSON.stringify(tvI).slice(0, 500) : '無技術指標數據';
 
     const prompt = `你是一位專業的金融分析師。請針對 ${sym} 提供深入的 AI 摘要分析。
@@ -620,8 +628,13 @@ ${newsText}
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {
-    console.error(`[AI] Error:`, e);
-    res.status(500).json({ error: e.message });
+    console.error(`[AI] Summarize Error for ${sym}:`, e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ 
+      error: `AI 摘要生成失敗: ${errMsg}`,
+      symbol: sym,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
