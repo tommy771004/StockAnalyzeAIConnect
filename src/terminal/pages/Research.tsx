@@ -52,6 +52,7 @@ export function ResearchPage() {
   const quote = data?.quote;
   const history = data?.history || [];
   const tv = data?.tvOverview || {};
+  const tvIndicators = data?.tvIndicators || {};
   const news = data?.tvNews || [];
 
   return (
@@ -76,7 +77,7 @@ export function ResearchPage() {
       <aside className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-4">
         <AISummaryPanel summary={aiSummary} loading={aiLoading} />
         <ValuationPanel tv={tv} />
-        <ConsensusPanel tv={tv} />
+        <ConsensusPanel tv={tv} tvIndicators={tvIndicators} />
         <RecentNewsPanel news={news} />
       </aside>
     </div>
@@ -166,16 +167,36 @@ function ValuationPanel({ tv }: { tv: any }) {
   );
 }
 
-function ConsensusPanel({ tv }: { tv: any }) {
-  const rec = tv?.recommendation_any || 'NEUTRAL';
-  const score = tv?.recommendation_any_score ?? 0; // -1 to 1
+function normalizeRecommendation(score: number): 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL' {
+  if (score > 0.5) return 'STRONG_BUY';
+  if (score > 0.1) return 'BUY';
+  if (score < -0.5) return 'STRONG_SELL';
+  if (score < -0.1) return 'SELL';
+  return 'NEUTRAL';
+}
+
+function toNum(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators: Record<string, unknown> }) {
+  const overviewScore = toNum(tv?.recommendation_any_score);
+  const indicatorScore = toNum(tvIndicators?.['Recommend.All']);
+  const score = overviewScore ?? indicatorScore ?? 0; // -1 to 1
+  const recRaw = (tv?.recommendation_any as string | undefined) ?? normalizeRecommendation(score);
+  const rec = String(recRaw).replace(/\s+/g, '_').toUpperCase();
   
   const buy = rec.includes('BUY') ? 70 : rec === 'NEUTRAL' ? 20 : 10;
   const hold = rec === 'NEUTRAL' ? 60 : 20;
   const sell = rec.includes('SELL') ? 70 : 10;
   const total = buy + hold + sell;
 
-  const hasData = tv?.recommendation_any != null;
+  const hasData = overviewScore != null || indicatorScore != null;
 
   return (
     <Panel title="分析師共識 & 技術指標">

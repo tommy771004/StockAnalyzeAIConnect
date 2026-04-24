@@ -112,19 +112,30 @@ function toTradingViewSymbol(input: string): string {
  * Calls OpenRouter with automatic fallback to other free models on failure
  */
 async function callAIWithFallback(prompt: string, jsonMode: boolean = false, userId?: string): Promise<string> {
-  let apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  let apiKey = '';
 
-  // If env key is missing, check user settings in DB
-  if (!apiKey && userId) {
+  // 1. Try user-provided key from DB first (if userId available)
+  if (userId) {
     try {
       const dbKey = await settingsRepo.getSetting<string>(userId, 'OPENROUTER_API_KEY');
-      if (dbKey) apiKey = dbKey.trim();
+      if (dbKey && dbKey.trim() && !dbKey.includes('sk-or-v1-YOUR_KEY')) {
+        apiKey = dbKey.trim();
+      }
     } catch (err) {
       console.warn(`[AI] Failed to load key from settings for user ${userId}`);
     }
   }
 
-  if (!apiKey) throw new Error('AI key missing');
+  // 2. Fallback to system-wide env key
+  if (!apiKey) {
+    apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+    // Ignore placeholder keys
+    if (apiKey.includes('sk-or-v1-YOUR_KEY') || !apiKey) {
+      apiKey = '';
+    }
+  }
+
+  if (!apiKey) throw new Error('AI key missing — please set your OpenRouter API Key in Settings');
 
   // Ensure we have models
   await getBestFreeModel();
@@ -967,7 +978,10 @@ app.get('/api/tv/news/:symbol', authMiddleware, async (req: AuthRequest, res) =>
   try {
     const data = await TV.getNewsHeadlines(req.params.symbol);
     res.json(data || []);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e: any) {
+    console.warn(`[TV News] Fallback to empty list for ${req.params.symbol}:`, e?.message ?? e);
+    res.json([]);
+  }
 });
 
 app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) => {
