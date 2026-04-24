@@ -19,9 +19,13 @@ export function ResearchPage() {
       try {
         const res = await fetch(`/api/ai/summarize/${activeSymbol}`);
         const json = await res.json();
-        setAiSummary(json.text || '無法生成摘要');
+        if (!res.ok) {
+          setAiSummary(json.error || `AI 服務錯誤 (HTTP ${res.status})`);
+        } else {
+          setAiSummary(json.text || '無法生成摘要');
+        }
       } catch (err) {
-        setAiSummary('AI 服務暫時無法連線');
+        setAiSummary('AI 服務暫時無法連線，請檢查網路或稍後再試');
       } finally {
         setAiLoading(false);
       }
