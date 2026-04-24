@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { Filter, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
@@ -21,7 +21,11 @@ const CATEGORY_STYLE: Record<NewsCategory['id'], { label: string; className: str
 export function DashboardPage() {
   const [range, setRange] = useState<ChartRange>('1W');
   const data = useDashboardData(range);
-  const { loading, isLive, watchlist, gainers, losers, candles, news, selected, setSelected, selectedRow, refresh } = data;
+  const { 
+    loading, isLive, watchlist, gainers, losers, candles, news, 
+    selected, setSelected, selectedRow, refresh,
+    addToWatchlist, removeFromWatchlist 
+  } = data;
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3">
@@ -34,13 +38,20 @@ export function DashboardPage() {
           isLive={isLive}
           loading={loading}
           onRefresh={refresh}
+          onAdd={addToWatchlist}
+          onDelete={removeFromWatchlist}
         />
-        <TopMoversPanel gainers={gainers} losers={losers} loading={loading} />
+        <TopMoversPanel 
+          gainers={gainers} 
+          losers={losers} 
+          loading={loading} 
+          onSelect={setSelected}
+        />
       </div>
 
       {/* Center column */}
       <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-6">
-        <MarketPulsePanel watchlist={watchlist} />
+        <MarketPulsePanel watchlist={watchlist} onSelect={setSelected} />
         <SelectedChartPanel
           row={selectedRow}
           candles={candles}
@@ -53,7 +64,7 @@ export function DashboardPage() {
 
       {/* Right column */}
       <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-3">
-        <MarketNewsPanel news={news} />
+        <MarketNewsPanel news={news} onSelect={setSelected} />
         <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
       </div>
     </div>
@@ -68,6 +79,8 @@ function WatchlistPanel({
   isLive,
   loading,
   onRefresh,
+  onAdd,
+  onDelete,
 }: {
   rows: WatchlistRow[];
   selected: string;
@@ -75,12 +88,33 @@ function WatchlistPanel({
   isLive: boolean;
   loading: boolean;
   onRefresh: () => void;
+  onAdd: (s: string) => Promise<void>;
+  onDelete: (s: string) => Promise<void>;
 }) {
+  const [newSymbol, setNewSymbol] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSymbol.trim()) return;
+    await onAdd(newSymbol.trim());
+    setNewSymbol('');
+    setShowAdd(false);
+  };
+
   return (
     <Panel
       title="WATCHLIST"
       actions={
         <div className="flex items-center gap-2">
+          {/* Add button */}
+          <button
+            type="button"
+            onClick={() => setShowAdd(!showAdd)}
+            className={cn("transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
           {/* Live / Offline badge */}
           <span
             className={cn(
@@ -106,15 +140,33 @@ function WatchlistPanel({
         </div>
       }
       className="flex-1 min-h-[260px]"
-      bodyClassName="overflow-auto"
+      bodyClassName="overflow-auto flex flex-col"
     >
+      {showAdd && (
+        <form onSubmit={handleAdd} className="flex border-b border-(--color-term-border) bg-black/20 p-2">
+          <input
+            autoFocus
+            className="flex-1 bg-transparent px-2 text-[12px] font-bold tracking-widest text-(--color-term-text) focus:outline-none placeholder:text-(--color-term-muted)/50"
+            placeholder="ENTER TICKER..."
+            value={newSymbol}
+            onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
+          />
+          <button type="submit" className="text-(--color-term-accent) px-2">
+            <Plus className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => setShowAdd(false)} className="text-(--color-term-muted) px-2">
+            <X className="h-4 w-4" />
+          </button>
+        </form>
+      )}
+
       <table className="w-full text-[12px]">
         <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
           <tr className="border-b border-(--color-term-border)">
             <th className="px-3 py-2 text-left font-medium">SYM</th>
             <th className="px-3 py-2 text-right font-medium">LAST</th>
             <th className="px-3 py-2 text-right font-medium">CHG%</th>
-            <th className="px-3 py-2 text-right font-medium">VOL</th>
+            <th className="px-3 py-2 text-right font-medium w-8"></th>
           </tr>
         </thead>
         <tbody>
@@ -125,7 +177,7 @@ function WatchlistPanel({
                 key={row.symbol}
                 onClick={() => onSelect(row.symbol)}
                 className={cn(
-                  'cursor-pointer border-b border-(--color-term-border)/60 transition-colors',
+                  'group cursor-pointer border-b border-(--color-term-border)/60 transition-colors',
                   isActive
                     ? 'bg-(--color-term-accent)/10 text-(--color-term-accent)'
                     : 'hover:bg-white/5',
@@ -147,8 +199,17 @@ function WatchlistPanel({
                 <td className={cn('px-3 py-2 text-right tabular-nums', toneClass(row.changePct))}>
                   {formatPct(row.changePct)}
                 </td>
-                <td className="px-3 py-2 text-right text-(--color-term-muted) tabular-nums">
-                  {row.volume}
+                <td className="px-3 py-2 text-right">
+                   <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Remove ${row.symbol}?`)) onDelete(row.symbol);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 transition-all p-1"
+                   >
+                     <Trash2 className="h-3.5 w-3.5" />
+                   </button>
                 </td>
               </tr>
             );
@@ -164,10 +225,12 @@ function TopMoversPanel({
   gainers,
   losers,
   loading,
+  onSelect,
 }: {
   gainers: { symbol: string; changePct: number }[];
   losers:  { symbol: string; changePct: number }[];
   loading: boolean;
+  onSelect: (s: string) => void;
 }) {
   const [tab, setTab] = useState<'gainers' | 'losers'>('gainers');
   const rows = tab === 'gainers' ? gainers : losers;
@@ -195,7 +258,11 @@ function TopMoversPanel({
           <li className="px-3 py-4 text-center text-[11px] text-(--color-term-muted)">Loading…</li>
         ) : (
           rows.map((m) => (
-            <li key={m.symbol} className="flex items-center justify-between px-3 py-2 text-[12px]">
+            <li 
+              key={m.symbol} 
+              onClick={() => onSelect(m.symbol)}
+              className="flex items-center justify-between px-3 py-2 text-[12px] hover:bg-white/5 cursor-pointer transition-colors group/mover"
+            >
               <span className="flex items-center gap-2">
                 <span
                   className={cn(
@@ -203,7 +270,7 @@ function TopMoversPanel({
                     m.changePct >= 0 ? 'bg-(--color-term-positive)' : 'bg-(--color-term-negative)',
                   )}
                 />
-                <span className="font-semibold tracking-wider">{m.symbol}</span>
+                <span className="font-semibold tracking-wider group-hover/mover:text-(--color-term-accent) transition-colors">{m.symbol}</span>
               </span>
               <span className={`${toneClass(m.changePct)} tabular-nums`}>
                 {formatPct(m.changePct, 1)}
@@ -217,7 +284,7 @@ function TopMoversPanel({
 }
 
 // ─── MarketPulsePanel ──────────────────────────────────────────────────────────
-function MarketPulsePanel({ watchlist }: { watchlist: WatchlistRow[] }) {
+function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   return (
     <Panel
       title="MARKET PULSE (WATCHLIST)"
@@ -230,13 +297,13 @@ function MarketPulsePanel({ watchlist }: { watchlist: WatchlistRow[] }) {
       className="h-[240px]"
       bodyClassName="p-2"
     >
-      <Heatmap watchlist={watchlist} />
+      <Heatmap watchlist={watchlist} onSelect={onSelect} />
     </Panel>
   );
 }
 
 // ─── Dynamic Heatmap ────────────────────────────────────────────────────────
-function Heatmap({ watchlist }: { watchlist: WatchlistRow[] }) {
+function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   if (!watchlist || watchlist.length === 0) {
     return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">Pulse unavailable</div>;
   }
@@ -251,15 +318,15 @@ function Heatmap({ watchlist }: { watchlist: WatchlistRow[] }) {
   return (
     <div className="grid h-full grid-rows-[2fr_1fr_1fr] gap-1">
       <div className="grid grid-cols-12 gap-1">
-        <HeatCell cell={items[0]!} className="col-span-5 row-span-2" size="lg" />
-        <HeatCell cell={items[1]!} className="col-span-3" />
-        <HeatCell cell={items[2]!} className="col-span-4" />
-        <HeatCell cell={items[3]!} className="col-span-7 row-span-2" size="lg" />
+        <HeatCell cell={items[0]!} onSelect={onSelect} className="col-span-5 row-span-2" size="lg" />
+        <HeatCell cell={items[1]!} onSelect={onSelect} className="col-span-3" />
+        <HeatCell cell={items[2]!} onSelect={onSelect} className="col-span-4" />
+        <HeatCell cell={items[3]!} onSelect={onSelect} className="col-span-7 row-span-2" size="lg" />
       </div>
       <div className="hidden grid-cols-12 gap-1" />
       <div className="grid grid-cols-12 gap-1">
-        <HeatCell cell={items[4]!} className="col-span-6" />
-        <HeatCell cell={items[5]!} className="col-span-6" />
+        <HeatCell cell={items[4]!} onSelect={onSelect} className="col-span-6" />
+        <HeatCell cell={items[5]!} onSelect={onSelect} className="col-span-6" />
       </div>
     </div>
   );
@@ -268,24 +335,26 @@ function Heatmap({ watchlist }: { watchlist: WatchlistRow[] }) {
 function HeatCell({
   cell,
   className,
+  onSelect,
   size = 'md',
 }: {
   cell: { symbol: string; changePct: number };
   className?: string;
+  onSelect: (s: string) => void;
   size?: 'md' | 'lg';
 }) {
   const isDummy = cell.symbol === '--';
   const shade = isDummy 
     ? 'bg-zinc-800/20' 
     : cell.changePct > 0.8
-      ? 'bg-emerald-700/80'
+      ? 'bg-emerald-700/80 hover:bg-emerald-700 active:scale-[0.98]'
       : cell.changePct > 0
-        ? 'bg-emerald-800/70'
+        ? 'bg-emerald-800/70 hover:bg-emerald-800 active:scale-[0.98]'
         : cell.changePct < -0.8
-          ? 'bg-rose-700/80'
+          ? 'bg-rose-700/80 hover:bg-rose-700 active:scale-[0.98]'
           : cell.changePct < 0
-            ? 'bg-rose-800/70'
-            : 'bg-zinc-700/70';
+            ? 'bg-rose-800/70 hover:bg-rose-800 active:scale-[0.98]'
+            : 'bg-zinc-700/70 hover:bg-zinc-700 active:scale-[0.98]';
   return (
     <div
       className={cn(
@@ -354,23 +423,6 @@ function SelectedChartPanel({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          {(['1D', '1W', '1M', 'YTD'] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={cn(
-                'h-6 min-w-9 px-1.5 text-[10px] tracking-widest transition-colors',
-                range === r
-                  ? 'border border-(--color-term-accent) text-(--color-term-accent)'
-                  : 'text-(--color-term-muted) hover:text-(--color-term-text)',
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
       </header>
 
       {/* OHLC summary bar */}
@@ -409,6 +461,7 @@ function SelectedChartPanel({
             symbol={row.symbol}
             data={chartData}
             liveMode={isLive}
+            onTimeframeChange={(t) => setRange(t as any)}
           />
         )}
       </div>
@@ -416,169 +469,73 @@ function SelectedChartPanel({
   );
 }
 
-// ─── CandlestickChart — renders real OHLC SVG ─────────────────────────────────
-function CandlestickChart({ candles }: { candles: CandlePoint[] }) {
-  const W = 700; const H = 320;
-  const PAD_LEFT = 8; const PAD_RIGHT = 52; const PAD_TOP = 12; const PAD_BOTTOM = 20;
-  const chartW = W - PAD_LEFT - PAD_RIGHT;
-  const chartH = H - PAD_TOP - PAD_BOTTOM;
-
-  if (candles.length === 0) return null;
-
-  const minPrice = Math.min(...candles.map((c) => c.low));
-  const maxPrice = Math.max(...candles.map((c) => c.high));
-  const priceRange = maxPrice - minPrice || 1;
-
-  const toY = (p: number) => PAD_TOP + chartH - ((p - minPrice) / priceRange) * chartH;
-  const barW = Math.max(2, (chartW / candles.length) * 0.6);
-  const barStep = chartW / candles.length;
-
-  // Price grid lines
-  const gridPrices = [0.2, 0.4, 0.6, 0.8].map((p) => minPrice + priceRange * p);
-
-  // Last price tag
-  const lastPrice = candles[candles.length - 1]!.close;
-  const lastY = toY(lastPrice);
-  const lastPriceLabel = lastPrice.toFixed(2);
-
-  return (
-    <svg
-      className="h-full w-full"
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-    >
-      <defs>
-        <linearGradient id="candleGreenFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#34d399" stopOpacity="0.02" />
-        </linearGradient>
-        <linearGradient id="candleRedFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#f87171" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#f87171" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-
-      {/* Grid lines */}
-      {gridPrices.map((p) => {
-        const y = toY(p);
-        return (
-          <g key={p}>
-            <line
-              x1={PAD_LEFT} x2={W - PAD_RIGHT}
-              y1={y} y2={y}
-              stroke="rgba(255,255,255,0.05)"
-              strokeWidth="1"
-            />
-            <text
-              x={W - PAD_RIGHT + 4}
-              y={y + 4}
-              fontSize="9"
-              fill="#6b7280"
-              fontFamily="monospace"
-            >
-              {p >= 1000 ? p.toFixed(0) : p.toFixed(2)}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Candles */}
-      {candles.map((c, i) => {
-        const x = PAD_LEFT + i * barStep + barStep / 2;
-        const isGreen = c.close >= c.open;
-        const color = isGreen ? '#34d399' : '#f87171';
-        const bodyTop    = toY(Math.max(c.open, c.close));
-        const bodyBottom = toY(Math.min(c.open, c.close));
-        const bodyH = Math.max(1, bodyBottom - bodyTop);
-
-        return (
-          <g key={i}>
-            {/* Wick */}
-            <line
-              x1={x} x2={x}
-              y1={toY(c.high)} y2={toY(c.low)}
-              stroke={color}
-              strokeWidth="1"
-              strokeOpacity="0.6"
-            />
-            {/* Body */}
-            <rect
-              x={x - barW / 2}
-              y={bodyTop}
-              width={barW}
-              height={bodyH}
-              fill={isGreen ? 'rgba(52,211,153,0.8)' : 'rgba(248,113,113,0.8)'}
-              stroke={color}
-              strokeWidth="0.5"
-            />
-          </g>
-        );
-      })}
-
-      {/* Last price dashed line + label */}
-      <line
-        x1={PAD_LEFT} x2={W - PAD_RIGHT}
-        y1={lastY} y2={lastY}
-        stroke="#f59e0b"
-        strokeWidth="1"
-        strokeDasharray="4 3"
-      />
-      <rect
-        x={W - PAD_RIGHT + 2}
-        y={lastY - 9}
-        width={48}
-        height={18}
-        fill="#f59e0b"
-        rx="2"
-      />
-      <text
-        x={W - PAD_RIGHT + 26}
-        y={lastY + 4}
-        textAnchor="middle"
-        fontSize="10"
-        fill="#0a0d13"
-        fontWeight="700"
-        fontFamily="monospace"
-      >
-        {lastPriceLabel}
-      </text>
-    </svg>
-  );
-}
 
 // ─── MarketNewsPanel ───────────────────────────────────────────────────────────
-function MarketNewsPanel({ news }: { news: DashboardNews[] }) {
+function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
+  const [filter, setFilter] = useState<NewsCategory['id'] | 'ALL'>('ALL');
+  
+  const filteredNews = useMemo(() => {
+    if (filter === 'ALL') return news;
+    return news.filter(n => n.category === filter);
+  }, [news, filter]);
+
+  const cycleFilter = () => {
+    const cats: Array<NewsCategory['id'] | 'ALL'> = ['ALL', 'MACRO', 'TECH', 'EARNINGS', 'CRYPTO'];
+    const idx = cats.indexOf(filter);
+    setFilter(cats[(idx + 1) % cats.length]);
+  };
+
   return (
     <Panel
-      title="MARKET NEWS"
-      actions={<Filter className="h-3.5 w-3.5" />}
+      title={`MARKET NEWS ${filter !== 'ALL' ? `(${filter})` : ''}`}
+      actions={
+        <button 
+          onClick={cycleFilter}
+          title="切換新聞類別"
+          className="p-1 hover:bg-white/10 rounded-sm transition-colors text-(--color-term-accent)"
+        >
+          <Filter className="h-3.5 w-3.5" />
+        </button>
+      }
       className="flex-1 min-h-[300px]"
       bodyClassName="overflow-auto"
     >
-      {news.length === 0 ? (
+      {filteredNews.length === 0 ? (
         <div className="flex h-full items-center justify-center text-[11px] text-(--color-term-muted)">
-          No recent news.
+          No recent {filter !== 'ALL' ? filter : ''} news.
         </div>
       ) : (
         <ul className="divide-y divide-(--color-term-border)/60">
-          {news.map((n) => {
+          {filteredNews.map((n) => {
             const cat = CATEGORY_STYLE[n.category] || CATEGORY_STYLE['TECH'];
             return (
-              <li key={n.id} className="px-3 py-3">
+              <li 
+                key={n.id} 
+                className="px-3 py-3 hover:bg-white/5 cursor-pointer transition-colors group/news"
+                onClick={() => n.link && window.open(n.link, '_blank', 'noopener')}
+              >
                 <div className="mb-1.5 flex items-center justify-between text-[10px] tracking-widest">
                   <span className={cn('border px-1.5 py-0.5 uppercase', cat.className)}>
                     {cat.label}
                   </span>
                   <span className="text-(--color-term-muted)">{n.time}</span>
                 </div>
-                <p className="mb-1.5 text-[12.5px] leading-snug text-(--color-term-text)">
+                <p className="mb-1.5 text-[12.5px] font-medium leading-snug text-(--color-term-text) group-hover/news:text-(--color-term-accent) transition-colors">
                   {n.title}
                 </p>
                 <div className="flex items-center gap-1.5 text-[10px] text-(--color-term-muted)">
                   <span>Mentions:</span>
                   {n.tickers?.map((t, i) => (
                     <span key={t}>
-                      <span className="text-(--color-term-positive)">{t}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelect(t);
+                        }}
+                        className="text-(--color-term-positive) hover:underline hover:text-(--color-term-accent)"
+                      >
+                        {t}
+                      </button>
                       {i < n.tickers.length - 1 && ','}
                     </span>
                   ))}
@@ -643,12 +600,14 @@ function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
         <div className="grid grid-cols-2 gap-2 text-[12px]">
           <Field label="">{symbol}</Field>
           <Field label="">
-            <span className="flex items-center justify-between">
-              LMT
-              <svg className="h-3 w-3 text-(--color-term-muted)" viewBox="0 0 12 12" fill="currentColor">
-                <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.2" fill="none" />
-              </svg>
-            </span>
+            <select 
+              className="w-full h-full bg-transparent outline-none cursor-pointer appearance-none text-center"
+              value="limit"
+              onChange={() => {}}
+            >
+              <option value="limit">LMT</option>
+              <option value="market">MKT</option>
+            </select>
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-2">

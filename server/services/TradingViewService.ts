@@ -65,7 +65,10 @@ export interface TVIdeaItem {
 
 type SymbolInput = string | CanonicalSymbol;
 
-const BASE = process.env.TV_SCRAPER_URL ?? 'http://127.0.0.1:8787';
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
+const BASE = isVercel 
+  ? `https://${process.env.VERCEL_URL || 'localhost'}/api/python`
+  : (process.env.TV_SCRAPER_URL ?? 'http://127.0.0.1:8787');
 const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? 8000);
 
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */

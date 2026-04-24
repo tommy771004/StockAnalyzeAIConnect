@@ -7,6 +7,8 @@ import { NewsPage } from './terminal/pages/News';
 import { ResearchPage } from './terminal/pages/Research';
 import { MarketPage } from './terminal/pages/Market';
 import { CryptoPage } from './terminal/pages/Crypto';
+import { SettingsPage } from './terminal/pages/Settings';
+import { AlertsPage } from './terminal/pages/Alerts';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
 
@@ -17,6 +19,8 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'portfolio',
   'research',
   'news',
+  'alerts',
+  'settings'
 ];
 
 function parseHashView(): TerminalView {
@@ -34,6 +38,8 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   portfolio: 'SEARCH HOLDINGS...',
   research: 'Search AAPL...',
   news: '搜尋 . . .',
+  alerts: 'SEARCH ALERTS...',
+  settings: 'SEARCH SETTINGS...',
 };
 
 export default function App() {
@@ -72,6 +78,8 @@ export default function App() {
       {view === 'portfolio' && <PortfolioPage />}
       {view === 'research' && <ResearchPage />}
       {view === 'news' && <NewsPage />}
+      {view === 'settings' && <SettingsPage />}
+      {view === 'alerts' && <AlertsPage />}
     </Layout>
   );
 }

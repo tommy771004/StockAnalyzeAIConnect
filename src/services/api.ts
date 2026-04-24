@@ -116,7 +116,8 @@ export const getNews = async (sym: string): Promise<NewsItem[]> => {
             throw new Error('Empty TV news');
           }
         } catch (tvError) {
-          console.warn('Fallback to Yahoo news due to TV error:', tvError);
+          // 靜默備援，避免 Console 頻繁報警
+          console.debug('[API] TV News fallback to Yahoo:', (tvError as Error)?.message);
           try {
             // 回退到 Yahoo 新聞
             data = await fetchJ<NewsItem[]>(`/api/news/${sym}`);
@@ -190,6 +191,12 @@ export const addWatchlistItem = (symbol: string, name?: string): Promise<Watchli
     body: JSON.stringify({ symbol, name }),
   });
 
+/** Remove a single item from the watchlist. */
+export const removeWatchlistItem = (symbol: string): Promise<boolean> =>
+  fetchJ(`/api/watchlist/${symbol}`, { method: 'DELETE' })
+    .then(() => true)
+    .catch(e => { apiWarn('removeWatchlistItem', e); throw e; });
+
 // ── Positions ─────────────────────────────────────────────────────────────────
 export const getPositions  = (): Promise<{ positions: Position[]; usdtwd: number }> =>
   IS_ELECTRON ? E().getPositions() : fetchJ<{ positions: Position[]; usdtwd: number }>('/api/positions');
@@ -255,6 +262,9 @@ export const setSetting    = async <T>(key: string, val: T): Promise<boolean> =>
 
 export const searchStocks = (query: string): Promise<{ quotes: SearchResult[] }> =>
   IS_ELECTRON ? Promise.resolve({ quotes: [] }) : fetchJ<{ quotes: SearchResult[] }>(`/api/search/${encodeURIComponent(query)}`);
+
+export const getQuotes = (symbols: string[]): Promise<any[]> =>
+  IS_ELECTRON ? Promise.resolve([]) : fetchJ<any[]>('/api/quotes?symbols=' + symbols.join(','));
 
 // ── DB Stats ──────────────────────────────────────────────────────────────────
 export const getDbStats    = (): Promise<unknown> =>
@@ -356,4 +366,11 @@ export const openExternal  = (url: string): void => {
   if (IS_ELECTRON) E().openExternal(url);
   else window.open(url, '_blank', 'noopener');
 };
+
+/** 獲取歷史資產淨值快照 (NAV) */
+export const getPortfolioHistory = (): Promise<any[]> => fetchJ<any[]>('/api/portfolio/history');
+
+/** 獲取全域市場新聞情報流 */
+export const getNewsFeed = (): Promise<any[]> => fetchJ<any[]>('/api/news/feed');
+
 

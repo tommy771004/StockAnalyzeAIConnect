@@ -4,7 +4,9 @@ export type TerminalView =
   | 'crypto'
   | 'portfolio'
   | 'research'
-  | 'news';
+  | 'news'
+  | 'alerts'
+  | 'settings';
 
 export interface TickerSummary {
   label: string;

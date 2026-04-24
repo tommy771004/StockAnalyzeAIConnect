@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar';
 import { useState } from 'react';
 import { Footer } from './Footer';
 import { AgentPanel } from './AgentPanel';
-import { indexTickers } from '../mockData';
+import { useMarketData } from '../hooks/useMarketData';
 
 interface LayoutProps {
   active: TerminalView;
@@ -18,13 +18,20 @@ interface LayoutProps {
 export function Layout({ active, onChange, searchPlaceholder, children }: LayoutProps) {
   const [isAgentOpen, setIsAgentOpen] = useState(false);
   const toggleAgent = () => setIsAgentOpen((prev) => !prev);
+  const { indices } = useMarketData();
+
+  const tickerItems = indices.map(idx => ({
+    label: idx.symbol.replace('^', ''),
+    value: idx.regularMarketPrice?.toLocaleString() || '---',
+    changePct: idx.regularMarketChangePercent || 0
+  }));
 
   return (
     <div className="flex h-screen w-screen flex-col bg-(--color-term-bg) text-(--color-term-text)">
       <TopNav active={active} onChange={onChange} searchPlaceholder={searchPlaceholder} onToggleAgent={toggleAgent} />
-      <TickerTape items={indexTickers} />
+      <TickerTape items={tickerItems.length > 0 ? tickerItems : [{ label: 'MARKET', value: 'LOADING...', changePct: 0 }]} />
       <div className="flex min-h-0 flex-1 relative">
-        <Sidebar active={active} />
+        <Sidebar active={active} onChange={onChange} />
         <main className="min-h-0 flex-1 overflow-hidden p-3">{children}</main>
         
         {/* The sliding Agent Panel */}

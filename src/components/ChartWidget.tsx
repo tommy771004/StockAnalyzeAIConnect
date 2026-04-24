@@ -166,6 +166,15 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         rightOffset: 0,
         barSpacing: 12,
         minBarSpacing: 1,
+        tickMarkFormatter: (time: number) => {
+          const date = new Date(time * 1000);
+          return date.toLocaleTimeString('zh-TW', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Taipei'
+          });
+        },
       },
       rightPriceScale: {
         borderColor: gridColor,
@@ -179,6 +188,16 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
       localization: {
         locale: 'zh-Hant-TW',
         dateFormat: 'yyyy/MM/dd',
+        timeFormatter: (time: number) => {
+          const date = new Date(time * 1000);
+          return date.toLocaleTimeString('zh-TW', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            timeZone: 'Asia/Taipei'
+          });
+        },
       },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
@@ -475,9 +494,6 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
           >
             <Maximize2 size={16} />
           </button>
-          <button className="p-1.5 text-zinc-500 hover:text-indigo-500 hover:bg-white/5 rounded-md transition-all" title="圖表設定">
-            <Settings2 size={14} />
-          </button>
         </div>
       </div>
 
@@ -573,9 +589,6 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
           <div className="absolute top-3 left-3 z-10 pointer-events-none select-none flex items-center gap-2">
             <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 text-[9px] font-black rounded border border-indigo-500/30 uppercase tracking-tighter backdrop-blur-md">
               {timeframe}
-            </span>
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-800/30 px-2 py-0.5 rounded-full border border-zinc-700/50 backdrop-blur-md">
-              {data.length} PACKETS
             </span>
           </div>
         )}

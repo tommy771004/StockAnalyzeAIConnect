@@ -25,6 +25,7 @@ export const users = pgTable('users', {
   email:            text('email').notNull().unique(),
   passwordHash:     text('password_hash').notNull(),
   name:             text('name'),
+  balance:          numeric('balance').notNull().default('100000'), // 現金餘額
   subscriptionTier: text('subscription_tier').notNull().default('free'),
   createdAt:        timestamp('created_at').defaultNow().notNull(),
   updatedAt:        timestamp('updated_at').defaultNow().notNull(),
@@ -38,6 +39,22 @@ export const usersRelations = relations(users, ({ many }) => ({
   settings:       many(userSettings),
   strategies:     many(strategies),
   agentMemories:  many(agentMemories),
+  portfolioHistory: many(portfolioHistory),
+}));
+
+// ─── portfolio_history (NAV snapshots) ────────────────────────────────────────
+export const portfolioHistory = pgTable('portfolio_history', {
+  id:          serial('id').primaryKey(),
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  totalEquity: numeric('total_equity').notNull(),
+  date:        text('date').notNull(), // 'YYYY-MM-DD'
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('portfolio_history_user_date_idx').on(t.userId, t.date),
+]);
+
+export const portfolioHistoryRelations = relations(portfolioHistory, ({ one }) => ({
+  user: one(users, { fields: [portfolioHistory.userId], references: [users.id] }),
 }));
 
 // ─── watchlist_items ──────────────────────────────────────────────────────────
@@ -213,4 +230,6 @@ export type NewStrategy  = typeof strategies.$inferInsert;
 export type AgentMemory    = typeof agentMemories.$inferSelect;
 export type NewAgentMemory = typeof agentMemories.$inferInsert;
 export type AgentMemoryType = 'PREFERENCE' | 'SKILL' | 'CONTEXT';
+export type PortfolioHistory = typeof portfolioHistory.$inferSelect;
+export type NewPortfolioHistory = typeof portfolioHistory.$inferInsert;
 

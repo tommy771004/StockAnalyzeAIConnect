@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getBatchQuotes, getWatchlist, getHistory, getNews } from '../../services/api';
+import * as api from '../../services/api';
 import type { WatchlistRow, Mover, CandlePoint, DashboardNews } from '../types';
 
 // ─── Shape returned by the hook ────────────────────────────────────────────────
@@ -34,21 +34,29 @@ export interface DashboardData {
   selectedRow: WatchlistRow;
   /** Re-fetch everything immediately */
   refresh: () => void;
+  /** Add symbol to watchlist */
+  addToWatchlist: (sym: string) => Promise<void>;
+  /** Remove symbol from watchlist */
+  removeFromWatchlist: (sym: string) => Promise<void>;
 }
 
 // ─── Range → Yahoo interval/period1 map ────────────────────────────────────────
-export type ChartRange = '1D' | '1W' | '1M' | 'YTD';
+export type ChartRange = '1D' | '5D' | '1W' | '1M' | '6M' | 'YTD' | '1Y';
 
 function rangeToParams(r: ChartRange): Record<string, string> {
   const now = Date.now();
   switch (r) {
-    case '1D': return { interval: '5m',  period1: String(now - 24 * 3600 * 1000) };
-    case '1W': return { interval: '60m', period1: String(now - 7  * 24 * 3600 * 1000) };
-    case '1M': return { interval: '1d',  period1: String(now - 30 * 24 * 3600 * 1000) };
+    case '1D':  return { interval: '1m',   period1: String(now - 24 * 3600 * 1000) };
+    case '5D':  return { interval: '5m',   period1: String(now - 5 * 24 * 3600 * 1000) };
+    case '1W':  return { interval: '15m',  period1: String(now - 7 * 24 * 3600 * 1000) };
+    case '1M':  return { interval: '1h',   period1: String(now - 30 * 24 * 3600 * 1000) };
+    case '6M':  return { interval: '1d',   period1: String(now - 180 * 24 * 3600 * 1000) };
     case 'YTD': {
       const ytd = new Date(); ytd.setMonth(0); ytd.setDate(1); ytd.setHours(0, 0, 0, 0);
       return { interval: '1d', period1: String(ytd.getTime()) };
     }
+    case '1Y':  return { interval: '1d',   period1: String(now - 365 * 24 * 3600 * 1000) };
+    default:    return { interval: '1h',   period1: String(now - 30 * 24 * 3600 * 1000) };
   }
 }
 
@@ -77,7 +85,7 @@ function mapQuote(q: any, sym: string): WatchlistRow {
 function mapHistory(raw: any[]): CandlePoint[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   return raw.map((r, i) => ({
-    t: i,
+    t: Math.floor(new Date(r.date).getTime() / 1000),
     open:   Number(r.open)   || 0,
     high:   Number(r.high)   || 0,
     low:    Number(r.low)    || 0,
@@ -111,7 +119,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
       // ── 1. Watchlist symbols ─────────────────────────────────────────────────
       let symbols: string[] = [...DEFAULT_SYMBOLS];
       try {
-        const wl = await getWatchlist();
+        const wl = await api.getWatchlist();
         if (Array.isArray(wl) && wl.length > 0) {
           symbols = wl.map((item: { symbol: string }) => item.symbol);
         }
@@ -125,7 +133,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
       // ── 2. Batch quotes ──────────────────────────────────────────────────────
       let quotes: any[] = [];
       try {
-        quotes = await getBatchQuotes(symbols);
+        quotes = await api.getBatchQuotes(symbols);
       } catch {
         // network failure, empty state
       }
@@ -147,7 +155,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
 
       // ── 3. Chart history for selected symbol ─────────────────────────────────
       try {
-        const hist: any[] = await getHistory(sym, rangeToParams(rng));
+        const hist: any[] = await api.getHistory(sym, rangeToParams(rng));
         const mapped = mapHistory(hist);
         if (mapped.length > 0) setCandles(mapped);
         else setCandles([]);
@@ -157,7 +165,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
 
       // ── 4. Market News for selected symbol ───────────────────────────────────
       try {
-        const rawNews = await getNews(sym);
+        const rawNews = await api.getNews(sym);
         const mappedNews: DashboardNews[] = rawNews.slice(0, 5).map(n => {
           let catDesc = 'TECH';
           if (n.title?.toLowerCase().includes('earn')) catDesc = 'EARNINGS';
@@ -210,6 +218,33 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
     watchlist[0] ??
     { symbol: selected, last: 0, changePct: 0, volume: '—' };
 
+  const addToWatchlist = useCallback(async (sym: string) => {
+    try {
+      await api.addWatchlistItem(sym.toUpperCase());
+      await fetchAll(selected, range);
+    } catch (e) {
+      console.error('Failed to add to watchlist', e);
+    }
+  }, [selected, range, fetchAll]);
+
+  const removeFromWatchlist = useCallback(async (sym: string) => {
+    try {
+      await api.removeWatchlistItem(sym.toUpperCase());
+      await fetchAll(selected, range);
+    } catch (e) {
+      console.error('Failed to remove from watchlist', e);
+    }
+  }, [selected, range, fetchAll]);
+
+  useEffect(() => {
+    const handleSearch = (e: any) => {
+      const sym = e.detail;
+      if (sym) setSelected(sym);
+    };
+    window.addEventListener('symbol-search', handleSearch);
+    return () => window.removeEventListener('symbol-search', handleSearch);
+  }, [setSelected]);
+
   return {
     loading,
     isLive,
@@ -223,5 +258,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
     setSelected,
     selectedRow,
     refresh,
+    addToWatchlist,
+    removeFromWatchlist,
   };
 }
