@@ -19,9 +19,13 @@ export function ResearchPage() {
       try {
         const res = await fetch(`/api/ai/summarize/${activeSymbol}`);
         const json = await res.json();
-        setAiSummary(json.text || '無法生成摘要');
+        if (!res.ok) {
+          setAiSummary(json.error || `AI 服務錯誤 (HTTP ${res.status})`);
+        } else {
+          setAiSummary(json.text || '無法生成摘要');
+        }
       } catch (err) {
-        setAiSummary('AI 服務暫時無法連線');
+        setAiSummary('AI 服務暫時無法連線，請檢查網路或稍後再試');
       } finally {
         setAiLoading(false);
       }
@@ -48,6 +52,7 @@ export function ResearchPage() {
   const quote = data?.quote;
   const history = data?.history || [];
   const tv = data?.tvOverview || {};
+  const tvIndicators = data?.tvIndicators || {};
   const news = data?.tvNews || [];
 
   return (
@@ -72,7 +77,7 @@ export function ResearchPage() {
       <aside className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-4">
         <AISummaryPanel summary={aiSummary} loading={aiLoading} />
         <ValuationPanel tv={tv} />
-        <ConsensusPanel tv={tv} />
+        <ConsensusPanel tv={tv} tvIndicators={tvIndicators} />
         <RecentNewsPanel news={news} />
       </aside>
     </div>

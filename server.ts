@@ -66,9 +66,31 @@ function toTradingViewSymbol(input: string): string {
 /**
  * Calls OpenRouter with automatic fallback to other free models on failure
  */
-async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Promise<string> {
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) throw new Error('AI key missing');
+async function callAIWithFallback(prompt: string, jsonMode: boolean = false, userId?: string): Promise<string> {
+  let apiKey = '';
+
+  // 1. Try user-provided key from DB first (if userId available)
+  if (userId) {
+    try {
+      const dbKey = await settingsRepo.getSetting<string>(userId, 'OPENROUTER_API_KEY');
+      if (dbKey && dbKey.trim() && !dbKey.includes('sk-or-v1-YOUR_KEY')) {
+        apiKey = dbKey.trim();
+      }
+    } catch (err) {
+      console.warn(`[AI] Failed to load key from settings for user ${userId}`);
+    }
+  }
+
+  // 2. Fallback to system-wide env key
+  if (!apiKey) {
+    apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+    // Ignore placeholder keys
+    if (apiKey.includes('sk-or-v1-YOUR_KEY') || !apiKey) {
+      apiKey = '';
+    }
+  }
+
+  if (!apiKey) throw new Error('AI key missing — please set your OpenRouter API Key in Settings');
 
   const modelsToTry = await getTopFreeModels(3);
 
@@ -76,7 +98,9 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
 
   for (const modelId of modelsToTry) {
     try {
-      console.log(`[AI] Attempting request with model: ${modelId}...`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout per attempt
+
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -91,7 +115,10 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
           temperature: 0.3,
           ...(jsonMode && { response_format: { type: 'json_object' } })
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errText = await res.text();
@@ -105,8 +132,8 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
         console.log(`[AI] Success with model: ${modelId}`);
         return content;
       }
-    } catch (err) {
-      console.warn(`[AI] Error calling ${modelId}:`, (err as Error).message);
+    } catch (err: any) {
+      console.warn(`[AI] Error calling ${modelId}:`, err.message);
       lastError = err;
     }
   }
@@ -521,7 +548,7 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
   }
 
   try {
-    const text = await callAIWithFallback(prompt, jsonMode);
+    const text = await callAIWithFallback(prompt, jsonMode, req.userId);
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
@@ -532,9 +559,6 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const sym = req.params.symbol;
   const tvSym = toTradingViewSymbol(sym);
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) return res.status(500).json({ error: 'AI key missing' });
-
   console.log(`[AI] Generating summary for ${sym} (TV Symbol: ${tvSym})...`);
 
   try {
@@ -546,13 +570,16 @@ app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, re
     ]);
 
     const quote = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
-    const news = newsRes.status === 'fulfilled' ? (newsRes.value as any).news : [];
+    const newsData = newsRes.status === 'fulfilled' ? (newsRes.value as any) : null;
+    const news = Array.isArray(newsData?.news) ? newsData.news : [];
     
     // Flatten nested TV responses
     const tvO = tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null;
     const tvI = tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null;
 
-    const newsText = news.slice(0, 3).map((n: any) => `- ${n.title}`).join('\n');
+    const newsText = news.length > 0 
+      ? news.slice(0, 3).map((n: any) => `- ${n.title || n.headline || '無標題'}`).join('\n')
+      : '無近期相關新聞';
     const techText = tvI ? JSON.stringify(tvI).slice(0, 500) : '無技術指標數據';
 
     const prompt = `你是一位專業的金融分析師。請針對 ${sym} 提供深入的 AI 摘要分析。
@@ -568,12 +595,17 @@ ${newsText}
 3. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
-    const resultText = await callAIWithFallback(prompt);
+    const resultText = await callAIWithFallback(prompt, false, req.userId);
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {
-    console.error(`[AI] Error:`, e);
-    res.status(500).json({ error: e.message });
+    console.error(`[AI] Summarize Error for ${sym}:`, e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ 
+      error: `AI 摘要生成失敗: ${errMsg}`,
+      symbol: sym,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -889,6 +921,37 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
     history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
   });
+});
+
+app.get('/api/tv/overview/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getOverview(req.params.symbol);
+    res.json(data || {});
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/indicators/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIndicators(req.params.symbol, (req.query.timeframe as any) || '1d');
+    res.json(data || {});
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getNewsHeadlines(req.params.symbol);
+    res.json(data || []);
+  } catch (e: any) {
+    console.warn(`[TV News] Fallback to empty list for ${req.params.symbol}:`, e?.message ?? e);
+    res.json([]);
+  }
+});
+
+app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIdeas(req.params.symbol, (req.query.sort as any) || 'popular');
+    res.json(data || []);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 app.use('/api/agent', authMiddleware, agentRouter);

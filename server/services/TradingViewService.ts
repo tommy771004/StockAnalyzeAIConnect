@@ -66,9 +66,12 @@ export interface TVIdeaItem {
 type SymbolInput = string | CanonicalSymbol;
 
 const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
-const BASE = isVercel 
-  ? `https://${process.env.VERCEL_URL || 'localhost'}/api/python`
-  : (process.env.TV_SCRAPER_URL ?? 'http://127.0.0.1:8787');
+const BASE = (process.env.TV_SCRAPER_URL) 
+  ? process.env.TV_SCRAPER_URL 
+  : (isVercel 
+      ? `https://${process.env.VERCEL_URL || 'localhost'}/api/python`
+      : 'http://127.0.0.1:8787');
+
 const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? 8000);
 
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */
@@ -90,8 +93,10 @@ async function call<T>(path: string, params: Record<string, string | number | un
     if (body.status !== 'success') throw new Error(`[TV] ${body.message ?? 'upstream error'}`);
     return body.data;
   } catch (e: unknown) {
-    // 服務未啟動 / DNS 解析失敗：視為「TV 不可用」
     const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[TV Service] Failed to call ${path}:`, msg);
+
+    // 服務未啟動 / DNS 解析失敗 / 逾時：視為「TV 不可用」
     if (/ECONNREFUSED|fetch failed|ENOTFOUND|aborted/i.test(msg)) {
       return null;
     }

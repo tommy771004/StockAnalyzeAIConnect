@@ -5,13 +5,14 @@
  *
  * Rule: skills/01_Frontend_Performance.md §2 "高頻數據與 Web Worker 通訊 (The Golden Rule)"
  * - WebSocket connections are created here, never in the main thread.
- * - Ticks are received, decompressed (if needed), and forwarded via postMessage.
- * - Components receive data via addEventListener('message') + useRef; no useState/Zustand.
+ * - Ticks are forwarded via postMessage.
+ * - When WS is unavailable (e.g. Vercel without a real WS backend), fallback to
+ *   HTTP polling against TradingView overview endpoints.
  *
  * Inbound commands (main → worker):
  *   { type: 'SUBSCRIBE',   symbol: string }
  *   { type: 'UNSUBSCRIBE', symbol: string }
- *   { type: 'CONNECT',     wsUrl: string }
+ *   { type: 'CONNECT',     wsUrl?: string, apiBaseUrl?: string }
  *   { type: 'DISCONNECT' }
  *
  * Outbound events (worker → main):
@@ -35,7 +36,7 @@ export interface TickData {
 type InboundMsg =
   | { type: 'SUBSCRIBE';   symbol: string }
   | { type: 'UNSUBSCRIBE'; symbol: string }
-  | { type: 'CONNECT';     wsUrl: string }
+  | { type: 'CONNECT';     wsUrl?: string; apiBaseUrl?: string }
   | { type: 'DISCONNECT' };
 
 type OutboundMsg =
@@ -49,48 +50,194 @@ type OutboundMsg =
 
 let ws: WebSocket | null = null;
 let currentWsUrl = '';
+let currentApiBaseUrl = '';
 const subscriptions = new Set<string>();
+
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 6;
-const BASE_RECONNECT_DELAY   = 2000; // ms, doubled each attempt (exponential backoff)
+const BASE_RECONNECT_DELAY = 2000; // ms, doubled each attempt
+
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollInFlight = false;
+const POLL_INTERVAL_MS = 5000;
+const POLL_TIMEOUT_MS = 4500;
 
 function post(msg: OutboundMsg): void {
   self.postMessage(msg);
 }
 
+function normalizeBaseUrl(raw?: string): string {
+  if (!raw) return '';
+  return raw.trim().replace(/\/+$/, '');
+}
+
+function buildApiUrl(path: string): string {
+  if (!currentApiBaseUrl) return path;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${currentApiBaseUrl}${normalizedPath}`;
+}
+
+function toNum(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function resolveTickFromOverview(payload: Record<string, unknown>): TickData | null {
+  const price =
+    toNum(payload.close) ??
+    toNum(payload.regularMarketPrice) ??
+    toNum(payload.last_price) ??
+    toNum(payload.price);
+
+  if (price == null) return null;
+
+  const vol =
+    toNum(payload.volume) ??
+    toNum(payload.regularMarketVolume) ??
+    0;
+
+  const bid = toNum(payload.bid) ?? price;
+  const ask = toNum(payload.ask) ?? price;
+  const timestamp =
+    toNum(payload.t) ??
+    toNum(payload.timestamp) ??
+    Date.now();
+
+  return { price, vol, bid, ask, timestamp };
+}
+
+function unpackOverviewResponse(body: unknown): Record<string, unknown> | null {
+  if (!body || typeof body !== 'object') return null;
+  const asRecord = body as Record<string, unknown>;
+
+  // python microservice style: { status: 'success', data: {...} }
+  if (
+    typeof asRecord.status === 'string' &&
+    'data' in asRecord &&
+    asRecord.data &&
+    typeof asRecord.data === 'object'
+  ) {
+    return asRecord.data as Record<string, unknown>;
+  }
+
+  return asRecord;
+}
+
+// ─── Polling fallback ─────────────────────────────────────────────────────────
+
+async function pollSymbol(symbol: string): Promise<void> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), POLL_TIMEOUT_MS);
+
+  try {
+    const url = buildApiUrl(`/api/tv/overview/${encodeURIComponent(symbol)}`);
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return;
+
+    const body = (await res.json()) as unknown;
+    const overview = unpackOverviewResponse(body);
+    if (!overview) return;
+
+    const tick = resolveTickFromOverview(overview);
+    if (!tick) return;
+
+    post({ type: 'TICK_UPDATE', symbol, data: tick });
+  } catch {
+    // Silent fallback: we keep retrying in next poll cycle.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function pollOnce(): Promise<void> {
+  if (pollInFlight) return;
+  if (subscriptions.size === 0) return;
+
+  pollInFlight = true;
+  try {
+    const symbols = Array.from(subscriptions);
+    await Promise.all(symbols.map((sym) => pollSymbol(sym)));
+  } finally {
+    pollInFlight = false;
+  }
+}
+
+function startPolling(): void {
+  if (pollTimer || subscriptions.size === 0) return;
+  pollTimer = setInterval(() => {
+    void pollOnce();
+  }, POLL_INTERVAL_MS);
+  void pollOnce();
+}
+
+function stopPolling(): void {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
 // ─── Reconnection logic ───────────────────────────────────────────────────────
 
 function scheduleReconnect(): void {
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    post({ type: 'ERROR', message: 'WebSocket max reconnect attempts exceeded' });
+  if (!currentWsUrl) {
+    startPolling();
     return;
   }
+
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    post({ type: 'ERROR', message: 'WebSocket max reconnect attempts exceeded; switched to HTTP polling fallback' });
+    startPolling();
+    return;
+  }
+
   const delay = BASE_RECONNECT_DELAY * 2 ** reconnectAttempts;
   reconnectAttempts += 1;
   reconnectTimer = setTimeout(() => connect(currentWsUrl), delay);
+  startPolling();
 }
 
 // ─── Connection management ────────────────────────────────────────────────────
 
-function connect(wsUrl: string): void {
+function connect(wsUrl?: string): void {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+
   if (ws) {
     ws.onclose = null; // prevent old socket from triggering reconnect
     ws.close();
     ws = null;
   }
 
-  currentWsUrl = wsUrl;
-  ws = new WebSocket(wsUrl);
+  currentWsUrl = (wsUrl ?? '').trim();
+  if (!currentWsUrl) {
+    startPolling();
+    return;
+  }
+
+  try {
+    ws = new WebSocket(currentWsUrl);
+  } catch {
+    post({ type: 'ERROR', message: 'Invalid WebSocket URL; switched to HTTP polling fallback' });
+    startPolling();
+    return;
+  }
 
   ws.onopen = () => {
     reconnectAttempts = 0;
-    post({ type: 'CONNECTED', wsUrl });
-    // Re-subscribe to all tracked symbols on reconnect
+    stopPolling();
+    post({ type: 'CONNECTED', wsUrl: currentWsUrl });
     for (const symbol of subscriptions) {
       sendSubscribe(symbol);
     }
@@ -101,13 +248,13 @@ function connect(wsUrl: string): void {
   };
 
   ws.onerror = () => {
-    post({ type: 'ERROR', message: 'WebSocket connection error' });
+    post({ type: 'ERROR', message: 'WebSocket connection error; falling back to HTTP polling' });
+    startPolling();
   };
 
   ws.onclose = (event: CloseEvent) => {
     post({ type: 'DISCONNECTED', code: event.code, reason: event.reason });
     if (event.code !== 1000) {
-      // Abnormal close — attempt reconnect
       scheduleReconnect();
     }
   };
@@ -123,6 +270,7 @@ function disconnect(): void {
     ws.close(1000, 'Client disconnect');
     ws = null;
   }
+  stopPolling();
   subscriptions.clear();
 }
 
@@ -178,6 +326,7 @@ self.onmessage = (event: MessageEvent<InboundMsg>) => {
   const msg = event.data;
   switch (msg.type) {
     case 'CONNECT':
+      currentApiBaseUrl = normalizeBaseUrl(msg.apiBaseUrl);
       connect(msg.wsUrl);
       break;
 
@@ -188,12 +337,14 @@ self.onmessage = (event: MessageEvent<InboundMsg>) => {
     case 'SUBSCRIBE':
       subscriptions.add(msg.symbol);
       sendSubscribe(msg.symbol);
+      if (!ws || ws.readyState !== WebSocket.OPEN) startPolling();
       post({ type: 'SUBSCRIPTION_OK', symbol: msg.symbol });
       break;
 
     case 'UNSUBSCRIBE':
       subscriptions.delete(msg.symbol);
       sendUnsubscribe(msg.symbol);
+      if (subscriptions.size === 0) stopPolling();
       break;
 
     default:
@@ -201,3 +352,4 @@ self.onmessage = (event: MessageEvent<InboundMsg>) => {
       break;
   }
 };
+
