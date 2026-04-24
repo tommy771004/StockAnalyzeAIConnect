@@ -13,6 +13,7 @@ const tabs: Tab[] = [
   { id: 'crypto', label: '加密貨幣' },
   { id: 'portfolio', label: '投資組合' },
   { id: 'research', label: '研究' },
+  { id: 'backtest', label: '回測' },
   { id: 'news', label: '新聞' },
 ];
 

@@ -3,6 +3,7 @@ import {
   Bell,
   CalendarDays,
   CircleHelp,
+  FlaskConical,
   LogOut,
   SlidersHorizontal,
   Star,
@@ -20,6 +21,7 @@ const items: Array<{ id: TerminalView; icon: React.ReactNode; label: string }> =
   { id: 'alerts', icon: <Bell className="h-4 w-4" />, label: 'Alerts' },
   { id: 'market', icon: <CalendarDays className="h-4 w-4" />, label: 'Markets' },
   { id: 'portfolio', icon: <BarChart3 className="h-4 w-4" />, label: 'Portfolio' },
+  { id: 'backtest', icon: <FlaskConical className="h-4 w-4" />, label: 'Backtest' },
   { id: 'settings', icon: <SlidersHorizontal className="h-4 w-4" />, label: 'Settings' },
 ];
 
