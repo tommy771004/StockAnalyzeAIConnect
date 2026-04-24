@@ -881,12 +881,13 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
 
   console.log(`[Research] Fetching data for: Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
 
-  const [quote, tvOverview, tvIndicators, tvNews, history] = await Promise.allSettled([
+  const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
     NativeYahooApi.quote(yahooSymbol as string),
     TV.getOverview(tvSymbol),
     TV.getIndicators(tvSymbol, (req.query.timeframe as any) || '1d'),
     TV.getNewsHeadlines(tvSymbol),
-    NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: String(Date.now() - 90 * 24 * 3600 * 1000) })
+    NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: String(Date.now() - 90 * 24 * 3600 * 1000) }),
+    NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']),
   ]);
 
   const quoteVal: any = quote.status === 'fulfilled' ? quote.value : null;
@@ -895,10 +896,19 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     ? (tvOverview.value as any)?.data || tvOverview.value
     : null;
 
+  // Yahoo majorHoldersBreakdown.institutionsPercentHeld is a 0-1 fraction.
+  // Convert to percent to match the frontend's toFixed(1) + '%' rendering.
+  const holdersVal: any = holdersSummary.status === 'fulfilled' ? holdersSummary.value : null;
+  const instRaw = holdersVal?.majorHoldersBreakdown?.institutionsPercentHeld;
+  const instFraction = typeof instRaw === 'number'
+    ? instRaw
+    : typeof instRaw?.raw === 'number' ? instRaw.raw : undefined;
+  const institutionalPct = typeof instFraction === 'number' ? instFraction * 100 : undefined;
+
   // Yahoo-derived baseline so the Valuation panel still populates when the TV
   // scraper has no coverage (common for TWSE/TPEX symbols). TV values take
   // precedence where present.
-  const yahooBaseline = yahooQuote ? {
+  const yahooBaseline: Record<string, any> = yahooQuote ? {
     market_cap_calc: yahooQuote.marketCap,
     pe_ratio: yahooQuote.trailingPE,
     eps_ttm: yahooQuote.epsTrailingTwelveMonths,
@@ -907,6 +917,7 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     description: yahooQuote.longName ?? yahooQuote.shortName,
     exchange: yahooQuote.fullExchangeName,
   } : {};
+  if (institutionalPct !== undefined) yahooBaseline.institutional_holders_pct = institutionalPct;
 
   const mergedOverview = (() => {
     const out: Record<string, any> = { ...yahooBaseline };
