@@ -1,60 +1,109 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
-import { aaplCandles, aaplMacd, aaplRecentNews } from '../mockData';
-import type { CandlePoint } from '../types';
+import { useResearchData } from '../hooks/useResearchData';
+import { Loader2, Search } from 'lucide-react';
 import { formatPct, toneClass } from '../ui/format';
+import type { CandlePoint } from '../types';
 
 export function ResearchPage() {
-  const [range, setRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1M');
-  const [overlay, setOverlay] = useState<'MA' | 'MACD'>('MA');
+  const [activeSymbol, setActiveSymbol] = useState('NVDA');
+  const [searchInput, setSearchInput] = useState('');
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const { data, loading } = useResearchData(activeSymbol);
 
-  const candles = aaplCandles;
-  const price = candles[candles.length - 1]?.close ?? 185.92;
-  const change = 2.41;
+  useEffect(() => {
+    const fetchSummary = async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch(`/api/ai/summarize/${activeSymbol}`);
+        const json = await res.json();
+        setAiSummary(json.text || '無法生成摘要');
+      } catch (err) {
+        setAiSummary('AI 服務暫時無法連線');
+      } finally {
+        setAiLoading(false);
+      }
+    };
+    if (activeSymbol) fetchSummary();
+  }, [activeSymbol]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchInput.trim()) {
+      setActiveSymbol(searchInput.trim().toUpperCase());
+      setSearchInput('');
+    }
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-(--color-term-accent)" />
+      </div>
+    );
+  }
+
+  const quote = data?.quote;
+  const history = data?.history || [];
+  const tv = data?.tvOverview || {};
+  const news = data?.tvNews || [];
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 gap-3">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
       <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-8">
-        <QuoteHeader price={price} change={change} />
-        <ChartPanel range={range} onRange={setRange} overlay={overlay} onOverlay={setOverlay} candles={candles} />
-        <MacdPanel />
+        <header className="flex items-center gap-4 border border-(--color-term-border) bg-(--color-term-panel) px-4 py-3">
+          <form onSubmit={handleSearch} className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-muted)" />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="搜尋代號 (如: AAPL, 2330)..."
+              className="h-9 w-full rounded-sm border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-sm focus:border-(--color-term-accent) focus:outline-none"
+            />
+          </form>
+          {loading && <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" />}
+        </header>
+
+        <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
+        <ChartPanel symbol={activeSymbol} history={history} />
       </div>
       <aside className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-4">
-        <ValuationPanel />
-        <ConsensusPanel />
-        <SentimentPanel />
-        <RecentNewsPanel />
+        <AISummaryPanel summary={aiSummary} loading={aiLoading} />
+        <ValuationPanel tv={tv} />
+        <ConsensusPanel tv={tv} />
+        <RecentNewsPanel news={news} />
       </aside>
     </div>
   );
 }
 
-function QuoteHeader({ price, change }: { price: number; change: number }) {
+function QuoteHeader({ symbol, quote, tv }: { symbol: string; quote: any; tv: any }) {
+  const price = quote?.regularMarketPrice || tv?.close || 0;
+  const change = quote?.regularMarketChange || 0;
+  const changePct = quote?.regularMarketChangePercent || 0;
+
   return (
     <section className="flex flex-wrap items-end justify-between gap-4 border border-(--color-term-border) bg-(--color-term-panel) px-5 py-4">
       <div className="flex items-baseline gap-3">
-        <span className="text-[18px] font-bold tracking-widest text-(--color-term-accent)">
-          AAPL
+        <span className="text-[20px] font-bold tracking-widest text-(--color-term-accent)">
+          {symbol}
         </span>
-        <span className="border border-(--color-term-border) px-2 py-0.5 text-[10px] tracking-widest text-(--color-term-muted)">
-          APPLE INC.
-        </span>
-        <span className="border border-(--color-term-border) px-2 py-0.5 text-[10px] tracking-widest text-(--color-term-muted)">
-          NASDAQ
+        <span className="text-[12px] text-(--color-term-text)">
+          {quote?.longName || tv?.description || symbol}
         </span>
       </div>
       <div className="flex flex-wrap items-end gap-6 tabular-nums">
         <div>
           <div className="text-3xl font-semibold text-(--color-term-text)">{price.toFixed(2)}</div>
-          <div className={`text-[12px] ${toneClass(change)}`}>
-            {`+${change.toFixed(2)} (${formatPct((change / (price - change)) * 100)})`}
+          <div className={cn("text-[12px]", toneClass(changePct))}>
+            {change >= 0 ? '+' : ''}{change.toFixed(2)} ({formatPct(changePct)})
           </div>
         </div>
-        <StatBlock label="BID" value="185.90 x 400" />
-        <StatBlock label="ASK" value="185.95 x 1200" />
-        <StatBlock label="VOL" value="42.5M" />
-        <StatBlock label="DAY RANGE" value="183.12 - 186.20" />
+        <StatBlock label="H/L (DAY)" value={`${quote?.regularMarketDayHigh?.toFixed(2) || '---'} - ${quote?.regularMarketDayLow?.toFixed(2) || '---'}`} />
+        <StatBlock label="VOLUME" value={quote?.regularMarketVolume?.toLocaleString() || '---'} />
+        <StatBlock label="EXCHANGE" value={quote?.fullExchangeName || tv?.exchange || '---'} />
       </div>
     </section>
   );
@@ -69,178 +118,38 @@ function StatBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ChartPanel({
-  range,
-  onRange,
-  overlay,
-  onOverlay,
-  candles,
-}: {
-  range: '1D' | '1W' | '1M' | '3M' | '1Y';
-  onRange: (r: '1D' | '1W' | '1M' | '3M' | '1Y') => void;
-  overlay: 'MA' | 'MACD';
-  onOverlay: (o: 'MA' | 'MACD') => void;
-  candles: CandlePoint[];
-}) {
+import ChartWidget from '../../components/ChartWidget';
+
+function ChartPanel({ symbol, history }: { symbol: string, history: any[] }) {
+  const [range, setRange] = useState('1M');
   return (
-    <Panel className="flex-1 min-h-[280px]" bodyClassName="flex min-h-0 flex-col">
-      <header className="flex items-center justify-between border-b border-(--color-term-border) px-3 py-2">
-        <div className="flex items-center gap-1">
-          {(['1D', '1W', '1M', '3M', '1Y'] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => onRange(r)}
-              className={cn(
-                'h-6 min-w-9 px-1.5 text-[10px] tracking-widest',
-                range === r
-                  ? 'border border-(--color-term-accent) text-(--color-term-accent)'
-                  : 'text-(--color-term-muted) hover:text-(--color-term-text)',
-              )}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {(['MA', 'MACD'] as const).map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() => onOverlay(o)}
-              className={cn(
-                'h-6 min-w-12 px-2 text-[10px] tracking-widest',
-                overlay === o
-                  ? 'border border-(--color-term-border-strong) bg-white/5 text-(--color-term-text)'
-                  : 'border border-(--color-term-border) text-(--color-term-muted)',
-              )}
-            >
-              {o}
-            </button>
-          ))}
-        </div>
-      </header>
-      <div className="absolute z-10 m-3 flex flex-col gap-0.5 text-[11px]">
-        <span className="text-(--color-term-accent) tabular-nums">MA(50) 178.42</span>
-        <span className="text-sky-300 tabular-nums">MA(200) 165.30</span>
-      </div>
+    <Panel title="交互式圖表 (Price Action)" className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
       <div className="relative flex-1 min-h-0">
-        <CandleChart candles={candles} />
+        {history.length > 0 ? (
+          <ChartWidget symbol={symbol} data={history} onTimeframeChange={setRange} />
+        ) : (
+          <div className="flex h-full items-center justify-center text-(--color-term-muted)">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            正在載入 K 線數據...
+          </div>
+        )}
       </div>
     </Panel>
   );
 }
 
-function CandleChart({ candles }: { candles: CandlePoint[] }) {
-  const { minLow, maxHigh } = useMemo(() => {
-    const lows = candles.map((c) => c.low);
-    const highs = candles.map((c) => c.high);
-    return { minLow: Math.min(...lows) - 1, maxHigh: Math.max(...highs) + 1 };
-  }, [candles]);
-  const W = 900;
-  const H = 360;
-  const range = maxHigh - minLow;
-  const step = W / candles.length;
-  const bw = step * 0.55;
 
-  const ma50 = rollingAvg(candles.map((c) => c.close), 50);
-  const ma200 = rollingAvg(candles.map((c) => c.close), 200);
 
-  function y(v: number) {
-    return H - ((v - minLow) / range) * H;
-  }
-
-  return (
-    <svg className="h-full w-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      {[0.2, 0.4, 0.6, 0.8].map((p) => (
-        <line key={p} x1="0" x2={W} y1={p * H} y2={p * H} stroke="rgba(255,255,255,0.05)" />
-      ))}
-      {candles.map((c, i) => {
-        const x = i * step + step / 2;
-        const isUp = c.close >= c.open;
-        const color = isUp ? '#22d3ee' : '#f87171';
-        return (
-          <g key={i}>
-            <line x1={x} x2={x} y1={y(c.high)} y2={y(c.low)} stroke={color} strokeWidth={1} />
-            <rect
-              x={x - bw / 2}
-              y={y(Math.max(c.open, c.close))}
-              width={bw}
-              height={Math.max(1, Math.abs(y(c.open) - y(c.close)))}
-              fill={color}
-              opacity={isUp ? 0.9 : 0.85}
-            />
-          </g>
-        );
-      })}
-      <LinePath values={ma50} y={y} step={step} stroke="#f59e0b" />
-      <LinePath values={ma200} y={y} step={step} stroke="#60a5fa" />
-    </svg>
-  );
-}
-
-function LinePath({
-  values,
-  y,
-  step,
-  stroke,
-}: {
-  values: Array<number | null>;
-  y: (v: number) => number;
-  step: number;
-  stroke: string;
-}) {
-  const pts: string[] = [];
-  values.forEach((v, i) => {
-    if (v == null) return;
-    const x = i * step + step / 2;
-    pts.push(`${pts.length === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y(v).toFixed(1)}`);
-  });
-  if (pts.length === 0) return null;
-  return <path d={pts.join(' ')} fill="none" stroke={stroke} strokeWidth={1.3} strokeDasharray="3 2" />;
-}
-
-function rollingAvg(values: number[], window: number): Array<number | null> {
-  const out: Array<number | null> = [];
-  let sum = 0;
-  for (let i = 0; i < values.length; i++) {
-    sum += values[i]!;
-    if (i >= window) sum -= values[i - window]!;
-    if (i >= window - 1) out.push(sum / window);
-    else out.push(values[i]!); // show rough trend for short series
-  }
-  return out;
-}
-
-function MacdPanel() {
-  return (
-    <Panel title="MACD (12, 26, 9)" className="h-[120px]" bodyClassName="relative">
-      <svg className="h-full w-full" viewBox="0 0 900 120" preserveAspectRatio="none">
-        {aaplMacd.map((m, i) => {
-          const w = 900 / aaplMacd.length;
-          const x = i * w + w * 0.25;
-          const bw = w * 0.5;
-          const h = Math.abs(m.hist) * 40;
-          const y = m.hist >= 0 ? 60 - h : 60;
-          const color = m.hist >= 0 ? '#22d3ee' : '#f87171';
-          return <rect key={i} x={x} y={y} width={bw} height={h} fill={color} opacity={0.7} />;
-        })}
-        <line x1="0" x2="900" y1="60" y2="60" stroke="rgba(255,255,255,0.1)" />
-      </svg>
-    </Panel>
-  );
-}
-
-function ValuationPanel() {
+function ValuationPanel({ tv }: { tv: any }) {
   const rows: Array<[string, string]> = [
-    ['市值 (Market Cap)', '2.85T'],
-    ['市盈率 (P/E Ratio)', '29.45'],
-    ['每股盈餘 (EPS TTM)', '6.31'],
-    ['股息殖利率 (Div Yield)', '0.52%'],
-    ['Beta (5Y Monthly)', '1.28'],
+    ['市值 (Market Cap)', tv?.market_cap_calc?.toLocaleString() || '---'],
+    ['市盈率 (P/E Ratio)', tv?.pe_ratio?.toFixed(2) || '---'],
+    ['每股盈餘 (EPS TTM)', tv?.eps_ttm?.toFixed(2) || '---'],
+    ['昨收 (Prev Close)', tv?.prev_close?.toFixed(2) || '---'],
+    ['持股比例 (Institutional)', tv?.institutional_holders_pct != null ? `${tv.institutional_holders_pct.toFixed(1)}%` : '---'],
   ];
   return (
-    <Panel title="估值指標 (Valuation)">
+    <Panel title="估值與重要指標">
       <ul className="divide-y divide-(--color-term-border)/60">
         {rows.map(([k, v]) => (
           <li key={k} className="flex items-center justify-between px-4 py-2 text-[12px]">
@@ -253,63 +162,55 @@ function ValuationPanel() {
   );
 }
 
-function ConsensusPanel() {
-  const buy = 28;
-  const hold = 12;
-  const sell = 4;
+function ConsensusPanel({ tv }: { tv: any }) {
+  const rec = tv?.recommendation_any || 'NEUTRAL';
+  const score = tv?.recommendation_any_score ?? 0; // -1 to 1
+  
+  const buy = rec.includes('BUY') ? 70 : rec === 'NEUTRAL' ? 20 : 10;
+  const hold = rec === 'NEUTRAL' ? 60 : 20;
+  const sell = rec.includes('SELL') ? 70 : 10;
   const total = buy + hold + sell;
+
+  const hasData = tv?.recommendation_any != null;
+
   return (
-    <Panel title="分析師共識 (Consensus)">
+    <Panel title="分析師共識 & 技術指標">
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4">
-        <div className="text-[32px] font-bold tracking-[0.2em] text-(--color-term-accent)">
-          買入
+        <div className={cn("text-[26px] font-bold tracking-[0.2em]", rec.includes('BUY') ? 'text-sky-400' : rec.includes('SELL') ? 'text-rose-400' : 'text-amber-400')}>
+          {rec.replace('STRONG_', '').replace('_', ' ')}
         </div>
         <div className="text-right text-[11px]">
           <div className="text-(--color-term-muted)">
-            目標價: <span className="text-(--color-term-text) tabular-nums">205.50</span>
+            技術評分: <span className="text-(--color-term-text) tabular-nums">{(score * 100).toFixed(0)}</span>
           </div>
           <div className="text-(--color-term-muted)">
-            上漲空間:{' '}
-            <span className="text-(--color-term-positive) tabular-nums">+10.5%</span>
+             趨勢方向: <span className={cn("tabular-nums", score >= 0 ? 'text-sky-400' : 'text-rose-400')}>{score >= 0 ? '看多' : '看空'}</span>
           </div>
         </div>
       </div>
       <div className="px-4 pb-4">
-        <div className="flex h-2 overflow-hidden bg-(--color-term-border)">
-          <div className="bg-sky-300" style={{ width: `${(buy / total) * 100}%` }} />
-          <div className="bg-amber-300" style={{ width: `${(hold / total) * 100}%` }} />
-          <div className="bg-rose-300" style={{ width: `${(sell / total) * 100}%` }} />
+        <div className="flex h-2 overflow-hidden bg-(--color-term-border) rounded-full">
+          {!hasData ? (
+             <div className="w-full bg-zinc-800" />
+          ) : (
+            <>
+              <div className="bg-sky-400" style={{ width: `${(buy / total) * 100}%` }} />
+              <div className="bg-amber-400" style={{ width: `${(hold / total) * 100}%` }} />
+              <div className="bg-rose-400" style={{ width: `${(sell / total) * 100}%` }} />
+            </>
+          )}
         </div>
         <div className="mt-2 flex items-center justify-between text-[10px] text-(--color-term-muted)">
-          <span>Buy ({buy})</span>
-          <span>Hold ({hold})</span>
-          <span>Sell ({sell})</span>
+          <span>BUY (TECH)</span>
+          <span>NEUTRAL</span>
+          <span>SELL</span>
         </div>
       </div>
     </Panel>
   );
 }
 
-function SentimentPanel() {
-  return (
-    <Panel title="情緒分析 (Sentiment)">
-      <div className="divide-y divide-(--color-term-border)/60">
-        <SentimentRow
-          label="新聞情緒 (News)"
-          tone="bullish"
-          rating="看多 (BULLISH)"
-          detail="近期新品發表及供應鏈穩定消息推升市場樂觀情緒。"
-        />
-        <SentimentRow
-          label="社群熱度 (Social)"
-          tone="neutral"
-          rating="中性 (NEUTRAL)"
-          detail="討論量維持均值，主要聚焦於下季財報預測。"
-        />
-      </div>
-    </Panel>
-  );
-}
+
 
 function SentimentRow({
   label,
@@ -339,19 +240,55 @@ function SentimentRow({
   );
 }
 
-function RecentNewsPanel() {
+function RecentNewsPanel({ news }: { news: any[] }) {
   return (
-    <Panel title="最新動態 (Recent News)" className="flex-1 min-h-[200px]">
+    <Panel title="標的相關新聞" className="flex-1 min-h-[300px]" bodyClassName="overflow-auto">
+      {news.length === 0 && <div className="p-10 text-center text-(--color-term-muted)">尚無新聞資料</div>}
       <ul className="divide-y divide-(--color-term-border)/60">
-        {aaplRecentNews.map((n) => (
-          <li key={n.title} className="px-4 py-3">
-            <div className="mb-1 text-[10px] tracking-widest text-(--color-term-muted)">
-              {n.time}
-            </div>
-            <p className="text-[12.5px] leading-snug text-(--color-term-text)">{n.title}</p>
-          </li>
-        ))}
+        {news.slice(0, 10).map((n) => {
+          const url = n.link || (n.storyPath ? `https://www.tradingview.com${n.storyPath}` : null);
+          return (
+            <li 
+              key={n.id || n.title} 
+              className={cn(
+                "px-4 py-3 transition-colors",
+                url ? "hover:bg-white/5 cursor-pointer group/item" : "opacity-80"
+              )}
+              onClick={() => url && window.open(url, '_blank', 'noopener')}
+            >
+              <div className="mb-1 text-[10px] tracking-widest text-(--color-term-muted) flex justify-between">
+                <span className="group-hover/item:text-sky-400 transition-colors">{n.source || n.publisher || 'MARKET'}</span>
+                <span>{n.published ? new Date(n.published * 1000).toLocaleDateString() : (n.time || '')}</span>
+              </div>
+              <p className="text-[12.5px] leading-snug text-(--color-term-text) font-medium group-hover/item:text-(--color-term-accent) transition-colors">
+                {n.title}
+              </p>
+            </li>
+          );
+        })}
       </ul>
+    </Panel>
+  );
+}
+
+function AISummaryPanel({ summary, loading }: { summary: string, loading: boolean }) {
+  return (
+    <Panel title="AI 摘要與分析" bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
+       <div className="flex flex-col gap-3">
+          {loading ? (
+             <div className="flex items-center gap-3 py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
+                <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">HERMES 正在分析市場數據...</span>
+             </div>
+          ) : (
+             <p className="text-[13px] leading-relaxed text-zinc-200 italic whitespace-pre-wrap">
+                {summary}
+             </p>
+          )}
+          <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2">
+             Generated by Hermes Llama-3.3 (Experimental)
+          </div>
+       </div>
     </Panel>
   );
 }

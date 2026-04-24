@@ -7,6 +7,10 @@ import { NewsPage } from './terminal/pages/News';
 import { ResearchPage } from './terminal/pages/Research';
 import { MarketPage } from './terminal/pages/Market';
 import { CryptoPage } from './terminal/pages/Crypto';
+import { SettingsPage } from './terminal/pages/Settings';
+import { AlertsPage } from './terminal/pages/Alerts';
+import { LoginPage } from './terminal/pages/Login';
+import { useAuth } from './contexts/AuthContext';
 
 const VALID_VIEWS: readonly TerminalView[] = [
   'dashboard',
@@ -15,6 +19,8 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'portfolio',
   'research',
   'news',
+  'alerts',
+  'settings'
 ];
 
 function parseHashView(): TerminalView {
@@ -32,9 +38,12 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   portfolio: 'SEARCH HOLDINGS...',
   research: 'Search AAPL...',
   news: '搜尋 . . .',
+  alerts: 'SEARCH ALERTS...',
+  settings: 'SEARCH SETTINGS...',
 };
 
 export default function App() {
+  const { user, loading } = useAuth();
   const [view, setView] = useState<TerminalView>(() => parseHashView());
 
   useEffect(() => {
@@ -49,6 +58,18 @@ export default function App() {
 
   const handleChange = useCallback((next: TerminalView) => setView(next), []);
 
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-(--color-term-bg)">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-(--color-term-accent) border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   return (
     <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>
       {view === 'dashboard' && <DashboardPage />}
@@ -57,6 +78,8 @@ export default function App() {
       {view === 'portfolio' && <PortfolioPage />}
       {view === 'research' && <ResearchPage />}
       {view === 'news' && <NewsPage />}
+      {view === 'settings' && <SettingsPage />}
+      {view === 'alerts' && <AlertsPage />}
     </Layout>
   );
 }

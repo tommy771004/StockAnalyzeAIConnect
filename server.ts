@@ -1,4 +1,6 @@
+import 'dotenv/config';
 import express from 'express';
+import expressWs from 'express-ws';
 import * as path from 'path';
 import * as https from 'https';
 import cors from 'cors';
@@ -14,23 +16,152 @@ import * as tradesRepo from './server/repositories/tradesRepo.js';
 import * as alertsRepo from './server/repositories/alertsRepo.js';
 import * as settingsRepo from './server/repositories/settingsRepo.js';
 import * as strategiesRepo from './server/repositories/strategiesRepo.js';
+import * as historyRepo from './server/repositories/portfolioHistoryRepo.js';
 import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter } from './server/api/agent.js';
 import { startAutonomousAgent } from './server/services/autonomousAgent.js';
 
-// Lazy-load Neon DB (requires DATABASE_URL to be set)
+// Lazy-load Neon DB
 let dbAvailable = false;
 try {
   await import('./src/db/index.js');
   dbAvailable = true;
-  // Start the background autonomous agent loop
-  startAutonomousAgent();
+  // Only start these in non-vercel environments
+  if (!process.env.VERCEL) {
+    startAutonomousAgent();
+  }
 } catch (e) {
-  console.warn('[DB] Neon not available — set DATABASE_URL in .env to enable persistence:', (e as Error).message);
+  console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
 }
 
-// --- Native Yahoo API Engine ---
+// --- OpenRouter Model Management ---
+let cachedFreeModels: string[] = [];
+let lastModelFetch = 0;
+const CACHE_DURATION = 3600 * 1000; // 1 hour
+
+/**
+ * Dynamically fetches and selects the best available free model from OpenRouter
+ */
+export async function getBestFreeModel(): Promise<string> {
+  const now = Date.now();
+  if (cachedFreeModels.length > 0 && (now - lastModelFetch < CACHE_DURATION)) {
+    return cachedFreeModels[0];
+  }
+
+  try {
+    console.log('[AI] Fetching latest free models from OpenRouter...');
+    const res = await fetch('https://openrouter.ai/api/v1/models');
+    if (!res.ok) throw new Error('Failed to fetch models');
+
+    const json = await res.json() as any;
+    const allModels = json.data || [];
+
+    const freeModels = allModels
+      .filter((m: any) => m.pricing?.prompt === '0' && m.pricing?.completion === '0')
+      .map((m: any) => m.id);
+
+    if (freeModels.length > 0) {
+      freeModels.sort((a: string, b: string) => {
+        const getScore = (id: string) => {
+          id = id.toLowerCase();
+          if (id.includes('70b') || id.includes('large')) return 100;
+          if (id.includes('pro')) return 80;
+          if (id.includes('flash')) return 60;
+          if (id.includes('gemini')) return 50;
+          return 0;
+        };
+        return getScore(b) - getScore(a);
+      });
+
+      cachedFreeModels = freeModels;
+      lastModelFetch = now;
+      console.log(`[AI] Selected top free model: ${cachedFreeModels[0]}`);
+      return cachedFreeModels[0];
+    }
+  } catch (err) {
+    console.warn('[AI] Error fetching free models, falling back to default:', (err as Error).message);
+  }
+
+  return 'google/gemini-2.0-flash-exp:free';
+}
+
+/**
+ * Converts various symbol formats to TradingView canonical format
+ * Yahoo: 2330.TW -> TradingView: TWSE:2330
+ * Yahoo: 8069.TWO -> TradingView: TPEX:8069
+ */
+function toTradingViewSymbol(input: string): string {
+  const sym = input.toUpperCase();
+  if (sym.endsWith('.TW')) {
+    return `TWSE:${sym.replace('.TW', '')}`;
+  }
+  if (sym.endsWith('.TWO')) {
+    return `TPEX:${sym.replace('.TWO', '')}`;
+  }
+  // If it's a pure numeric string (Taiwan stock without suffix), default to TWSE
+  if (/^\d{4}$/.test(sym)) {
+    return `TWSE:${sym}`;
+  }
+  return sym;
+}
+
+// REMOVED: local parseSymbol to fix conflict with import
+
+/**
+ * Calls OpenRouter with automatic fallback to other free models on failure
+ */
+async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Promise<string> {
+  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) throw new Error('AI key missing');
+
+  // Ensure we have models
+  await getBestFreeModel();
+  const modelsToTry = cachedFreeModels.slice(0, 3);
+  if (modelsToTry.length === 0) modelsToTry.push('google/gemini-2.0-flash-exp:free');
+
+  let lastError: any = null;
+
+  for (const modelId of modelsToTry) {
+    try {
+      console.log(`[AI] Attempting request with model: ${modelId}...`);
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://hermes-ai.trading',
+          'X-Title': 'Hermes AI Trading'
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          ...(jsonMode && { response_format: { type: 'json_object' } })
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[AI] Model ${modelId} failed (${res.status}): ${errText.slice(0, 100)}`);
+        continue; // Try next model
+      }
+
+      const json = await res.json() as any;
+      const content = json?.choices?.[0]?.message?.content;
+      if (content) {
+        console.log(`[AI] Success with model: ${modelId}`);
+        return content;
+      }
+    } catch (err) {
+      console.warn(`[AI] Error calling ${modelId}:`, (err as Error).message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All AI models failed to respond');
+}
+
 const UA_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 interface HistoricalData {
@@ -55,12 +186,11 @@ class NativeYahooApi {
   private static crumbTtl = 25 * 60 * 1000;
   private static isFetchingCrumb = false;
   private static lastFailedAt = 0;
-  private static failureCooldown = 5 * 60 * 1000; // 5 min backoff after 429
+  private static failureCooldown = 5 * 60 * 1000;
 
-  // --- In-memory response cache (survives 429 outages) ---
   private static cache = new Map<string, { data: unknown; ts: number }>();
-  private static CACHE_TTL = 10 * 60 * 1000; // 10 min fresh data
-  private static STALE_TTL = 60 * 60 * 1000; // 1 hr stale-while-error
+  private static CACHE_TTL = 10 * 60 * 1000;
+  private static STALE_TTL = 60 * 60 * 1000;
 
   private static getCached(key: string): { data: unknown; stale: boolean } | null {
     const entry = this.cache.get(key);
@@ -78,17 +208,17 @@ class NativeYahooApi {
   public static async ensureAuth() {
     if (this.crumb && Date.now() - this.crumbFetchedAt < this.crumbTtl) return;
     if (this.lastFailedAt && Date.now() - this.lastFailedAt < this.failureCooldown) {
-      throw new Error('Yahoo Finance 暫時不可用，請稍後再試');
+      throw new Error('Yahoo Finance is currently unavailable (rate limited), please try again later.');
     }
     if (this.isFetchingCrumb) {
       while (this.isFetchingCrumb) await new Promise(r => setTimeout(r, 100));
-      if (!this.crumb) throw new Error('Yahoo Finance 驗證失敗');
+      if (!this.crumb) throw new Error('Yahoo Finance Auth failed');
       return;
     }
 
     this.isFetchingCrumb = true;
     try {
-      console.log('[NativeYF] 正在取得 Yahoo Cookie 與 Crumb...');
+      console.log('[NativeYF] Fetching Yahoo Cookie & Crumb...');
       this.cookie = await new Promise<string>((resolve, reject) => {
         const req = https.get('https://finance.yahoo.com/', {
           headers: {
@@ -106,11 +236,11 @@ class NativeYahooApi {
               break;
             }
           }
-          res.on('data', () => {});
+          res.on('data', () => { });
           res.on('end', () => resolve(foundCookie));
         });
         req.on('error', reject);
-        req.setTimeout(10000, () => { req.destroy(); reject(new Error('Cookie 請求超時')); });
+        req.setTimeout(10000, () => { req.destroy(); reject(new Error('Cookie Request Timeout')); });
       });
 
       const res2 = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
@@ -123,13 +253,13 @@ class NativeYahooApi {
       if (res2.ok) {
         this.crumb = await res2.text();
         this.crumbFetchedAt = Date.now();
-        console.log(`[NativeYF] Crumb 取得成功! (${this.crumb})`);
+        console.log(`[NativeYF] Crumb Fetched Successfully! (${this.crumb})`);
       } else {
-        throw new Error(`Crumb 取得失敗: HTTP ${res2.status}`);
+        throw new Error(`Crumb Fetch Failed: HTTP ${res2.status}`);
       }
     } catch (err) {
       this.lastFailedAt = Date.now();
-      console.error('[NativeYF] 取得驗證資料失敗:', err);
+      console.error('[NativeYF] Auth Data Fetch Error:', err);
       throw err;
     } finally {
       this.isFetchingCrumb = false;
@@ -183,12 +313,17 @@ class NativeYahooApi {
 
   public static async chart(symbol: string, opts: ChartOptions = {}): Promise<{ quotes: HistoricalData[] }> {
     const interval = opts.interval || '1d';
-    const p1 = opts.period1 ? Math.floor(new Date(opts.period1).getTime() / 1000) : Math.floor(Date.now()/1000) - 31536000;
+    const getUnixTs = (val: string | number) => {
+      const num = Number(val);
+      if (!isNaN(num)) return Math.floor(num / (num > 1e11 ? 1000 : 1));
+      return Math.floor(new Date(val).getTime() / 1000);
+    };
+    const p1 = opts.period1 ? getUnixTs(opts.period1) : Math.floor(Date.now() / 1000) - 31536000;
     let url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&period1=${p1}`;
     if (opts.period2) {
-      url += `&period2=${Math.floor(new Date(opts.period2).getTime() / 1000)}`;
+      url += `&period2=${getUnixTs(opts.period2)}`;
     } else {
-      url += `&period2=${Math.floor(Date.now()/1000)}`;
+      url += `&period2=${Math.floor(Date.now() / 1000)}`;
     }
     const cacheKey = `chart:${symbol}:${interval}:${p1}`;
     try {
@@ -199,15 +334,19 @@ class NativeYahooApi {
       const quote = result.indicators.quote[0];
       const quotes: HistoricalData[] = timestamps.map((ts: number, i: number) => ({
         date: new Date(ts * 1000),
-        open:   quote.open[i],
-        high:   quote.high[i],
-        low:    quote.low[i],
-        close:  quote.close[i],
+        open: quote.open[i],
+        high: quote.high[i],
+        low: quote.low[i],
+        close: quote.close[i],
         volume: quote.volume[i]
       })).filter((q: any): q is HistoricalData => q.close !== null && q.close !== undefined);
       this.setCache(cacheKey, quotes);
       return { quotes };
-    } catch (err) {
+    } catch (err: any) {
+      const msg = String(err.message || '').toUpperCase();
+      if (msg.includes('HTTP 422') || msg.includes('HTTP 400')) {
+        return { quotes: [] };
+      }
       const cached = this.getCached(cacheKey);
       if (cached) {
         if (cached.stale) console.warn(`[NativeYF] chart: serving stale cache for ${symbol}`);
@@ -229,9 +368,6 @@ class NativeYahooApi {
   }
 }
 
-// (JSON DB helpers removed — data is now stored in Neon PostgreSQL)
-
-// --- Backtest Logic ---
 function SMA(data: number[], p: number) {
   const r: (number | null)[] = [];
   for (let i = 0; i < data.length; i++) {
@@ -252,32 +388,15 @@ function EMA(data: number[], p: number) {
   return r;
 }
 function RSI(data: number[], p: number = 14) {
-  const r: (number | null)[] = [];
-  let g = 0, l = 0;
+  const rsi: (number | null)[] = [null];
   for (let i = 1; i < data.length; i++) {
-    const d = data[i] - data[i - 1];
-    if (d > 0) g += d; else l -= d;
-    if (i < p) r.push(null);
-    else if (i === p) {
-      const ag = g / p, al = l / p;
-      r.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
-    } else {
-      // Wilder's
-      const prev = r[i - 1]!;
-      // This is complex to do perfectly in one pass, let's use a simpler version
-      r.push(prev); // Placeholder
+    let up = 0, dn = 0;
+    const start = Math.max(0, i - p);
+    for (let j = start + 1; j <= i; j++) {
+      const d = data[j] - data[j - 1];
+      if (d > 0) up += d; else dn -= d;
     }
-  }
-  // Simplified RSI for backtest
-  const rsi: (number|null)[] = [null];
-  for(let i=1; i<data.length; i++) {
-    let up=0, dn=0;
-    const start = Math.max(0, i-p);
-    for(let j=start+1; j<=i; j++) {
-      const d = data[j]-data[j-1];
-      if(d>0) up+=d; else dn-=d;
-    }
-    rsi.push(dn===0?100:100-100/(1+up/dn));
+    rsi.push(dn === 0 ? 100 : 100 - 100 / (1 + up / dn));
   }
   return rsi;
 }
@@ -285,21 +404,20 @@ function RSI(data: number[], p: number = 14) {
 function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCapital: number) {
   const closes = quotes.map(q => q.close);
   const dates = quotes.map(q => q.date.toISOString().split('T')[0]);
-  
   const signals: (1 | -1 | 0)[] = new Array(quotes.length).fill(0);
-  
+
   if (strategy === 'ma_crossover') {
     const s10 = SMA(closes, 10);
     const s30 = SMA(closes, 30);
     for (let i = 1; i < quotes.length; i++) {
-      if (s10[i-1]! <= s30[i-1]! && s10[i]! > s30[i]!) signals[i] = 1;
-      else if (s10[i-1]! >= s30[i-1]! && s10[i]! < s30[i]!) signals[i] = -1;
+      if (s10[i - 1]! <= s30[i - 1]! && s10[i]! > s30[i]!) signals[i] = 1;
+      else if (s10[i - 1]! >= s30[i - 1]! && s10[i]! < s30[i]!) signals[i] = -1;
     }
   } else if (strategy === 'rsi') {
     const rsi = RSI(closes, 14);
     for (let i = 1; i < quotes.length; i++) {
-      if (rsi[i-1]! < 35 && rsi[i]! >= 35) signals[i] = 1;
-      else if (rsi[i-1]! > 65 && rsi[i]! <= 65) signals[i] = -1;
+      if (rsi[i - 1]! < 35 && rsi[i]! >= 35) signals[i] = 1;
+      else if (rsi[i - 1]! > 65 && rsi[i]! <= 65) signals[i] = -1;
     }
   } else if (strategy === 'macd') {
     const e12 = EMA(closes, 12);
@@ -311,11 +429,10 @@ function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCap
       return (v !== null && sIdx >= 0) ? v! - signal[sIdx]! : null;
     });
     for (let i = 1; i < quotes.length; i++) {
-      if (hist[i-1]! <= 0 && hist[i]! > 0 && macd[i]! > 0) signals[i] = 1;
-      else if (hist[i-1]! >= 0 && hist[i]! < 0) signals[i] = -1;
+      if (hist[i - 1]! <= 0 && hist[i]! > 0 && macd[i]! > 0) signals[i] = 1;
+      else if (hist[i - 1]! >= 0 && hist[i]! < 0) signals[i] = -1;
     }
   } else {
-    // Neural/Default: Simple Momentum
     const e8 = EMA(closes, 8);
     const e21 = EMA(closes, 21);
     for (let i = 1; i < quotes.length; i++) {
@@ -330,13 +447,11 @@ function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCap
   const equityCurve: any[] = [];
   let entryPrice = 0;
   let entryTime = '';
-
   const benchStart = closes[0];
 
   for (let i = 0; i < quotes.length; i++) {
     const price = closes[i];
     const date = dates[i];
-
     if (signals[i] === 1 && shares === 0) {
       shares = Math.floor(balance / price);
       balance -= shares * price;
@@ -356,7 +471,6 @@ function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCap
       balance += shares * price;
       shares = 0;
     }
-
     const currentEquity = balance + (shares * price);
     equityCurve.push({
       date,
@@ -365,14 +479,12 @@ function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCap
     });
   }
 
-  const roi = Number((( (balance + shares * closes[closes.length-1]) / initialCapital - 1) * 100).toFixed(2));
+  const roi = Number((((balance + shares * closes[closes.length - 1]) / initialCapital - 1) * 100).toFixed(2));
   const winRate = trades.length > 0 ? Number(((trades.filter(t => t.pnl > 0).length / trades.length) * 100).toFixed(2)) : 0;
-  
-  // Drawdown
   let maxEquity = -Infinity;
   let maxDD = 0;
   const drawdownCurve = equityCurve.map(e => {
-    const val = e.portfolio + 100; // use 100 as base
+    const val = e.portfolio + 100;
     if (val > maxEquity) maxEquity = val;
     const dd = ((maxEquity - val) / maxEquity) * 100;
     if (dd > maxDD) maxDD = dd;
@@ -380,727 +492,491 @@ function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCap
   });
 
   return {
-    metrics: {
-      roi,
-      sharpe: 1.5, // Mock
-      maxDrawdown: Number(maxDD.toFixed(2)),
-      winRate,
-      totalTrades: trades.length,
-      avgWin: 0, avgLoss: 0, profitFactor: 1.2
-    },
-    equityCurve,
-    drawdownCurve,
-    trades
+    metrics: { roi, sharpe: 1.5, maxDrawdown: Number(maxDD.toFixed(2)), winRate, totalTrades: trades.length, avgWin: 0, avgLoss: 0, profitFactor: 1.2 },
+    equityCurve, drawdownCurve, trades
   };
 }
 
 export const app = express();
+const wsInstance = expressWs(app);
 const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
 
-  // --- Health / Diagnostics ---
-  app.get('/api/health', (_req, res) => {
-    res.json({
-      ok: true,
-      time: new Date().toISOString(),
-      vercel: !!(process.env.VERCEL || process.env.VERCEL_ENV),
-      node: process.version,
-      db: dbAvailable,
+const lastPrices = new Map<string, number>();
+
+function isMarketOpen(symbol: string): boolean {
+  const now = new Date();
+  const tpeDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const tpeDay = tpeDate.getDay();
+  const tpeHour = tpeDate.getHours();
+  const tpeMin = tpeDate.getMinutes();
+  const isTpeWeekend = (tpeDay === 0 || tpeDay === 6);
+  if (symbol.endsWith('.TW') || symbol.endsWith('.TWO')) {
+    if (isTpeWeekend) return false;
+    const totalMinutes = tpeHour * 60 + tpeMin;
+    return totalMinutes >= (9 * 60) && totalMinutes < (13 * 60 + 30);
+  }
+  const nyDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const nyDay = nyDate.getDay();
+  const nyHour = nyDate.getHours();
+  const nyMin = nyDate.getMinutes();
+  const isNyWeekend = (nyDay === 0 || nyDay === 6);
+  if (isNyWeekend) return false;
+  const totalNyMinutes = nyHour * 60 + nyMin;
+  return totalNyMinutes >= (9 * 60 + 30) && totalNyMinutes < (16 * 60);
+}
+
+(app as any).ws('/ws', (ws) => {
+  const subs = new Set<string>();
+  ws.on('message', (msg: string) => {
+    try {
+      const data = JSON.parse(msg);
+      if (data.action === 'subscribe') {
+        subs.add(data.symbol);
+        if (!lastPrices.has(data.symbol)) lastPrices.set(data.symbol, 150 + Math.random() * 500);
+      } else if (data.action === 'unsubscribe') {
+        subs.delete(data.symbol);
+      }
+    } catch { }
+  });
+  const timer = setInterval(() => {
+    if (ws.readyState !== 1) return clearInterval(timer);
+    subs.forEach(sym => {
+      if (!isMarketOpen(sym)) return;
+      let price = lastPrices.get(sym) || 200;
+      const change = (Math.random() - 0.5) * (price * 0.0005);
+      price += change;
+      lastPrices.set(sym, price);
+      ws.send(JSON.stringify({ type: 'tick', symbol: sym, price: Number(price.toFixed(2)), vol: Math.floor(Math.random() * 100) + 1, t: Date.now() }));
     });
-  });
+  }, 1000);
+  ws.on('close', () => clearInterval(timer));
+});
 
-  // --- AI Analysis (OpenRouter proxy) ---
-  app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
-    const { prompt, model, jsonMode } = req.body;
-    if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, time: new Date().toISOString(), vercel: !!(process.env.VERCEL || process.env.VERCEL_ENV), node: process.version, db: dbAvailable });
+});
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      console.warn('[API] OPENROUTER_API_KEY is missing in environment variables.');
-      res.status(500).json({ error: 'AI service configuration error: Missing API Key. Please contact the administrator.' });
-      return;
-    }
+app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
+  const { prompt, model, jsonMode } = req.body;
+  if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
+  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) {
+    res.status(500).json({ error: 'AI service configuration error: Missing API Key.' });
+    return;
+  }
 
-    const targetModel = model || 'meta-llama/llama-3.3-70b-instruct:free';
+  try {
+    const text = await callAIWithFallback(prompt, jsonMode);
+    res.json({ text });
+  } catch (e: any) { 
+    res.status(500).json({ error: e.message }); 
+  }
+});
 
-    try {
-      const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer':  'https://hermes-ai.trading',
-          'X-Title':       'Hermes AI Trading',
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
-          max_tokens: 2048,
-          stream: false,
-          ...(jsonMode && { response_format: { type: 'json_object' } }),
-        }),
-      });
 
-      if (!orRes.ok) {
-        const errBody = await orRes.text().catch(() => '');
-        console.error('[API] OpenRouter error:', orRes.status, errBody.slice(0, 200));
-        res.status(orRes.status).json({ error: `OpenRouter ${orRes.status}: ${errBody.slice(0, 200)}` });
-        return;
-      }
+app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  const sym = req.params.symbol;
+  const tvSym = toTradingViewSymbol(sym);
+  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) return res.status(500).json({ error: 'AI key missing' });
 
-      const json = await orRes.json() as { choices?: { message?: { content?: string } }[] };
-      const text = json?.choices?.[0]?.message?.content ?? '';
-      if (!text) throw new Error('OpenRouter response was empty');
-      res.json({ text });
-    } catch (e: any) {
-      console.error('[API] AI Analyze error:', e);
-      res.status(500).json({ error: e.message });
-    }
-  });
+  console.log(`[AI] Generating summary for ${sym} (TV Symbol: ${tvSym})...`);
 
-  // --- System Stats ---
-  app.get('/api/stats', authMiddleware, (_req, res) => {
-    const mem = process.memoryUsage();
-    const cpu = process.cpuUsage();
-    const MB  = 1024 * 1024;
-    const uptimeSec = process.uptime();
-    const hours   = Math.floor(uptimeSec / 3600);
-    const minutes = Math.floor((uptimeSec % 3600) / 60);
-    const uptimeStr = hours > 0 ? `${hours} 時 ${minutes} 分鐘` : `${minutes} 分鐘`;
-    res.json({
-      heapUsed:        Math.round(mem.heapUsed  / MB),
-      heapTotal:       Math.round(mem.heapTotal / MB),
-      rss:             Math.round(mem.rss       / MB),
-      cpuUser:         cpu.user,
-      cpuSystem:       cpu.system,
-      uptimeStr,
-      nodeVersion:     process.version,
-      electronVersion: '',
-      platform:        process.platform,
-    });
-  });
-
-  // --- System Logs ---
-  app.get('/api/logs', authMiddleware, (_req, res) => {
-    res.json([]);
-  });
-
-  // ── Auth ────────────────────────────────────────────────────────────────────
-  app.post('/api/auth/register', async (req, res) => {
-    const { email, password, name } = req.body ?? {};
-    if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return; }
-    if (password.length < 8) { res.status(400).json({ error: 'password must be at least 8 characters' }); return; }
-    try {
-      const existing = await usersRepo.findUserByEmail(email);
-      if (existing) { res.status(409).json({ error: 'Email already registered' }); return; }
-      const passwordHash = await bcrypt.hash(password, 12);
-      const user = await usersRepo.createUser({ email, passwordHash, name: name ?? null });
-      setTokenCookie(res, user.id);
-      res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body ?? {};
-    if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return; }
-    try {
-      const user = await usersRepo.findUserByEmail(email);
-      if (!user) { res.status(401).json({ error: 'Invalid credentials' }); return; }
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
-      setTokenCookie(res, user.id);
-      res.json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const user = await usersRepo.findUserById(req.userId!);
-      if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-      res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/auth/logout', (_req, res) => {
-    clearTokenCookie(res);
-    res.json({ ok: true });
-  });
-
-  // --- API Routes ---
-  app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const q = await NativeYahooApi.quote(req.params.symbol as string); res.json(q); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const q = await NativeYahooApi.chart(req.params.symbol as string, req.query);
-      res.json(q.quotes);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const syms = (req.query.symbols as string)?.split(',') || [];
-      const results = await NativeYahooApi.quote(syms);
-      res.json(Array.isArray(results) ? results : [results]);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
-    try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const data = await NativeYahooApi.quoteSummary(req.params.symbol as string, ['calendarEvents']);
-      res.json(data.calendarEvents || {});
-    } catch (e: any) {
-      // Calendar data is non-critical; many non-US symbols lack this module
-      console.warn(`[Calendar] ${req.params.symbol}: ${e.message}`);
-      res.json({});
-    }
-  });
-
-  app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
-    try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const items = await watchlistRepo.getWatchlistByUser(req.userId!);
-      res.json(items.map(i => ({ symbol: i.symbol, name: i.name, addedAt: i.addedAt })));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.put('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const list: Array<{ symbol: string; name?: string; addedAt?: number }> = req.body;
-      await watchlistRepo.replaceWatchlist(req.userId!, list);
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Single-item add/upsert — avoids full-replace race conditions
-  app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const { symbol, name } = req.body ?? {};
-      if (!symbol || typeof symbol !== 'string') {
-        res.status(400).json({ error: 'symbol is required' }); return;
-      }
-      const item = await watchlistRepo.addWatchlistItem({
-        userId: req.userId!,
-        symbol: symbol.toUpperCase(),
-        name: name ?? null,
-        addedAt: Date.now(),
-      });
-      res.status(201).json({ symbol: item.symbol, name: item.name, addedAt: item.addedAt });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- Alerts ---
-  app.get('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const list = await alertsRepo.getAlertsByUser(req.userId!);
-      res.json(list.map(a => ({
-        id: a.id, symbol: a.symbol, condition: a.condition,
-        target: Number(a.target), triggered: a.triggered,
-        triggeredAt: a.triggeredAt, triggeredPrice: a.triggeredPrice != null ? Number(a.triggeredPrice) : undefined,
-      })));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const { symbol, condition, target } = req.body;
-      const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(target) });
-      res.json({ id: alert.id, symbol: alert.symbol, condition: alert.condition, target: Number(alert.target), triggered: alert.triggered });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete('/api/alerts/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      await alertsRepo.deleteAlert(req.userId!, Number(req.params.id));
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- Trade Execution ---
-  app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => {
-    const order = req.body;
-    const userId = req.userId!;
-    try {
-      // 1. Fetch current positions for Risk Management
-      const existing = await positionsRepo.getPositionsByUser(userId);
-      let totalCost = 0;
-      let totalVal = 0;
-      let usdtwd = 32.5;
-      
-      // Calculate total exposure to enforce limits
-      const symbols = existing.map(p => p.symbol);
-      let qMap = new Map();
-      if (symbols.length > 0) {
-         try {
-           const results = await NativeYahooApi.quote(symbols);
-           const quotes = Array.isArray(results) ? results : [results];
-           qMap = new Map(quotes.filter(q => q && q.symbol).map(q => [q.symbol, q]));
-         } catch { /* if fetch fails, skip live value */ }
-      }
-
-      existing.forEach(p => {
-         const shares = Number(p.shares) || 0;
-         const avgCost = Number(p.avgCost) || 0;
-         const currentPrice = qMap.get(p.symbol)?.regularMarketPrice || avgCost;
-         totalCost += avgCost * shares;
-         totalVal += currentPrice * shares;
-      });
-
-      const plPct = totalCost > 0 ? ((totalVal - totalCost) / totalCost) * 100 : 0;
-      const targetAccountValue = totalVal > 0 ? totalVal : 1000000; // Simulated $1M starting capital
-      const tradeValue = order.amount * order.price;
-
-      // [Risk Validation Check] Backend Level
-      if (order.side === 'buy') {
-        if (totalCost > 0 && plPct <= -3) {
-           return res.status(403).json({ error: 'Circuit Breaker Triggered: Total loss exceeds -3% limit.' });
-        }
-        if (tradeValue > targetAccountValue * 0.05) {
-           return res.status(403).json({ error: `Position Limit Exceeded: Order value > 5% of account.` });
-        }
-      }
-
-      const trade = await tradesRepo.createTrade(userId, { ...order, time: new Date().toISOString() });
-      const pos = existing.find(p => p.symbol === order.symbol);
-      const isTWD = order.symbol.endsWith('.TW') || order.symbol.endsWith('.TWO');
-      const currency = isTWD ? 'TWD' : 'USD';
-      
-      if (order.side === 'buy') {
-        if (pos) {
-          const newCost = Number(pos.shares) * Number(pos.avgCost) + order.total;
-          const newShares = Number(pos.shares) + order.amount;
-          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: String(newCost / newShares), currency });
-        } else {
-          await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(order.amount), avgCost: String(order.price), currency });
-        }
-      } else {
-        if (pos) {
-          const newShares = Number(pos.shares) - order.amount;
-          if (newShares <= 0) {
-            await positionsRepo.removePosition(userId, order.symbol);
-          } else {
-            await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: pos.avgCost, currency });
-          }
-        }
-      }
-      res.json({ ok: true, trade });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- Screener ---
-  app.post('/api/screener', authMiddleware, async (req: AuthRequest, res) => {
-    const { symbols, filters } = req.body;
-    try {
-      const results = await Promise.all(symbols.map(async (s: string) => {
-        try {
-          const q = await NativeYahooApi.quote(s);
-          const h = await NativeYahooApi.chart(s, { interval: '1d', period1: Date.now() - 60*24*60*60*1000 });
-          const closes = h.quotes.map((x: HistoricalData) => x.close);
-          const rsiVal = RSI(closes, 14).pop() || 50;
-          const sma20Val = SMA(closes, 20).pop() || 0;
-          const current = q.regularMarketPrice;
-          let match = true;
-          if (filters.rsiBelow && rsiVal > filters.rsiBelow) match = false;
-          if (filters.rsiAbove && rsiVal < filters.rsiAbove) match = false;
-          if (filters.aboveSMA20 && current < sma20Val) match = false;
-          if (filters.belowSMA20 && current > sma20Val) match = false;
-          if (match) return { symbol: s, price: current, change: q.regularMarketChangePercent, rsi: rsiVal, sma20: sma20Val };
-          return null;
-        } catch { return null; }
-      }));
-      res.json(results.filter(r => r !== null));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
-    let usdtwd = 32.5;
-    try { const q = await NativeYahooApi.quote('USDTWD=X'); usdtwd = q?.regularMarketPrice ?? 32.5; } catch { /**/ }
-    try {
-      const userId = req.userId!;
-      const list = await positionsRepo.getPositionsByUser(userId);
-      
-      // Batch fetch prices to avoid UI spinners
-      const symbols = list.map(p => p.symbol);
-      let quotes: any[] = [];
-      if (symbols.length > 0) {
-        try {
-          const results = await NativeYahooApi.quote(symbols);
-          quotes = Array.isArray(results) ? results : [results];
-        } catch (err) {
-          console.warn('[API] Failed to fetch prices for positions:', err);
-        }
-      }
-      
-      const qMap = new Map(quotes.filter(q => q && q.symbol).map(q => [q.symbol, q]));
-      
-      const enriched = list.map(p => {
-        const q = qMap.get(p.symbol);
-        const shares = Number(p.shares);
-        const avgCost = Number(p.avgCost);
-        const cur = p.currency || 'USD';
-        
-        let currentPrice = q?.regularMarketPrice ?? null;
-        let pnl = null;
-        let pnlPercent = null;
-        let marketValue = null;
-        let marketValueTWD = null;
-
-        if (currentPrice != null) {
-          pnl = (currentPrice - avgCost) * shares;
-          pnlPercent = avgCost > 0 ? ((currentPrice / avgCost) - 1) * 100 : 0;
-          marketValue = currentPrice * shares;
-          marketValueTWD = cur === 'TWD' ? marketValue : marketValue * usdtwd;
-        }
-
-        return {
-          symbol: p.symbol,
-          name: q?.shortName || p.name || p.symbol,
-          shares,
-          avgCost,
-          currency: cur,
-          currentPrice,
-          pnl,
-          pnlPercent,
-          marketValue,
-          marketValueTWD
-        };
-      });
-
-      res.json({ positions: enriched, usdtwd });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.put('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      if (!Array.isArray(req.body)) {
-        res.status(400).json({ error: 'Body must be an array of positions' });
-        return;
-      }
-      await positionsRepo.replacePositions(req.userId!, req.body);
-      res.json({ ok: true });
-    } catch (e: any) {
-      console.error('[API] PUT /api/positions error:', e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.get('/api/trades', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      res.json(await tradesRepo.getTradesByUser(req.userId!));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/trades', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const trade = await tradesRepo.createTrade(req.userId!, req.body);
-      res.json(trade);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.put('/api/trades/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const trade = await tradesRepo.updateTrade(req.userId!, Number(req.params.id), req.body);
-      if (!trade) { res.status(404).json({ error: 'Trade not found' }); return; }
-      res.json(trade);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete('/api/trades/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      await tradesRepo.deleteTrade(req.userId!, Number(req.params.id));
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const value = await settingsRepo.getSetting(req.userId!, req.params.key as string);
-      res.json({ value: value ?? null });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      await settingsRepo.setSetting(req.userId!, req.params.key as string, req.body.value);
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- Strategies ---
-  app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
-    try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const s = await strategiesRepo.createStrategy(req.userId!, req.body);
-      res.status(201).json(s);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.put('/api/strategies/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const s = await strategiesRepo.updateStrategy(req.userId!, Number(req.params.id), req.body);
-      if (!s) { res.status(404).json({ error: 'Strategy not found' }); return; }
-      res.json(s);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete('/api/strategies/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      await strategiesRepo.deleteStrategy(req.userId!, Number(req.params.id));
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.post('/api/strategies/:id/activate', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      await strategiesRepo.setActiveStrategy(req.userId!, Number(req.params.id));
-      res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- TradingView (via Python microservice) ---
-  // 所有端點接受 Yahoo 或 TradingView 風格 symbol，內部以 symbolParser 統一轉換。
-  app.get('/api/tv/health', async (_req, res) => {
-    res.json({ available: await TV.isAvailable() });
-  });
-
-  app.get('/api/tv/overview/:symbol', async (req, res) => {
-    try {
-      const data = await TV.getOverview(req.params.symbol);
-      if (data === null) return res.status(503).json({ error: 'TradingView service unavailable' });
-      res.json(data);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/tv/indicators/:symbol', async (req, res) => {
-    try {
-      const tf = (req.query.timeframe as any) || '1d';
-      const data = await TV.getIndicators(req.params.symbol, tf);
-      if (data === null) return res.status(503).json({ error: 'TradingView service unavailable' });
-      res.json(data);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/tv/news/:symbol', async (req, res) => {
-    try {
-      const data = await TV.getNewsHeadlines(req.params.symbol);
-      res.json(data ?? []);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.get('/api/tv/ideas/:symbol', async (req, res) => {
-    try {
-      const sort = (req.query.sort as 'popular' | 'recent') || 'popular';
-      const data = await TV.getIdeas(req.params.symbol, sort);
-      res.json(data ?? []);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // --- Unified multi-source insights ---
-  // Yahoo 為主要資料源（價格、歷史），TradingView 為補強（指標、想法、社群）。
-  // 任一來源失敗不阻斷另一來源。
-  app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    const input = req.params.symbol as string;
-    const canonical = parseSymbol(input);
-    const yahooSymbol = toYahoo(canonical);
-
-    const [quote, tvOverview, tvIndicators, tvNews] = await Promise.allSettled([
-      NativeYahooApi.quote(yahooSymbol as string),
-      TV.getOverview(canonical),
-      TV.getIndicators(canonical, (req.query.timeframe as any) || '1d'),
-      TV.getNewsHeadlines(canonical),
+  try {
+    const [quoteRes, newsRes, tvOverview, tvIndicators] = await Promise.allSettled([
+      NativeYahooApi.quote(toYahoo(sym)),
+      NativeYahooApi.search(toYahoo(sym)),
+      TV.getOverview(tvSym),
+      TV.getIndicators(tvSym)
     ]);
 
-    res.json({
-      symbol: { input, canonical, yahoo: yahooSymbol },
-      quote:       quote.status === 'fulfilled' ? quote.value : null,
-      tvOverview:  tvOverview.status === 'fulfilled' ? tvOverview.value : null,
-      tvIndicators:tvIndicators.status === 'fulfilled' ? tvIndicators.value : null,
-      tvNews:      tvNews.status === 'fulfilled' ? tvNews.value : null,
-      errors: [quote, tvOverview, tvIndicators, tvNews]
-        .map((r, i) => r.status === 'rejected'
-          ? { source: ['yahoo','tv.overview','tv.indicators','tv.news'][i], message: (r.reason as Error)?.message }
-          : null)
-        .filter(Boolean),
-    });
-  });
+    const quote = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
+    const news = newsRes.status === 'fulfilled' ? (newsRes.value as any).news : [];
+    
+    // Flatten nested TV responses
+    const tvO = tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null;
+    const tvI = tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null;
 
-  // --- Hermes Agent ---
-  app.use('/api/agent', authMiddleware, agentRouter);
+    const newsText = news.slice(0, 3).map((n: any) => `- ${n.title}`).join('\n');
+    const techText = tvI ? JSON.stringify(tvI).slice(0, 500) : '無技術指標數據';
 
-  // --- Smart Market Routing (/api/market/:symbol) ---
-  // 解析 ticker 判斷市場（純數字為台股）。
-  // 預設呼叫 Yahoo Finance 獲取資料。
-  // 若為台股且 Yahoo 資料非最新，則同步呼叫 TWSE API 更新即時價格。
-  // 若上述失敗，嘗試 Fallback 到 TradingView。
-  app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-    const rawSymbol = req.params.symbol as string;
-    const isTWStock = /^\d{4,5}$/.test(rawSymbol);
-    const yahooSymbol = isTWStock ? `${rawSymbol}.TW` : rawSymbol;
+    const prompt = `你是一位專業的金融分析師。請針對 ${sym} 提供深入的 AI 摘要分析。
+市場數據：現價 ${quote?.regularMarketPrice || tvO?.close || 'N/A'}，漲跌幅 ${quote?.regularMarketChangePercent || 'N/A'}%。
+公司概況：${tvO?.description || '無描述'}。
+技術指標摘要：${techText}。
+最近新聞：
+${newsText}
 
-    try {
-      // Step 1: Yahoo Finance 主要資料源
-      const [quoteData, histData, newsData] = await Promise.allSettled([
-        NativeYahooApi.quote(yahooSymbol),
-        NativeYahooApi.chart(yahooSymbol, {
-          interval: '1d',
-          period1:  Date.now() - 90 * 24 * 60 * 60 * 1000,
-        }),
-        NativeYahooApi.search(yahooSymbol),
-      ]);
+請提供：
+1. 營運狀況簡評
+2. 技術面分析（根據指標）
+3. 投資建議（看多/看空/中立）與理由。
+請以繁體中文回答，維持專業、簡潔的風格。`;
 
-      const quote   = quoteData.status === 'fulfilled' ? quoteData.value : null;
-      const history = histData.status  === 'fulfilled' ? histData.value.quotes : [];
-
-      // Step 2: 若為台股且 Yahoo 價格超過 5 分鐘未更新 → 嘗試 TWSE
-      let twseQuote: TWSE.TWSeQuote | null = null;
-      if (isTWStock && quote) {
-        const lastRefresh = quote.regularMarketTime
-          ? new Date(quote.regularMarketTime * 1000).getTime()
-          : 0;
-        const staleMs = Date.now() - lastRefresh;
-        if (staleMs > 5 * 60 * 1000) {
-          twseQuote = await TWSE.realtimeQuote(rawSymbol).catch(() => null);
-        }
-      }
-
-      // Step 3: 誡算技術指標
-      let techResult = null;
-      if (history.length >= 20) {
-        try {
-          techResult = calcIndicators(history);
-        } catch { /* 指標計算失敗不阻斷 */ }
-      }
-
-      // Step 4: 情緒分析
-      const rawNews = newsData.status === 'fulfilled' ? (newsData.value?.news ?? []) : [];
-      const sentiment = analyzeSentiment(rawNews, 3);
-
-      const price = twseQuote?.price ?? quote?.regularMarketPrice ?? 0;
-
-      // Step 5: 若全部失敗→ TradingView Fallback
-      if (!quote && !twseQuote) {
-        const canonical = parseSymbol(rawSymbol);
-        const tvData = await TV.getOverview(canonical).catch(() => null);
-        if (tvData) {
-          return res.json({
-            symbol:    rawSymbol,
-            source:    'TradingView',
-            price:     (tvData as Record<string, unknown>).close ?? 0,
-            history:   [],
-            technical: null,
-            sentiment,
-            raw:       tvData,
-          });
-        }
-        return res.status(404).json({ error: `找不到 ${rawSymbol} 的市場資料` });
-      }
-
-      return res.json({
-        symbol:    rawSymbol,
-        source:    twseQuote ? 'TWSE+Yahoo' : 'Yahoo',
-        price,
-        change:    twseQuote?.change   ?? quote?.regularMarketChange,
-        changePct: twseQuote?.changePercent ?? quote?.regularMarketChangePercent,
-        open:      twseQuote?.open  ?? quote?.regularMarketOpen,
-        high:      twseQuote?.high  ?? quote?.regularMarketDayHigh,
-        low:       twseQuote?.low   ?? quote?.regularMarketDayLow,
-        volume:    twseQuote?.volume ?? quote?.regularMarketVolume,
-        name:      twseQuote?.name  ?? quote?.longName ?? quote?.shortName,
-        history:   history.map(h => ({
-          date:   h.date instanceof Date ? h.date.toISOString().split('T')[0] : h.date,
-          open:   h.open,
-          high:   h.high,
-          low:    h.low,
-          close:  h.close,
-          volume: h.volume,
-        })),
-        technical: techResult ? {
-          sma20:          techResult.latest.sma20,
-          sma50:          techResult.latest.sma50,
-          macdLine:       techResult.latest.macdLine,
-          macdSignal:     techResult.latest.macdSignal,
-          macdHist:       techResult.latest.macdHist,
-          rsi14:          techResult.latest.rsi14,
-          recommendation: techResult.recommendation,
-          score:          techResult.score,
-        } : null,
-        sentiment,
-        twse:  twseQuote,
-      });
-    } catch (e: unknown) {
-      // 最終 Fallback→TradingView
-      try {
-        const canonical = parseSymbol(rawSymbol);
-        const tvData = await TV.getOverview(canonical);
-        if (tvData) {
-          return res.json({ symbol: rawSymbol, source: 'TradingView', price: (tvData as Record<string, unknown>).close ?? 0, history: [], technical: null });
-        }
-      } catch { /* ignore */ }
-      const msg = e instanceof Error ? e.message : String(e);
-      return res.status(500).json({ error: msg });
-    }
-  });
-
-  // --- Backtest Engine ---
-  app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
-    const { symbol, period1, period2, initialCapital, strategy } = req.body;
-    try {
-      const data = await NativeYahooApi.chart(symbol, { period1, period2 });
-      const quotes = data.quotes;
-      if (quotes.length < 50) throw new Error('數據不足，無法進行回測');
-
-      const cap = Number(initialCapital) || 1000000;
-      const result = runBacktestLogic(quotes, strategy, cap);
-      res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // --- Vite Middleware ---
-  if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
-    if (process.env.NODE_ENV !== 'production') {
-      import('vite').then(async ({ createServer: createViteServer }) => {
-        const vite = await createViteServer({
-          server: { middlewareMode: true },
-          appType: 'spa',
-        });
-        app.use(vite.middlewares);
-        app.listen(PORT, '0.0.0.0', () => {
-          console.log(`Server running on http://localhost:${PORT}`);
-        });
-      });
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('/{*path}', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
-      app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on http://localhost:${PORT}`);
-      });
-    }
+    const resultText = await callAIWithFallback(prompt);
+    console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
+    res.json({ text: resultText });
+  } catch (e: any) {
+    console.error(`[AI] Error:`, e);
+    res.status(500).json({ error: e.message });
   }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, name } = req.body ?? {};
+  if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return; }
+  if (password.length < 8) { res.status(400).json({ error: 'password must be at least 8 characters' }); return; }
+  try {
+    const existing = await usersRepo.findUserByEmail(email);
+    if (existing) { res.status(409).json({ error: 'Email already registered' }); return; }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await usersRepo.createUser({ email, passwordHash, name: name ?? null });
+    setTokenCookie(res, user.id);
+    res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body ?? {};
+  if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return; }
+  try {
+    const user = await usersRepo.findUserByEmail(email);
+    if (!user) { res.status(401).json({ error: 'Invalid credentials' }); return; }
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
+    setTokenCookie(res, user.id);
+    res.json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const user = await usersRepo.findUserById(req.userId!);
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/auth/update', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { name } = req.body;
+    const user = await usersRepo.updateUser(req.userId!, { name });
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/auth/logout', (_req, res) => {
+  clearTokenCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try { const q = await NativeYahooApi.quote(req.params.symbol as string); res.json(q); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
+  try { const q = await NativeYahooApi.chart(req.params.symbol as string, req.query); res.json(q.quotes); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const syms = (req.query.symbols as string)?.split(',') || [];
+    const results = await NativeYahooApi.quote(syms);
+    res.json(Array.isArray(results) ? results : [results]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/news/feed', authMiddleware, async (_req, res) => {
+  try {
+    const data = await NativeYahooApi.search('Market');
+    res.json(data.news || []);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
+  try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await NativeYahooApi.quoteSummary(req.params.symbol as string, ['calendarEvents']);
+    res.json(data.calendarEvents || {});
+  } catch (e: any) { res.json({}); }
+});
+
+app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
+  try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/portfolio/history', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const list = await historyRepo.getHistoryByUser(req.userId!);
+    res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.date })));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const items = await watchlistRepo.getWatchlistByUser(req.userId!);
+    res.json(items.map(i => ({ symbol: i.symbol, name: i.name, addedAt: i.addedAt })));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { symbol, name } = req.body ?? {};
+    if (!symbol) { res.status(400).json({ error: 'symbol required' }); return; }
+    const item = await watchlistRepo.addWatchlistItem({ userId: req.userId!, symbol: symbol.toUpperCase(), name: name ?? null, addedAt: Date.now() });
+    res.status(201).json(item);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/watchlist/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    await watchlistRepo.removeWatchlistItem(req.userId!, req.params.symbol);
+    res.json({ ok: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const list = await alertsRepo.getAlertsByUser(req.userId!);
+    res.json(list.map(a => ({ id: a.id, symbol: a.symbol, condition: a.condition, target: Number(a.target), triggered: a.triggered, triggeredAt: a.triggeredAt, triggeredPrice: a.triggeredPrice != null ? Number(a.triggeredPrice) : undefined })));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { symbol, condition, target } = req.body;
+    const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(target) });
+    res.json(alert);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/alerts/:id', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    await alertsRepo.deleteAlert(req.userId!, Number(req.params.id));
+    res.json({ ok: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => {
+  const order = req.body;
+  const userId = req.userId!;
+  try {
+    const existing = await positionsRepo.getPositionsByUser(userId);
+    let totalCost = 0, totalVal = 0, usdtwd = 32.5;
+    const symbols = existing.map(p => p.symbol);
+    let qMap = new Map();
+    if (symbols.length > 0) {
+      try {
+        const results = await NativeYahooApi.quote(symbols);
+        const quotes = Array.isArray(results) ? results : [results];
+        qMap = new Map(quotes.filter(q => q && q.symbol).map(q => [q.symbol, q]));
+      } catch { /* ignore */ }
+    }
+    existing.forEach(p => {
+      const shares = Number(p.shares), avgCost = Number(p.avgCost);
+      const currentPrice = qMap.get(p.symbol)?.regularMarketPrice || avgCost;
+      totalCost += avgCost * shares; totalVal += currentPrice * shares;
+    });
+    const plPct = totalCost > 0 ? ((totalVal - totalCost) / totalCost) * 100 : 0;
+    const targetAccountValue = totalVal > 0 ? totalVal : 1000000;
+    const tradeValue = order.amount * order.price;
+    if (order.side === 'buy') {
+      if (totalCost > 0 && plPct <= -3) return res.status(403).json({ error: 'Circuit Breaker: Loss > 3%' });
+      if (tradeValue > targetAccountValue * 0.05) return res.status(403).json({ error: 'Position Limit: > 5% of account' });
+    }
+    const trade = await tradesRepo.createTrade(userId, { ...order, time: new Date().toISOString() });
+    const pos = existing.find(p => p.symbol === order.symbol);
+    const isTWD = order.symbol.endsWith('.TW') || order.symbol.endsWith('.TWO'), currency = isTWD ? 'TWD' : 'USD';
+    if (order.side === 'buy') {
+      if (pos) {
+        const newCost = Number(pos.shares) * Number(pos.avgCost) + order.total, newShares = Number(pos.shares) + order.amount;
+        await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: String(newCost / newShares), currency });
+      } else {
+        await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(order.amount), avgCost: String(order.price), currency });
+      }
+    } else {
+      if (pos) {
+        const newShares = Number(pos.shares) - order.amount;
+        if (newShares <= 0) await positionsRepo.removePosition(userId, order.symbol);
+        else await positionsRepo.upsertPosition(userId, { symbol: order.symbol, shares: String(newShares), avgCost: pos.avgCost, currency });
+      }
+    }
+    res.json({ ok: true, trade });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
+  let usdtwd = 32.5;
+  try { const q = await NativeYahooApi.quote('USDTWD=X'); usdtwd = q?.regularMarketPrice ?? 32.5; } catch { /**/ }
+  try {
+    const list = await positionsRepo.getPositionsByUser(req.userId!);
+    const symbols = list.map(p => p.symbol);
+    let quotes: any[] = [];
+    if (symbols.length > 0) {
+      try { const results = await NativeYahooApi.quote(symbols); quotes = Array.isArray(results) ? results : [results]; } catch { /* ignore */ }
+    }
+    const qMap = new Map(quotes.filter(q => q && q.symbol).map(q => [q.symbol, q]));
+    const enriched = list.map(p => {
+      const q = qMap.get(p.symbol), shares = Number(p.shares), avgCost = Number(p.avgCost), cur = p.currency || 'USD';
+      let currentPrice = q?.regularMarketPrice ?? null, pnl = null, pnlPercent = null, marketValue = null, marketValueTWD = null;
+      if (currentPrice != null) {
+        pnl = (currentPrice - avgCost) * shares;
+        pnlPercent = avgCost > 0 ? ((currentPrice / avgCost) - 1) * 100 : 0;
+        marketValue = currentPrice * shares;
+        marketValueTWD = cur === 'TWD' ? marketValue : marketValue * usdtwd;
+      }
+      return { symbol: p.symbol, name: q?.shortName || p.name || p.symbol, shares, avgCost, currency: cur, currentPrice, pnl, pnlPercent, marketValue, marketValueTWD };
+    });
+    res.json({ positions: enriched, usdtwd });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/trades', authMiddleware, async (req: AuthRequest, res) => {
+  try { res.json(await tradesRepo.getTradesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
+  try { const value = await settingsRepo.getSetting(req.userId!, req.params.key as string); res.json({ value: value ?? null }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
+  try { await settingsRepo.setSetting(req.userId!, req.params.key as string, req.body.value); res.json({ ok: true }); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
+  try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/overview/:symbol', async (req, res) => {
+  try {
+    const data = await TV.getOverview(req.params.symbol);
+    if (data === null) return res.status(503).json({ error: 'TV Service Down' });
+    res.json(data);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  const input = req.params.symbol as string;
+  const canonical = parseSymbol(input);
+  const yahooSymbol = toYahoo(input);
+  const tvSymbol = toTradingViewSymbol(input);
+
+  console.log(`[Research] Fetching data for: Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
+
+  const [quote, tvOverview, tvIndicators, tvNews, history] = await Promise.allSettled([
+    NativeYahooApi.quote(yahooSymbol as string),
+    TV.getOverview(tvSymbol),
+    TV.getIndicators(tvSymbol, (req.query.timeframe as any) || '1d'),
+    TV.getNewsHeadlines(tvSymbol),
+    NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: String(Date.now() - 90 * 24 * 3600 * 1000) })
+  ]);
+  res.json({
+    symbol: { input, canonical, yahoo: yahooSymbol },
+    quote: quote.status === 'fulfilled' ? quote.value : null,
+    tvOverview: tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null,
+    tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
+    tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
+    history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
+  });
+});
+
+app.use('/api/agent', authMiddleware, agentRouter);
+
+app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  const rawSymbol = req.params.symbol as string, isTWStock = /^\d{4,5}$/.test(rawSymbol), yahooSymbol = isTWStock ? `${rawSymbol}.TW` : rawSymbol;
+  try {
+    const [quoteData, histData, newsData] = await Promise.allSettled([
+      NativeYahooApi.quote(yahooSymbol),
+      NativeYahooApi.chart(yahooSymbol, { interval: '1d', period1: Date.now() - 90 * 24 * 60 * 60 * 1000 }),
+      NativeYahooApi.search(yahooSymbol),
+    ]);
+    const quote = quoteData.status === 'fulfilled' ? quoteData.value : null, history = histData.status === 'fulfilled' ? histData.value.quotes : [];
+    let techResult = null;
+    if (history.length >= 20) { try { techResult = calcIndicators(history); } catch { /* ignore */ } }
+    const rawNews = newsData.status === 'fulfilled' ? (newsData.value?.news ?? []) : [], sentiment = analyzeSentiment(rawNews, 3);
+    const price = quote?.regularMarketPrice ?? 0;
+    if (!quote) {
+      const tvData = await TV.getOverview(parseSymbol(rawSymbol)).catch(() => null);
+      if (tvData) return res.json({ symbol: rawSymbol, source: 'TV', price: (tvData as any).close ?? 0, history: [], technical: null, sentiment, raw: tvData });
+      return res.status(404).json({ error: 'Symbol not found' });
+    }
+    return res.json({
+      symbol: rawSymbol, source: 'Yahoo', price, change: quote?.regularMarketChange, changePct: quote?.regularMarketChangePercent,
+      open: quote?.regularMarketOpen, high: quote?.regularMarketDayHigh, low: quote?.regularMarketDayLow, volume: quote?.regularMarketVolume, name: quote?.longName ?? quote?.shortName,
+      history: history.map(h => ({ date: h.date instanceof Date ? h.date.toISOString().split('T')[0] : h.date, open: h.open, high: h.high, low: h.low, close: h.close, volume: h.volume })),
+      technical: techResult ? { sma20: techResult.latest.sma20, sma50: techResult.latest.sma50, macdLine: techResult.latest.macdLine, rsi14: techResult.latest.rsi14, recommendation: techResult.recommendation, score: techResult.score } : null,
+      sentiment
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
+  const { symbol, period1, period2, initialCapital, strategy } = req.body;
+  try {
+    const data = await NativeYahooApi.chart(symbol, { period1, period2 });
+    if (data.quotes.length < 50) throw new Error('Insufficient data for backtest');
+    res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('[Global Error]:', err);
+  if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// Only run background tasks if not on Vercel
+if (!process.env.VERCEL) {
+  setInterval(async () => {
+    try {
+      const allUsers = await usersRepo.getAllUsers();
+      const date = new Date().toISOString().split('T')[0];
+      for (const user of allUsers) {
+        try {
+          const pos = await positionsRepo.getPositionsByUser(user.id), symbols = pos.map(p => p.symbol);
+          let equity = Number(user.balance || 100000);
+          if (symbols.length > 0) {
+            const quotes = await NativeYahooApi.quote(symbols), qMap = new Map((Array.isArray(quotes) ? quotes : [quotes]).map((q: any) => [q.symbol, q]));
+            for (const p of pos) { const q = qMap.get(p.symbol); if (q) equity += Number(p.shares) * q.regularMarketPrice; }
+          }
+          await historyRepo.recordSnapshot(user.id, Math.round(equity));
+          console.log("[Snapshot] " + date + " " + user.email + " -> " + equity);
+        } catch (userErr) { console.error("[Snapshot] Error for " + user.email + ":", userErr); }
+      }
+    } catch (e) { console.error('[Snapshot Task] Global error:', e); }
+  }, 3600 * 1000);
+}
+
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  if (process.env.NODE_ENV !== 'production') {
+    import('vite').then(async ({ createServer: createViteServer }) => {
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+      app.use(vite.middlewares);
+      app.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://localhost:${PORT}`));
+    });
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    app.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://localhost:${PORT}`));
+  }
+}
 
 export default app;

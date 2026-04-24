@@ -27,3 +27,7 @@ export async function updateUser(id: string, data: Partial<Pick<User, 'name' | '
     .returning();
   return updated;
 }
+
+export async function getAllUsers(): Promise<User[]> {
+  return db.select().from(users);
+}

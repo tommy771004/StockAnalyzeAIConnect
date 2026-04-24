@@ -3,17 +3,21 @@
  * Neon serverless PostgreSQL connection + Drizzle ORM instance.
  *
  * Works in both Node (server.ts / Express) and edge runtimes (Vercel).
+ * When DATABASE_URL is not set, exports `db = null` so the server can still
+ * start in dev/demo mode (API routes requiring DB will return 503).
  */
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema.js';
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required. Copy .env.example to .env and fill in your Neon connection string.');
+  console.warn('[DB] DATABASE_URL not set — running without database. Set it in .env to enable persistence.');
 }
 
-const sql = neon(process.env.DATABASE_URL);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db: ReturnType<typeof drizzle<typeof schema>> | null = process.env.DATABASE_URL
+  ? drizzle(neon(process.env.DATABASE_URL), { schema })
+  : null;
 
-export const db = drizzle(sql, { schema });
+export type DB = NonNullable<typeof db>;
 
-export type DB = typeof db;

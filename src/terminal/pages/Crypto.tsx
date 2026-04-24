@@ -1,52 +1,85 @@
+import { useState, useEffect } from 'react';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
 import { formatPct, toneClass } from '../ui/format';
+import * as api from '../../services/api';
+import { Loader2 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
-const cryptos = [
-  { symbol: 'BTC/USD', name: 'Bitcoin', price: 51450.12, changePct: 1.2 },
-  { symbol: 'ETH/USD', name: 'Ethereum', price: 3145.5, changePct: -0.4 },
-  { symbol: 'SOL/USD', name: 'Solana', price: 152.88, changePct: 3.1 },
-  { symbol: 'AVAX/USD', name: 'Avalanche', price: 38.42, changePct: -1.1 },
-  { symbol: 'DOGE/USD', name: 'Dogecoin', price: 0.162, changePct: 5.2 },
-];
-
-const spark = (seed: number) =>
-  Array.from({ length: 40 }, (_, i) => Math.sin((i + seed) / 3) * 5 + Math.cos(i / 2) * 2 + 10);
+const CRYPTO_SYMBOLS = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'AVAX-USD', 'DOGE-USD', 'ADA-USD', 'DOT-USD'];
 
 export function CryptoPage() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCrypto = async () => {
+    try {
+      const quotes = await api.getBatchQuotes(CRYPTO_SYMBOLS);
+      setData(quotes.filter(Boolean));
+    } catch (err) {
+      console.error('Crypto fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCrypto();
+    const timer = setInterval(fetchCrypto, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const spark = (seed: number) =>
+    Array.from({ length: 40 }, (_, i) => Math.sin((i + seed) / 3) * 5 + Math.cos(i / 2) * 2 + 10);
+
+  if (loading && data.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-(--color-term-accent)" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3">
       <div className="col-span-12 min-h-[300px]">
-        <Panel title="CRYPTO MARKETS">
+        <Panel title="REAL-TIME CRYPTO MARKETS (USD)">
           <table className="w-full text-[12px]">
-            <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
+            <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) sticky top-0 z-10">
               <tr className="border-b border-(--color-term-border)">
-                <th className="px-4 py-2 text-left">PAIR</th>
-                <th className="px-4 py-2 text-left">NAME</th>
-                <th className="px-4 py-2 text-right">PRICE (USD)</th>
-                <th className="px-4 py-2 text-right">24H CHG</th>
-                <th className="px-4 py-2 text-right">TREND</th>
+                <th className="px-4 py-3 text-left">PAIR</th>
+                <th className="px-4 py-3 text-left">NAME</th>
+                <th className="px-4 py-3 text-right">PRICE (USD)</th>
+                <th className="px-4 py-3 text-right">24H CHG</th>
+                <th className="px-4 py-3 text-right">TREND (SMOOTHED)</th>
               </tr>
             </thead>
             <tbody>
-              {cryptos.map((c, i) => (
-                <tr key={c.symbol} className="border-b border-(--color-term-border)/60">
-                  <td className="px-4 py-2 font-semibold tracking-wider">{c.symbol}</td>
-                  <td className="px-4 py-2 text-(--color-term-muted)">{c.name}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {c.price.toLocaleString('en-US', {
-                      minimumFractionDigits: c.price < 1 ? 4 : 2,
+              {data.map((c, i) => (
+                <tr 
+                  key={c.symbol} 
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('symbol-search', { detail: c.symbol }));
+                    window.location.hash = 'dashboard';
+                  }}
+                  className="border-b border-(--color-term-border)/60 hover:bg-white/5 transition-colors cursor-pointer group"
+                >
+                  <td className="px-4 py-3 font-bold tracking-wider group-hover:text-(--color-term-accent) transition-colors">{c.symbol}</td>
+                  <td className="px-4 py-3 text-(--color-term-muted)">{c.shortName || 'Crypto Asset'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                    {Number(c.regularMarketPrice || 0).toLocaleString('en-US', {
+                      minimumFractionDigits: (c.regularMarketPrice || 0) < 1 ? 4 : 2,
                     })}
                   </td>
-                  <td className={`px-4 py-2 text-right tabular-nums ${toneClass(c.changePct)}`}>
-                    {formatPct(c.changePct, 2)}
+                  <td className={cn("px-4 py-3 text-right tabular-nums font-bold", toneClass(c.regularMarketChangePercent || 0))}>
+                    {formatPct(c.regularMarketChangePercent || 0, 2)}
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="ml-auto h-8 w-28">
+                  <td className="px-4 py-3">
+                    <div className="ml-auto h-8 w-28 opacity-60">
                       <Sparkline
-                        data={spark(i * 3)}
-                        stroke={c.changePct >= 0 ? '#22d3ee' : '#f87171'}
-                        fill="rgba(255,255,255,0.04)"
+                        data={spark(i * 3 + (c.regularMarketChangePercent || 0))}
+                        stroke={(c.regularMarketChangePercent || 0) >= 0 ? '#22d3ee' : '#f87171'}
+                        fill="rgba(255,255,255,0.02)"
                       />
                     </div>
                   </td>
