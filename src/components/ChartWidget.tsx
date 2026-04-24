@@ -48,6 +48,17 @@ function resolveWsUrl(): string | null {
   return null;
 }
 
+function resolveApiBaseUrl(): string | undefined {
+  const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (!configuredApi) return undefined;
+  try {
+    const url = new URL(configuredApi, window.location.origin);
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    return undefined;
+  }
+}
+
 const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, onTimeframeChange }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -116,14 +127,14 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
     if (!liveMode) return;
 
     const wsUrl = resolveWsUrl();
+    const apiBaseUrl = resolveApiBaseUrl();
     if (!wsUrl) {
-      console.info('[ChartWidget] Live WebSocket disabled: no WS endpoint configured.');
-      return;
+      console.info('[ChartWidget] No WS endpoint configured; worker will use HTTP polling fallback.');
     }
     const worker = new Worker(new URL('../workers/socket.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
-    worker.postMessage({ type: 'CONNECT', wsUrl });
+    worker.postMessage({ type: 'CONNECT', wsUrl: wsUrl ?? undefined, apiBaseUrl });
     worker.postMessage({ type: 'SUBSCRIBE', symbol });
 
     worker.addEventListener('message', (event: MessageEvent) => {
