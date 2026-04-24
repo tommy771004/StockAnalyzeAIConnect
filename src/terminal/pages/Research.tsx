@@ -5,12 +5,16 @@ import { useResearchData } from '../hooks/useResearchData';
 import { Loader2, Search } from 'lucide-react';
 import { formatPct, toneClass } from '../ui/format';
 import type { CandlePoint } from '../types';
-
+import { PersonaSelector } from '../ui/PersonaSelector';
+import { SecFilingsPanel } from '../ui/SecFilingsPanel';
+import { CongressTradesPanel } from '../ui/CongressTradesPanel';
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
-  const [searchInput, setSearchInput] = useState('');
-  const [aiSummary, setAiSummary] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
+  const [searchInput, setSearchInput]   = useState('');
+  const [aiSummary, setAiSummary]       = useState('');
+  const [aiLoading, setAiLoading]       = useState(false);
+  const [persona, setPersona]           = useState('hermes');
+  const [viewMode, setViewMode]         = useState<'standard' | 'pro'>('standard');
   const { data, loading } = useResearchData(activeSymbol);
 
   // Listen for global symbol-search events (from TopNav search bar and Screener page)
@@ -30,7 +34,7 @@ export function ResearchPage() {
     const fetchSummary = async () => {
       setAiLoading(true);
       try {
-        const res = await fetch(`/api/ai/summarize/${activeSymbol}`);
+        const res = await fetch(`/api/ai/summarize/${activeSymbol}?persona=${persona}`);
         const json = await res.json();
         if (!res.ok) {
           setAiSummary(json.error || `AI 服務錯誤 (HTTP ${res.status})`);
@@ -44,7 +48,7 @@ export function ResearchPage() {
       }
     };
     if (activeSymbol) fetchSummary();
-  }, [activeSymbol]);
+  }, [activeSymbol, persona]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,17 +85,55 @@ export function ResearchPage() {
               className="h-9 w-full rounded-sm border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-sm focus:border-(--color-term-accent) focus:outline-none"
             />
           </form>
+          
+          <div className="flex bg-(--color-term-surface) p-1 rounded border border-(--color-term-border)">
+            <button
+              type="button"
+              onClick={() => setViewMode('standard')}
+              className={cn(
+                'px-3 py-1 text-[11px] font-bold tracking-widest uppercase transition-colors rounded-sm',
+                viewMode === 'standard' ? 'bg-(--color-term-accent) text-black' : 'text-(--color-term-muted) hover:text-(--color-term-text)'
+              )}
+            >
+              標準視圖
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('pro')}
+              className={cn(
+                'px-3 py-1 text-[11px] font-bold tracking-widest uppercase transition-colors rounded-sm',
+                viewMode === 'pro' ? 'bg-(--color-term-accent) text-black' : 'text-(--color-term-muted) hover:text-(--color-term-text)'
+              )}
+            >
+              Research Pro
+            </button>
+          </div>
+
+          <PersonaSelector value={persona} onChange={setPersona} compact />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" />}
         </header>
 
         <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
-        <ChartPanel symbol={activeSymbol} history={history} />
+        {viewMode === 'standard' ? (
+          <ChartPanel symbol={activeSymbol} history={history} />
+        ) : (
+          <div className="flex flex-col gap-3 min-h-0 overflow-auto">
+            <SecFilingsPanel symbol={activeSymbol} />
+            <CongressTradesPanel symbol={activeSymbol} />
+          </div>
+        )}
       </div>
       <aside className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-4">
-        <AISummaryPanel summary={aiSummary} loading={aiLoading} />
-        <ValuationPanel tv={tv} />
-        <ConsensusPanel tv={tv} tvIndicators={tvIndicators} />
-        <RecentNewsPanel news={news} />
+        <AISummaryPanel summary={aiSummary} loading={aiLoading} persona={persona} />
+        {viewMode === 'standard' ? (
+          <>
+            <ValuationPanel tv={tv} />
+            <ConsensusPanel tv={tv} tvIndicators={tvIndicators} />
+            <RecentNewsPanel news={news} />
+          </>
+        ) : (
+          <CongressTradesPanel /> // No symbol = show all recent trades for market context
+        )}
       </aside>
     </div>
   );
@@ -298,14 +340,29 @@ function RecentNewsPanel({ news }: { news: any[] }) {
   );
 }
 
-function AISummaryPanel({ summary, loading }: { summary: string, loading: boolean }) {
+function AISummaryPanel({ summary, loading, persona }: { summary: string; loading: boolean; persona: string }) {
+  const PERSONA_LABEL: Record<string, string> = {
+    hermes:          'Hermes AI (通用)',
+    buffett:         '華倫·巴菲特視角',
+    munger:          '查理·芒格視角',
+    graham:          '班傑明·葛拉漢視角',
+    lynch:           '彼得·林區視角',
+    soros:           '喬治·索羅斯視角',
+    dalio:           '瑞·達利歐視角',
+    simons:          '吉姆·西蒙斯視角',
+    cathie_wood:     '凱西·伍德視角',
+    congress_tracker:'國會交易分析',
+    geopolitics:     '地緣政治分析',
+    risk_manager:    '風險管理師視角',
+  };
+
   return (
     <Panel title="AI 摘要與分析" bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
        <div className="flex flex-col gap-3">
           {loading ? (
              <div className="flex items-center gap-3 py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
-                <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">HERMES 正在分析市場數據...</span>
+                <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">正在以 {PERSONA_LABEL[persona] ?? persona} 分析...</span>
              </div>
           ) : (
              <p className="text-[13px] leading-relaxed text-zinc-200 italic whitespace-pre-wrap">
@@ -313,7 +370,7 @@ function AISummaryPanel({ summary, loading }: { summary: string, loading: boolea
              </p>
           )}
           <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2">
-             Generated by Hermes Llama-3.3 (Experimental)
+             {PERSONA_LABEL[persona] ?? persona} · Powered by OpenRouter
           </div>
        </div>
     </Panel>

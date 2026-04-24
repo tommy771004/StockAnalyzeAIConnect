@@ -184,7 +184,7 @@ export default function SubscriptionGate({
         {/* Primary CTA */}
         <button
           type="button"
-          onClick={openUpgradeModal}
+          onClick={() => openUpgradeModal()}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-sm transition-all shadow-lg shadow-sky-500/25 active:scale-95"
         >
           {config.ctaLabel ?? '查看升級方案'}

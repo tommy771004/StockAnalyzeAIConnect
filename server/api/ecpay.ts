@@ -23,8 +23,8 @@
 
 import { Router } from 'express';
 import crypto from 'crypto';
-import { db } from '../db/index.js';
-import { paymentOrders } from '../db/schema.js';
+import { db } from '../../src/db/index.js';
+import { paymentOrders } from '../../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import * as usersRepo from '../repositories/usersRepo.js';
 import type { AuthRequest } from '../middleware/auth.js';

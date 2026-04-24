@@ -28,9 +28,9 @@ export function SEO({ title, description, path = '/' }: SEOProps) {
       <link rel="canonical" href={canonicalUrl} />
       
       {/* International SEO: Hreflang alternates */}
-      <link rel="alternate" hreflang="en" href={`${canonicalUrl}?lng=en`} />
-      <link rel="alternate" hreflang="zh" href={`${canonicalUrl}?lng=zh`} />
-      <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
+      <link rel="alternate" hrefLang="en" href={`${canonicalUrl}?lng=en`} />
+      <link rel="alternate" hrefLang="zh" href={`${canonicalUrl}?lng=zh`} />
+      <link rel="alternate" hrefLang="x-default" href={canonicalUrl} />
       
       {/* Open Graph Tags */}
       <meta property="og:title" content={pageTitle} />

@@ -19,8 +19,9 @@ import * as strategiesRepo from './server/repositories/strategiesRepo.js';
 import * as historyRepo from './server/repositories/portfolioHistoryRepo.js';
 import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
-import { agentRouter } from './server/api/agent.js';
-import { ecpayRouter } from './server/api/ecpay.js';
+import { agentRouter }    from './server/api/agent.js';
+import { ecpayRouter }    from './server/api/ecpay.js';
+import { researchRouter } from './server/api/research.js';
 import { startAutonomousAgent } from './server/services/autonomousAgent.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
@@ -1056,6 +1057,9 @@ app.use('/api/agent', authMiddleware, agentRouter);
 // ECPay payment routes — notify endpoint is called by ECPay server (no auth),
 // checkout endpoint requires auth to associate order with user.
 app.use('/api/payment/ecpay', ecpayRouter);
+
+// Research Pro routes — SEC Edgar, Congressional trades
+app.use('/api/research', authMiddleware, researchRouter);
 
 
 app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {

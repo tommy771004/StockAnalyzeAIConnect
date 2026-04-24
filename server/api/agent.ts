@@ -23,6 +23,8 @@ import * as settingsRepo    from '../repositories/settingsRepo.js';
 import { calcIndicators }    from '../utils/technical.js';
 import { analyzeSentiment }  from '../utils/sentiment.js';
 import { getBestFreeModel }  from '../utils/modelSelector.js';
+import { getPersonaPrompt, getPersonaList } from '../utils/personas.js';
+import { getKeyMacroSnapshot, formatMacroForPrompt } from '../utils/fredApi.js';
 
 export const agentRouter = Router();
 
@@ -199,6 +201,7 @@ interface MarketSnap {
 async function buildSystemPrompt(
   userId: string,
   marketSnap?: MarketSnap | null,
+  personaId?: string,
 ): Promise<string> {
   // 1. 讀取長期記憶
   const memories = await agentMemoryRepo.getMemoriesByUser(userId, 30).catch(() => []);
@@ -243,7 +246,13 @@ async function buildSystemPrompt(
         `${t.date} ${t.side} ${t.ticker} @${t.entry} qty:${t.qty} pnl:${t.pnl ?? '?'}`
       ).join('\n');
 
-  return `你是 Hermes 代理框架，一個具備自我進化能力的高頻量化交易 AI。
+  // 8. Persona overlay — if a persona is set, prefix its system prompt
+  const personaPrompt = personaId ? getPersonaPrompt(personaId) : null;
+  const baseIdentity = personaPrompt
+    ? `${personaPrompt}\n\n---\n你現在使用以下的個人記憶與市場數據來強化你的分析：`
+    : `你是 Hermes 代理框架，一個具備自我進化能力的高頻量化交易 AI。`;
+
+  return `${baseIdentity}
 
 ## 使用者背景記憶
 ${memSummary}
@@ -274,7 +283,7 @@ ${marketContext}
 
 agentRouter.post('/chat', async (req: AuthRequest, res) => {
   const userId    = req.userId;
-  const { message, symbol, history: convHistory = [] } = req.body ?? {};
+  const { message, symbol, history: convHistory = [], persona = 'hermes' } = req.body ?? {};
 
   if (!userId) { res.status(401).json({ error: '未授權' }); return; }
   if (!message) { res.status(400).json({ error: '缺少 message' }); return; }
@@ -290,7 +299,7 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
       } catch { /* 無法取得市場快照，繼續 */ }
     }
 
-    const systemPrompt = await buildSystemPrompt(userId, marketSnap);
+    const systemPrompt = await buildSystemPrompt(userId, marketSnap, persona);
 
     // 組裝對話歷史
     const messages: OpenRouterMessage[] = [
@@ -409,6 +418,24 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_economic_data',
+      description: '取得美國關鍵總體經濟數據，包含聯準會利率、通膨（CPI/PCE）、就業、殖利率曲線等指標',
+      parameters: {
+        type: 'object',
+        properties: {
+          indicators: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '指定要取得的指標 key，例如 ["FED_FUNDS_RATE", "CPI_ALL"]。留空則取全部關鍵指標',
+          },
+        },
+        required: [],
+      },
+    },
+  },
 ] as const;
 
 type AgentToolName = (typeof AGENT_TOOLS)[number]['function']['name'];
@@ -435,6 +462,15 @@ async function executeToolCall(
       // Placeholder — real impl would call server-side backtestEngine
       return { ok: true, message: '回測已排入佇列，結果將透過 SSE 回傳', args };
     }
+    case 'get_economic_data': {
+      try {
+        const snap = await getKeyMacroSnapshot();
+        const formatted = formatMacroForPrompt(snap);
+        return { formatted, raw: snap };
+      } catch (e) {
+        return { error: `FRED API 失敗: ${(e as Error).message}` };
+      }
+    }
     case 'show_stock_chart':
     case 'show_news_sentiment': {
       // These tools produce UI components rendered on the frontend
@@ -452,7 +488,7 @@ async function executeToolCall(
 
 agentRouter.post('/stream', async (req: AuthRequest, res) => {
   const userId = req.userId;
-  const { message, symbol, history: convHistory = [], locale = 'zh-TW' } = req.body ?? {};
+  const { message, symbol, history: convHistory = [], locale = 'zh-TW', persona = 'hermes' } = req.body ?? {};
 
   if (!userId) { res.status(401).json({ error: '未授權' }); return; }
   if (!message) { res.status(400).json({ error: '缺少 message' }); return; }
@@ -486,7 +522,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
     }
 
     // Build system prompt with locale (Rule: skills/04_Production_Readiness.md §2 "AI 語系連動")
-    const systemPrompt = await buildSystemPrompt(userId, null);
+    const systemPrompt = await buildSystemPrompt(userId, null, persona);
     const localizedSystem = `${systemPrompt}\n\n[LOCALE: ${locale}] 請以 ${locale} 語系回覆。`;
 
     const messages: OpenRouterMessage[] = [
@@ -604,6 +640,12 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
   } finally {
     res.end();
   }
+});
+
+// ── GET /api/agent/personas ───────────────────────────────────────────────────
+
+agentRouter.get('/personas', (_req, res) => {
+  res.json(getPersonaList());
 });
 
 // ── GET /api/agent/memories ───────────────────────────────────────────────────

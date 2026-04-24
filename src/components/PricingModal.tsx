@@ -118,6 +118,7 @@ const PLANS: Plan[] = [
 export default function PricingModal() {
   const { isUpgradeModalOpen, closeUpgradeModal, tier, setTier } = useSubscription();
   const [billing, setBilling] = useState<BillingCycle>('monthly');
+  const [activating, setActivating] = useState<SubscriptionTier | null>(null);
 
   // Annual savings display
   const annualSavingsPct = 20;

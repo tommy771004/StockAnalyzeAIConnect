@@ -36,8 +36,9 @@ export function usePortfolioData() {
   const updatePositions = async (updated: any[]) => {
     await api.setPositions(updated.map(p => ({
       symbol: p.symbol,
-      shares: String(p.shares),
-      avgCost: String(p.avgCost),
+      name: p.name || p.symbol,
+      shares: Number(p.shares) || 0,
+      avgCost: Number(p.avgCost) || 0,
       currency: p.currency || (p.symbol.endsWith('.TW') ? 'TWD' : 'USD')
     })));
     await fetchPortfolio();
