@@ -111,8 +111,19 @@ function toTradingViewSymbol(input: string): string {
 /**
  * Calls OpenRouter with automatic fallback to other free models on failure
  */
-async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Promise<string> {
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+async function callAIWithFallback(prompt: string, jsonMode: boolean = false, userId?: string): Promise<string> {
+  let apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+
+  // If env key is missing, check user settings in DB
+  if (!apiKey && userId) {
+    try {
+      const dbKey = await settingsRepo.getSetting<string>(userId, 'OPENROUTER_API_KEY');
+      if (dbKey) apiKey = dbKey.trim();
+    } catch (err) {
+      console.warn(`[AI] Failed to load key from settings for user ${userId}`);
+    }
+  }
+
   if (!apiKey) throw new Error('AI key missing');
 
   // Ensure we have models
@@ -574,7 +585,7 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
   }
 
   try {
-    const text = await callAIWithFallback(prompt, jsonMode);
+    const text = await callAIWithFallback(prompt, jsonMode, req.userId);
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
@@ -585,9 +596,6 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const sym = req.params.symbol;
   const tvSym = toTradingViewSymbol(sym);
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) return res.status(500).json({ error: 'AI key missing' });
-
   console.log(`[AI] Generating summary for ${sym} (TV Symbol: ${tvSym})...`);
 
   try {
@@ -624,7 +632,7 @@ ${newsText}
 3. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
-    const resultText = await callAIWithFallback(prompt);
+    const resultText = await callAIWithFallback(prompt, false, req.userId);
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {
@@ -939,6 +947,34 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
     history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
   });
+});
+
+app.get('/api/tv/overview/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getOverview(req.params.symbol);
+    res.json(data || {});
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/indicators/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIndicators(req.params.symbol, (req.query.timeframe as any) || '1d');
+    res.json(data || {});
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getNewsHeadlines(req.params.symbol);
+    res.json(data || []);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIdeas(req.params.symbol, (req.query.sort as any) || 'popular');
+    res.json(data || []);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 app.use('/api/agent', authMiddleware, agentRouter);

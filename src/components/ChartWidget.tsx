@@ -89,7 +89,8 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   useEffect(() => {
     if (!liveMode) return;
 
-    const wsUrl = (import.meta.env.VITE_WS_URL as string | undefined) ?? `ws://${location.host}/ws`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = (import.meta.env.VITE_WS_URL as string | undefined) ?? `${wsProtocol}//${window.location.host}/ws`;
     const worker = new Worker(new URL('../workers/socket.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
