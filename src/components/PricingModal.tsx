@@ -34,7 +34,8 @@ export default function PricingModal() {
         >
           {/* Header */}
           <div className="p-6 md:p-8 text-center relative shrink-0 border-b" style={{ borderColor: 'var(--md-outline-variant)' }}>
-            <button type="button">
+            <button type="button" onClick={closeUpgradeModal} aria-label="關閉"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[var(--md-outline)] hover:text-[var(--md-on-surface)] hover:bg-white/5 transition">
               <X size={20} />
             </button>
             <h2 className="text-2xl md:text-3xl font-black mb-2 tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
@@ -71,7 +72,7 @@ export default function PricingModal() {
                   <FeatureItem text="進階策略回測" disabled />
                 </div>
 
-                <button type="button" onClick={(e) => {}}
+                <button type="button" onClick={() => handleSubscribe(SubscriptionTier.FREE)} disabled={tier === SubscriptionTier.FREE}
                   className={cn(
                     "w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest transition",
                     tier === SubscriptionTier.FREE ? "bg-[var(--md-surface-container-highest)] text-[var(--md-outline)] cursor-default" : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
@@ -108,11 +109,11 @@ export default function PricingModal() {
                   <FeatureItem text="深入推理與目標價預測" disabled />
                 </div>
 
-                <button type="button" onClick={(e) => {}}
+                <button type="button" onClick={() => handleSubscribe(SubscriptionTier.BASIC)} disabled={tier === SubscriptionTier.BASIC}
                   className={cn(
                     "w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest transition",
-                    tier === SubscriptionTier.BASIC 
-                      ? "bg-[var(--md-secondary-container)]/20 text-[var(--md-secondary)] cursor-default" 
+                    tier === SubscriptionTier.BASIC
+                      ? "bg-[var(--md-secondary-container)]/20 text-[var(--md-secondary)] cursor-default"
                       : "bg-[var(--md-secondary)] text-[var(--md-on-secondary)] hover:brightness-110 shadow-lg"
                   )}
                 >
@@ -144,11 +145,11 @@ export default function PricingModal() {
                   <FeatureItem text="無限制 AI 查詢額度" />
                 </div>
 
-                <button type="button" onClick={(e) => {}}
+                <button type="button" onClick={() => handleSubscribe(SubscriptionTier.PRO)} disabled={tier === SubscriptionTier.PRO}
                   className={cn(
                     "w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest transition",
-                    tier === SubscriptionTier.PRO 
-                      ? "bg-[var(--md-primary-container)]/20 text-[var(--md-primary)] cursor-default" 
+                    tier === SubscriptionTier.PRO
+                      ? "bg-[var(--md-primary-container)]/20 text-[var(--md-primary)] cursor-default"
                       : "bg-[var(--md-primary)] text-[var(--md-on-primary)] hover:brightness-110 shadow-lg"
                   )}
                 >

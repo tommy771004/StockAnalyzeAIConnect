@@ -365,7 +365,7 @@ export default function Portfolio({onGoBacktest,onGoJournal}:Props) {
       className="h-full flex flex-col gap-4 pb-10 overflow-auto"
     >
       <PullToRefreshIndicator state={pullState} />
-      {saveErr&&<div className="flex items-center gap-2 text-sm rounded-xl p-3 shrink-0" style={{ background: 'rgba(255,77,79,0.08)', border: '1px solid rgba(255,77,79,0.3)', color: 'var(--color-up)' }}><AlertCircle size={13}/>{saveErr}<button type="button" onClick={(e) => {}} className="ml-auto"><X size={11}/></button></div>}
+      {saveErr&&<div className="flex items-center gap-2 text-sm rounded-xl p-3 shrink-0" style={{ background: 'rgba(255,77,79,0.08)', border: '1px solid rgba(255,77,79,0.3)', color: 'var(--color-up)' }}><AlertCircle size={13}/>{saveErr}<button type="button" onClick={() => setSaveErr('')} aria-label="關閉錯誤訊息" className="ml-auto"><X size={11}/></button></div>}
 
       {/* Toolbar */}
       <div className="flex items-center justify-end gap-2 shrink-0">
@@ -542,7 +542,7 @@ export default function Portfolio({onGoBacktest,onGoJournal}:Props) {
                 <Wallet size={32} className="mx-auto mb-3" style={{ color: 'var(--md-outline-variant)' }} />
                 <div className="font-bold mb-1" style={{ color: 'var(--md-on-surface-variant)' }}>尚無持倉資料</div>
                 <div className="text-xs mb-4" style={{ color: 'var(--md-outline)' }}>點擊「新增持倉」開始追蹤投資組合</div>
-                <button type="button" onClick={(e) => {}} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ background: 'rgba(128,131,255,0.12)', border: '1px solid rgba(128,131,255,0.4)', color: 'var(--md-primary)' }}>
+                <button type="button" onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ background: 'rgba(128,131,255,0.12)', border: '1px solid rgba(128,131,255,0.4)', color: 'var(--md-primary)' }}>
                   <Plus size={12} className="inline mr-1" /> 新增第一筆持倉
                 </button>
               </div>

@@ -65,7 +65,8 @@ export default function VisualStrategyBuilder({ onChange }: { onChange: (script:
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-white">進場條件</h3>
-        <button type="button">
+        <button type="button" onClick={addCondition}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition">
           <Plus size={12}/> 新增條件
         </button>
       </div>
@@ -80,7 +81,8 @@ export default function VisualStrategyBuilder({ onChange }: { onChange: (script:
               {OPERATORS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <input aria-label="條件數值或指標" type="text" value={c.value} onChange={(e) => updateCondition(c.id, 'value', e.target.value)} className="bg-transparent text-xs text-zinc-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 w-20" placeholder="數值/指標" />
-            <button type="button" onClick={(e) => {}} className="ml-auto text-zinc-600 hover:text-rose-400">
+            <button type="button" onClick={() => removeCondition(c.id)} aria-label="移除條件" disabled={conditions.length <= 1}
+              className="ml-auto text-zinc-600 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed transition">
               <Trash2 size={12}/>
             </button>
           </div>
