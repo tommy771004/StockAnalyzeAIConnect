@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Terminal, SendHorizontal, BrainCircuit, X, Loader2 } from 'lucide-react';
 import { streamAgentChat, type AgentStreamChunk, type GenUIComponent } from '../../services/aiService';
@@ -18,11 +19,12 @@ interface Message {
 }
 
 export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPanelProps) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'init',
       role: 'assistant',
-      content: `SYSTEM_READY... HERMES_AGENT_ONLINE.\nCurrently tracking: ${selectedSymbol}. How can I assist with your trading strategy?`,
+      content: t('agent.systemReady', { symbol: selectedSymbol }),
       components: [],
     }
   ]);
@@ -123,13 +125,13 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 400, opacity: 0 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-          className="fixed top-0 right-0 z-50 flex h-screen w-96 flex-col border-l border-(--color-term-border-strong) bg-(--color-term-panel) shadow-[-10px_0_30px_rgba(0,0,0,0.5)] font-mono"
+          className="fixed top-0 right-0 z-50 flex h-dvh w-96 flex-col border-l border-(--color-term-border-strong) bg-(--color-term-panel) shadow-[-10px_0_30px_rgba(0,0,0,0.5)] font-mono"
         >
           {/* Header */}
           <div className="flex h-14 items-center justify-between border-b border-(--color-term-border) bg-(--color-term-surface) px-4">
             <div className="flex items-center gap-3 text-(--color-term-accent)">
               <BrainCircuit className="h-4 w-4" />
-              <span className="text-[13px] font-bold tracking-[0.2em]">HERMES_AI</span>
+              <span className="text-[13px] font-bold tracking-[0.2em]">{t('agent.title')}</span>
             </div>
             <button
               onClick={onClose}
@@ -153,7 +155,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
                     <div className="h-2 w-2 bg-(--color-term-positive) rounded-full" />
                   )}
                   <span className="text-[9px] tracking-widest text-(--color-term-text) uppercase">
-                    {msg.role === 'assistant' ? 'SYS.AGENT' : 'OPERATOR'}
+                    {msg.role === 'assistant' ? t('agent.sysAgent') : t('agent.operator')}
                   </span>
                 </div>
                 <div
@@ -186,7 +188,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Awaiting command..."
+                placeholder={t('agent.inputPlaceholder')}
                 className="h-10 w-full border border-(--color-term-border-strong) bg-(--color-term-bg) pl-10 pr-12 text-[12px] tracking-wide text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none"
                 disabled={isTyping}
               />

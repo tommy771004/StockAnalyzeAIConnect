@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getQuotes } from '../../services/api';
+import type { YahooQuote, PriceFlash } from '../types/market';
 
 const SECTORS = ['XLK', 'XLF', 'XLV', 'XLY', 'XLI', 'XLP', 'XLE', 'XLB'];
 const FLASH_TTL_MS = 3500; // How long the flash animation lives
@@ -54,12 +55,13 @@ export function formatTaipeiTime(d: Date = new Date()): string {
   });
 }
 
-export type PriceFlash = 'up' | 'down';
+// PriceFlash is re-exported from shared types for consumers that import from this hook
+export type { PriceFlash } from '../types/market';
 
 export function useMarketData() {
-  const [sectors, setSectors]           = useState<any[]>([]);
-  const [indices, setIndices]           = useState<any[]>([]);
-  const [tickerQuotes, setTickerQuotes] = useState<any[]>([]);
+  const [sectors, setSectors]           = useState<YahooQuote[]>([]);
+  const [indices, setIndices]           = useState<YahooQuote[]>([]);
+  const [tickerQuotes, setTickerQuotes] = useState<YahooQuote[]>([]);
   const [loading, setLoading]           = useState(true);
   const [lastUpdated, setLastUpdated]   = useState<string>('');
 
@@ -91,13 +93,14 @@ export function useMarketData() {
 
         setSectors(secRes || []);
         setTickerQuotes(tickerRes || []);
-        setIndices((tickerRes || []).filter((q: any) => q.symbol?.startsWith('^')));
+        // Filter indices (symbols starting with ^) from the ticker response
+        setIndices((tickerRes || []).filter((q: YahooQuote) => q.symbol?.startsWith('^')));
         setLastUpdated(formatTaipeiTime());
 
         // ── Price-change detection ───────────────────────────────────────────
         const newFlashes = new Map<string, PriceFlash>();
 
-        (tickerRes || []).forEach((q: any) => {
+        (tickerRes || []).forEach((q: YahooQuote) => {
           const sym      = q.symbol as string;
           const newPrice = q.regularMarketPrice as number | undefined;
           if (newPrice == null) return;

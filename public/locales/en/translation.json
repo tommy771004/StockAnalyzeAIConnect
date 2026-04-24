@@ -16,10 +16,28 @@
     "desc": "Professional real-time AI stock analysis and algorithmic trading terminal."
   },
   "settings": {
-    "title": "Account Settings",
+    "title": "System Settings",
     "language": "Language",
     "apiKey": "OpenRouter API Key",
-    "apiKeyDesc": "Set your custom API key for AI generation."
+    "apiKeyDesc": "Required to enable AI stock summaries and the Hermes agent.",
+    "profile": "Account Profile",
+    "subscription": "Subscription",
+    "aiIntegration": "AI & Integration",
+    "name": "Name",
+    "email": "Email",
+    "notSet": "Not set",
+    "editProfile": "Edit Profile",
+    "enterName": "Enter new name",
+    "currentPlan": "Current Plan",
+    "trialQuota": "Trial plan — {{n}} AI analyses remaining today.",
+    "contactSales": "Contact Sales Team",
+    "notifications": "Push Notifications",
+    "notificationsDesc": "Send browser alerts when a price target is triggered.",
+    "saveChanges": "Save Changes",
+    "saved": "Settings saved",
+    "saveFailed": "Save failed",
+    "profileUpdated": "Profile updated",
+    "updateFailed": "Update failed"
   },
   "footer": {
     "status": "System Status",
@@ -31,6 +49,8 @@
   },
   "market": {
     "title": "Market Overview",
+    "sectorTitle": "Global Sector Performance (US SPDR ETFs)",
+    "indicesTitle": "Major Indices & Global Benchmarks",
     "watchlist": "Watchlist",
     "editList": "Edit List",
     "addSymbol": "Add Symbol",
@@ -38,13 +58,18 @@
     "confirmRemove": "Confirm Remove",
     "cancel": "Cancel",
     "indices": "Major Indices",
+    "indexSymbol": "Index Symbol",
+    "lastPrice": "Last Price",
+    "change": "Change",
+    "changePct": "Chg%",
+    "dayRange": "Day Range",
     "sectors": "Sector Performance",
     "noData": "No data available",
     "loading": "Loading..."
   },
   "ticker": {
     "manage": "Manage Ticker",
-    "add": "Add Symbol",
+    "add": "Add",
     "placeholder": "Enter symbol (e.g. AAPL, 2330.TW)",
     "saved": "Saved",
     "reset": "Reset to Default"
@@ -94,10 +119,12 @@
     "tradeLog": "Trade Log"
   },
   "alerts": {
-    "title": "Price Alerts",
+    "title": "Price Alert Center",
+    "subtitle": "Set price alerts — receive instant notifications when targets are hit.",
     "add": "Add Alert",
-    "symbol": "Symbol",
-    "condition": "Condition",
+    "symbolLabel": "Target Symbol",
+    "symbolPlaceholder": "e.g. AAPL or 2330.TW",
+    "condition": "Trigger Condition",
     "target": "Target Price",
     "above": "Price Above",
     "below": "Price Below",
@@ -105,8 +132,18 @@
     "triggered": "Triggered",
     "watching": "Watching",
     "active": "Active Alerts",
+    "colSymbol": "Symbol",
+    "colCondition": "Condition",
+    "colTarget": "Target",
+    "colStatus": "Status",
+    "colAction": "Action",
+    "condAbove": "Above",
+    "condBelow": "Below",
+    "addFailed": "Failed to add alert",
+    "deleteFailed": "Failed to delete alert",
     "delete": "Delete",
-    "noAlerts": "No alerts configured"
+    "noAlerts": "No alerts configured",
+    "deleteConfirm": "Delete alert for {{symbol}}?"
   },
   "news": {
     "title": "Market News",
@@ -123,10 +160,40 @@
     "email": "Email",
     "password": "Password",
     "name": "Name",
+    "operatorId": "Operator ID",
+    "accessCoord": "Access Coordinate (Email)",
+    "securityKey": "Security Key",
     "loginTitle": "Sign In to Terminal",
-    "loginSubtitle": "Enter your credentials to continue",
+    "loginSubtitle": "AUTONOMOUS_TRADING_SYNDICATE_v3",
     "loggingIn": "Signing in...",
-    "loginError": "Invalid email or password"
+    "loginError": "Invalid email or password",
+    "establishUplink": "ESTABLISH_UPLINK",
+    "initiateHandshake": "INITIATE_HANDSHAKE",
+    "switchToLogin": "SWITCH_TO_LOGIN",
+    "requestAccess": "REQUEST_NEW_ACCESS",
+    "namePlaceholder": "Enter handle...",
+    "emailPlaceholder": "sys.operator@fin.local",
+    "requiredFields": "REQUIRED_FIELDS_MISSING",
+    "authFailed": "AUTHENTICATION_FAILED"
+  },
+  "agent": {
+    "title": "HERMES_AI",
+    "inputPlaceholder": "Awaiting command...",
+    "sysAgent": "SYS.AGENT",
+    "operator": "OPERATOR",
+    "navigation": "NAVIGATION",
+    "systemReady": "SYSTEM_READY... HERMES_AGENT_ONLINE.\nCurrently tracking: {{symbol}}. How can I assist with your trading strategy?"
+  },
+  "sidebar": {
+    "navigation": "Navigation",
+    "help": "Help",
+    "logout": "Logout"
+  },
+  "topnav": {
+    "search": "SEARCH...",
+    "settings": "SETTINGS",
+    "alerts": "Price Alerts",
+    "aiAgent": "AI Agent"
   },
   "common": {
     "loading": "Loading...",

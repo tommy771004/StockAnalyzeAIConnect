@@ -1,4 +1,4 @@
-import React, { useState, useCallback, type ReactNode } from 'react';
+import React, { useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TerminalView } from '../types';
 import { TopNav } from './TopNav';
@@ -7,16 +7,29 @@ import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { AgentPanel } from './AgentPanel';
 import { useMarketData, TICKER_LABEL_MAP, TICKER_TAPE_SYMBOLS } from '../hooks/useMarketData';
+import type { YahooQuote } from '../types/market';
 import { BarChart3, Bell, LayoutDashboard, Target, Globe } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const STORAGE_KEY = 'ticker_tape_custom_symbols';
+import { TICKER_STORAGE_KEY } from '../constants/storage';
+const LEGACY_KEY  = 'ticker_tape_custom_symbols'; // pre-v1, no version
 
 function getInitialSymbols(): string[] {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : TICKER_TAPE_SYMBOLS;
-  } catch { return TICKER_TAPE_SYMBOLS; }
+    // client-localstorage-schema: versioned key with migration
+    const current = localStorage.getItem(TICKER_STORAGE_KEY);
+    if (current) return JSON.parse(current);
+
+    // migrate from legacy unversioned key
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      localStorage.setItem(TICKER_STORAGE_KEY, JSON.stringify(parsed));
+      localStorage.removeItem(LEGACY_KEY);
+      return parsed;
+    }
+  } catch { /* ignore quota/parse errors */ }
+  return TICKER_TAPE_SYMBOLS;
 }
 
 interface LayoutProps {
@@ -46,28 +59,34 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
 
   const { tickerQuotes, changedSymbols, lastUpdated } = useMarketData();
 
-  // Filter quotes to only show the user's selected symbols, in order
-  const quoteMap = new Map(tickerQuotes.map((q: any) => [q.symbol, q]));
+  // js-index-maps: build Map once per tickerQuotes change, not every render
+  const quoteMap = useMemo(
+    () => new Map<string, YahooQuote>(tickerQuotes.map((q) => [q.symbol, q])),
+    [tickerQuotes]
+  );
 
-  const tickerItems = customSymbols
-    .filter(sym => quoteMap.has(sym))
-    .map(sym => {
-      const q: any = quoteMap.get(sym);
-      const price: number | null = q?.regularMarketPrice ?? null;
-      return {
-        symbol: sym,
-        label: TICKER_LABEL_MAP[sym] ?? sym.replace(/[=].*$/, '').replace('-USD', ''),
-        value: price != null
-          ? price >= 1000
-            ? price.toLocaleString('en-US', { maximumFractionDigits: 0 })
-            : price >= 1
-            ? price.toFixed(2)
-            : price.toFixed(4)
-          : '---',
-        changePct: q?.regularMarketChangePercent ?? 0,
-        change: q?.regularMarketChange ?? undefined,
-      };
-    });
+  const tickerItems = useMemo(() =>
+    customSymbols
+      .filter(sym => quoteMap.has(sym))
+      .map(sym => {
+        const q = quoteMap.get(sym)!;
+        const price: number | null = q?.regularMarketPrice ?? null;
+        return {
+          symbol: sym,
+          label: TICKER_LABEL_MAP[sym] ?? sym.replace(/[=].*$/, '').replace('-USD', ''),
+          value: price != null
+            ? price >= 1000
+              ? price.toLocaleString('en-US', { maximumFractionDigits: 0 })
+              : price >= 1
+              ? price.toFixed(2)
+              : price.toFixed(4)
+            : '---',
+          changePct: q?.regularMarketChangePercent ?? 0,
+          change: q?.regularMarketChange ?? undefined,
+        };
+      }),
+    [customSymbols, quoteMap]
+  );
 
   const handleTickerSelect = useCallback((symbol: string) => {
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: symbol }));
@@ -79,7 +98,7 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
   }, []);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
+    <div className="flex h-dvh w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
       {/* Top navigation */}
       <TopNav
         active={active}
@@ -134,9 +153,10 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
             <button
               key={item.id}
               type="button"
+              aria-label={t(item.labelKey)}
               onClick={() => onChange(item.id)}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] tracking-widest transition-colors',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors relative',
                 isActive
                   ? 'text-(--color-term-accent)'
                   : 'text-(--color-term-muted)',
@@ -145,7 +165,7 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
               {item.icon}
               <span>{t(item.labelKey)}</span>
               {isActive && (
-                <span className="absolute top-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" />
+                <span className="absolute top-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" aria-hidden="true" />
               )}
             </button>
           );

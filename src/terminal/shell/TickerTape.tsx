@@ -30,7 +30,7 @@ interface TickerTapeProps {
   changedSymbols?: Map<string, PriceFlash>;
 }
 
-const STORAGE_KEY = 'ticker_tape_custom_symbols';
+import { TICKER_STORAGE_KEY } from '../constants/storage'; // Fix #9: shared key, single source of truth
 const SCROLL_PX_PER_SEC = 55;
 
 export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }: TickerTapeProps) {
@@ -76,19 +76,20 @@ export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }:
 
   return (
     <div className="relative flex h-9 items-center border-b border-(--color-term-border) bg-(--color-term-bg)">
-      {/* Manage button */}
+      {/* Manage button — icon-only, requires aria-label */}
       <button
         type="button"
         onClick={() => setShowManager(v => !v)}
-        title={t('ticker.manage')}
+        aria-label={t('ticker.manage')}
+        aria-expanded={showManager}
         className={cn(
-          'shrink-0 flex items-center justify-center h-full px-2.5 border-r border-(--color-term-border) transition-colors z-20',
+          'shrink-0 flex items-center justify-center h-full px-2.5 border-r border-(--color-term-border) transition-opacity z-20',
           showManager
             ? 'text-(--color-term-accent) bg-(--color-term-accent)/5'
             : 'text-(--color-term-muted) hover:text-(--color-term-accent)'
         )}
       >
-        <Settings2 size={13} />
+        <Settings2 size={13} aria-hidden="true" />
       </button>
 
       {/* Scrolling marquee */}
@@ -103,8 +104,12 @@ export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }:
 
         <div
           ref={trackRef}
-          className="flex h-full items-center will-change-transform whitespace-nowrap"
-          style={{ width: 'max-content' }}
+          className="flex h-full items-center whitespace-nowrap"
+          style={{
+            width: 'max-content',
+            // will-change applied only while the rAF loop is running (active animation)
+            willChange: 'transform',
+          }}
         >
           {displayed.map((item, i) => (
             <TickerChip
@@ -223,11 +228,11 @@ function TickerChip({
       <span className={cn('font-mono font-bold tabular-nums', toneClass(item.changePct))}>
         {formatPct(item.changePct)}
       </span>
-      {absDisplay && (
+      {absDisplay ? (
         <span className={cn('font-mono tabular-nums text-[10px] opacity-65', toneClass(item.changePct))}>
           {absDisplay}
         </span>
-      )}
+      ) : null}
     </button>
   );
 }
@@ -246,7 +251,7 @@ function TickerManager({
   const { t } = useTranslation();
   const [list, setList] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(TICKER_STORAGE_KEY);
       return saved ? JSON.parse(saved) : currentSymbols;
     } catch { return currentSymbols; }
   });
@@ -263,7 +268,10 @@ function TickerManager({
   const handleRemove = (sym: string) => setList(prev => prev.filter(s => s !== sym));
 
   const handleSave = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    try {
+      // client-localstorage-schema: always wrap setItem (throws in incognito/quota exceeded)
+      localStorage.setItem(TICKER_STORAGE_KEY, JSON.stringify(list));
+    } catch { /* no-op: storage unavailable */ }
     onChange?.(list);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);

@@ -21,6 +21,24 @@ import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter } from './server/api/agent.js';
 import { startAutonomousAgent } from './server/services/autonomousAgent.js';
+import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
+import type { ScreenerResultRow } from './src/terminal/types/market.js';
+
+// ─── Error helper (Fix #4) ────────────────────────────────────────────────────
+// Centralises: (a) `e instanceof Error` narrowing, (b) no raw DB/stack leaks
+// in production, (c) consistent { error } response shape.
+import type { Response } from 'express';
+function handleApiError(res: Response, e: unknown): void {
+  const msg = e instanceof Error ? e.message : 'Internal server error';
+  const safe = process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : msg;
+  res.status(500).json({ error: safe });
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+/** Fix #1: hard cap on screener input — prevents DoS via 10 k-symbol batch */
+const MAX_SCREENER_SYMBOLS = 50;
 
 // Lazy-load Neon DB
 let dbAvailable = false;
@@ -620,7 +638,7 @@ app.post('/api/auth/register', async (req, res) => {
     const user = await usersRepo.createUser({ email, passwordHash, name: name ?? null });
     setTokenCookie(res, user.id);
     res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -633,7 +651,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
     setTokenCookie(res, user.id);
     res.json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
@@ -641,7 +659,7 @@ app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
     const user = await usersRepo.findUserById(req.userId!);
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.put('/api/auth/update', authMiddleware, async (req: AuthRequest, res) => {
@@ -650,7 +668,7 @@ app.put('/api/auth/update', authMiddleware, async (req: AuthRequest, res) => {
     const user = await usersRepo.updateUser(req.userId!, { name });
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/auth/logout', (_req, res) => {
@@ -660,12 +678,12 @@ app.post('/api/auth/logout', (_req, res) => {
 
 app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.quote(req.params.symbol as string); res.json(q); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.chart(req.params.symbol as string, req.query); res.json(q.quotes); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
@@ -673,24 +691,24 @@ app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
     const syms = (req.query.symbols as string)?.split(',') || [];
     const results = await NativeYahooApi.quote(syms);
     res.json(Array.isArray(results) ? results : [results]);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/news/feed', authMiddleware, async (_req, res) => {
   try {
     const data = await NativeYahooApi.search('Market');
     res.json(data.news || []);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
   try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
@@ -702,21 +720,21 @@ app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) =
 
 app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/portfolio/history', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await historyRepo.getHistoryByUser(req.userId!);
     res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.date })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const items = await watchlistRepo.getWatchlistByUser(req.userId!);
     res.json(items.map(i => ({ symbol: i.symbol, name: i.name, addedAt: i.addedAt })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
@@ -725,36 +743,50 @@ app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
     if (!symbol) { res.status(400).json({ error: 'symbol required' }); return; }
     const item = await watchlistRepo.addWatchlistItem({ userId: req.userId!, symbol: symbol.toUpperCase(), name: name ?? null, addedAt: Date.now() });
     res.status(201).json(item);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.delete('/api/watchlist/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await watchlistRepo.removeWatchlistItem(req.userId!, req.params.symbol);
     res.json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await alertsRepo.getAlertsByUser(req.userId!);
     res.json(list.map(a => ({ id: a.id, symbol: a.symbol, condition: a.condition, target: Number(a.target), triggered: a.triggered, triggeredAt: a.triggeredAt, triggeredPrice: a.triggeredPrice != null ? Number(a.triggeredPrice) : undefined })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
-app.post('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/api/alerts', authMiddleware, alertsWriteLimiter, async (req: AuthRequest, res) => {
   try {
     const { symbol, condition, target } = req.body;
-    const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(target) });
+    // nodejs-backend-patterns: validate input before hitting the DB
+    if (!symbol || typeof symbol !== 'string') {
+      return res.status(400).json({ error: 'symbol is required and must be a string' });
+    }
+    if (!['above', 'below'].includes(condition)) {
+      return res.status(400).json({ error: 'condition must be "above" or "below"' });
+    }
+    const targetNum = Number(target);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target must be a valid number' });
+    }
+    const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(targetNum) });
     res.json(alert);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Internal server error';
+    res.status(500).json({ error: msg });
+  }
 });
 
 app.delete('/api/alerts/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await alertsRepo.deleteAlert(req.userId!, Number(req.params.id));
     res.json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => {
@@ -802,7 +834,7 @@ app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => 
       }
     }
     res.json({ ok: true, trade });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
@@ -828,25 +860,25 @@ app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
       return { symbol: p.symbol, name: q?.shortName || p.name || p.symbol, shares, avgCost, currency: cur, currentPrice, pnl, pnlPercent, marketValue, marketValueTWD };
     });
     res.json({ positions: enriched, usdtwd });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/trades', authMiddleware, async (req: AuthRequest, res) => {
-  try { res.json(await tradesRepo.getTradesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  try { res.json(await tradesRepo.getTradesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
   try { const value = await settingsRepo.getSetting(req.userId!, req.params.key as string); res.json({ value: value ?? null }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
   try { await settingsRepo.setSetting(req.userId!, req.params.key as string, req.body.value); res.json({ ok: true }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
-  try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/tv/overview/:symbol', async (req, res) => {
@@ -854,7 +886,7 @@ app.get('/api/tv/overview/:symbol', async (req, res) => {
     const data = await TV.getOverview(req.params.symbol);
     if (data === null) return res.status(503).json({ error: 'TV Service Down' });
     res.json(data);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
@@ -927,14 +959,14 @@ app.get('/api/tv/overview/:symbol', authMiddleware, async (req: AuthRequest, res
   try {
     const data = await TV.getOverview(req.params.symbol);
     res.json(data || {});
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/tv/indicators/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const data = await TV.getIndicators(req.params.symbol, (req.query.timeframe as any) || '1d');
     res.json(data || {});
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/tv/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
@@ -951,19 +983,26 @@ app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) =
   try {
     const data = await TV.getIdeas(req.params.symbol, (req.query.sort as any) || 'popular');
     res.json(data || []);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 // ── Stock Screener ─────────────────────────────────────────────────────────────
 // Batch-scans a list of symbols against technical criteria.
 // Uses Yahoo Finance for quotes + 90-day price history for indicator computation.
-app.post('/api/screener', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthRequest, res) => {
   const { symbols = [], filters = {} } = req.body ?? {};
   if (!Array.isArray(symbols) || symbols.length === 0) {
     return res.status(400).json({ error: 'symbols array required' });
   }
+  // Fix #1: cap symbols to prevent event-loop saturation
+  if (symbols.length > MAX_SCREENER_SYMBOLS) {
+    return res.status(400).json({
+      error: `Max ${MAX_SCREENER_SYMBOLS} symbols per request`,
+    });
+  }
 
-  const results: any[] = [];
+  // Fix #5: typed accumulator — no more results: any[]
+  const results: ScreenerResultRow[] = [];
 
   await Promise.allSettled(
     symbols.map(async (sym: string) => {
@@ -1110,7 +1149,7 @@ app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => 
       technical: techResult ? { sma20: techResult.latest.sma20, sma50: techResult.latest.sma50, macdLine: techResult.latest.macdLine, rsi14: techResult.latest.rsi14, recommendation: techResult.recommendation, score: techResult.score } : null,
       sentiment
     });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
@@ -1119,7 +1158,7 @@ app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
     const data = await NativeYahooApi.chart(symbol, { period1, period2 });
     if (data.quotes.length < 50) throw new Error('Insufficient data for backtest');
     res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.use((err: any, req: any, res: any, next: any) => {

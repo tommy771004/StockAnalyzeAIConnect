@@ -16,10 +16,28 @@
     "desc": "專業級即時 AI 股票分析與量化交易終端機。"
   },
   "settings": {
-    "title": "帳戶設定",
+    "title": "系統設定",
     "language": "系統語言",
     "apiKey": "OpenRouter API 金鑰",
-    "apiKeyDesc": "設定自訂金鑰以使用 AI 生成功能。"
+    "apiKeyDesc": "啟用「個股 AI 摘要」與「Hermes 智能助手」對話功能所需的金鑰。",
+    "profile": "個人帳戶",
+    "subscription": "訂閱狀態",
+    "aiIntegration": "AI 模型與整合",
+    "name": "姓名",
+    "email": "電子郵件",
+    "notSet": "未設定",
+    "editProfile": "修改個人資料",
+    "enterName": "請輸入新姓名",
+    "currentPlan": "當前方案",
+    "trialQuota": "體驗版用戶，每日 AI 分析額度剩餘 {{n}} 次。",
+    "contactSales": "聯繫商務團隊 (Contact Sales)",
+    "notifications": "通知推送",
+    "notificationsDesc": "當個股觸發預設警報時發送瀏覽器通知",
+    "saveChanges": "儲存變更",
+    "saved": "設定已儲存",
+    "saveFailed": "儲存失敗",
+    "profileUpdated": "個人資料已更新",
+    "updateFailed": "更新失敗"
   },
   "footer": {
     "status": "系統狀態",
@@ -31,6 +49,8 @@
   },
   "market": {
     "title": "市場總覽",
+    "sectorTitle": "美股類股表現 (SPDR ETFs)",
+    "indicesTitle": "主要指數 & 全球基準",
     "watchlist": "自選清單",
     "editList": "編輯清單",
     "addSymbol": "新增代碼",
@@ -38,13 +58,18 @@
     "confirmRemove": "確認移除",
     "cancel": "取消",
     "indices": "主要指數",
+    "indexSymbol": "指數代號",
+    "lastPrice": "最新價",
+    "change": "漲跌",
+    "changePct": "漲跌幅",
+    "dayRange": "當日區間",
     "sectors": "類股表現",
     "noData": "暫無資料",
     "loading": "載入中..."
   },
   "ticker": {
     "manage": "管理跑馬燈",
-    "add": "新增標的",
+    "add": "新增",
     "placeholder": "輸入代號 (如 AAPL, 2330.TW)",
     "saved": "已儲存",
     "reset": "恢復預設"
@@ -94,19 +119,31 @@
     "tradeLog": "交易紀錄"
   },
   "alerts": {
-    "title": "預警通知",
+    "title": "預警通知中心",
+    "subtitle": "設定價格警報，系統將在達到目標值時即時推播。",
     "add": "新增預警",
-    "symbol": "代號",
-    "condition": "條件",
-    "target": "目標價",
+    "symbolLabel": "標的代號",
+    "symbolPlaceholder": "例如: AAPL 或 2330.TW",
+    "condition": "觸發條件",
+    "target": "目標價格",
     "above": "高於",
     "below": "低於",
-    "submit": "啟動預警",
+    "submit": "啟動預警機制",
     "triggered": "已觸發",
     "watching": "追蹤中",
     "active": "進行中的預警",
+    "colSymbol": "標的",
+    "colCondition": "觸發條件",
+    "colTarget": "目標價",
+    "colStatus": "狀態",
+    "colAction": "操作",
+    "condAbove": "高於",
+    "condBelow": "低於",
+    "addFailed": "新增失敗",
+    "deleteFailed": "刪除失敗",
     "delete": "刪除",
-    "noAlerts": "目前沒有設定任何預警"
+    "noAlerts": "目前沒有設定任何預警",
+    "deleteConfirm": "確定刪除 {{symbol}} 的預警嗎？"
   },
   "news": {
     "title": "市場新聞",
@@ -123,10 +160,40 @@
     "email": "電子郵件",
     "password": "密碼",
     "name": "名稱",
+    "operatorId": "OPERATOR_ID",
+    "accessCoord": "ACCESS_COORD (EMAIL)",
+    "securityKey": "SECURITY_KEY",
     "loginTitle": "登入終端機",
-    "loginSubtitle": "請輸入您的帳號與密碼",
+    "loginSubtitle": "AUTONOMOUS_TRADING_SYNDICATE_v3",
     "loggingIn": "登入中...",
-    "loginError": "帳號或密碼錯誤"
+    "loginError": "帳號或密碼錯誤",
+    "establishUplink": "ESTABLISH_UPLINK",
+    "initiateHandshake": "INITIATE_HANDSHAKE",
+    "switchToLogin": "SWITCH_TO_LOGIN",
+    "requestAccess": "REQUEST_NEW_ACCESS",
+    "namePlaceholder": "輸入代號...",
+    "emailPlaceholder": "sys.operator@fin.local",
+    "requiredFields": "必填欄位缺少",
+    "authFailed": "帳號驗證失敗"
+  },
+  "agent": {
+    "title": "HERMES_AI",
+    "inputPlaceholder": "等待指令...",
+    "sysAgent": "SYS.AGENT",
+    "operator": "操作員",
+    "navigation": "導航選單",
+    "systemReady": "SYSTEM_READY... HERMES_AGENT_ONLINE.\n目前追蹤: {{symbol}}。請問有何交易策略需要協助？"
+  },
+  "sidebar": {
+    "navigation": "導航選單",
+    "help": "說明",
+    "logout": "登出"
+  },
+  "topnav": {
+    "search": "搜尋...",
+    "settings": "設定",
+    "alerts": "價格預警",
+    "aiAgent": "AI 助手"
   },
   "common": {
     "loading": "載入中...",

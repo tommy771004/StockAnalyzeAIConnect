@@ -126,7 +126,7 @@ export function TopNav({
         </IconButton>
 
         {/* AI Agent toggle */}
-        <IconButton onClick={onToggleAgent} title="AI Agent">
+        <IconButton onClick={onToggleAgent} title={t('topnav.aiAgent')}>
           <BrainCircuit className="h-4 w-4" />
         </IconButton>
 
@@ -134,7 +134,7 @@ export function TopNav({
         <IconButton
           onClick={() => onChange('alerts')}
           className="relative"
-          title="預警通知"
+          title={t('topnav.alerts')}
         >
           <Bell className="h-4 w-4" />
           <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse border border-(--color-term-bg)" />
@@ -147,10 +147,10 @@ export function TopNav({
             'hidden sm:flex items-center gap-2 px-2 py-1 border border-(--color-term-border) hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-all group',
             active === 'settings' && 'border-(--color-term-accent) text-(--color-term-accent) bg-(--color-term-accent)/5',
           )}
-          title="帳戶設定"
+          title={t('settings.title')}
         >
           <CircleUserRound className="h-4 w-4 group-hover:scale-110 transition-transform" />
-          <span className="text-[10px] font-bold tracking-widest hidden xl:block">SETTINGS</span>
+          <span className="text-[10px] font-bold tracking-widest hidden xl:block">{t('topnav.settings')}</span>
         </button>
       </div>
     </header>
