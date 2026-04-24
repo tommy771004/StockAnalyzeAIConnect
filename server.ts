@@ -724,7 +724,7 @@ app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/portfolio/history', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await historyRepo.getHistoryByUser(req.userId!);
-    res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.recordedAt })));
+    res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.date })));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -876,8 +876,8 @@ app.get('/api/tv/overview/:symbol', async (req, res) => {
 app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const input = req.params.symbol as string;
   const canonical = parseSymbol(input);
-  const yahooSymbol = toYahoo(canonical);
-  const tvSymbol = toTradingViewSymbol(canonical);
+  const yahooSymbol = toYahoo(input);
+  const tvSymbol = toTradingViewSymbol(input);
 
   console.log(`[Research] Fetching data for: Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
 
