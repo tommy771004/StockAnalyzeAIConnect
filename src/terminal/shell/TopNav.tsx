@@ -1,4 +1,4 @@
-import { Bell, CircleUserRound, Search, Settings } from 'lucide-react';
+import { Bell, CircleUserRound, Search, Settings, BrainCircuit } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { TerminalView } from '../types';
 
@@ -20,9 +20,10 @@ interface TopNavProps {
   active: TerminalView;
   onChange: (view: TerminalView) => void;
   searchPlaceholder?: string;
+  onToggleAgent?: () => void;
 }
 
-export function TopNav({ active, onChange, searchPlaceholder = 'SEARCH...' }: TopNavProps) {
+export function TopNav({ active, onChange, searchPlaceholder = 'SEARCH...', onToggleAgent }: TopNavProps) {
   return (
     <header className="flex h-14 items-center gap-6 border-b border-(--color-term-border) bg-(--color-term-bg) px-5">
       <a
@@ -68,6 +69,9 @@ export function TopNav({ active, onChange, searchPlaceholder = 'SEARCH...' }: To
             placeholder={searchPlaceholder}
           />
         </div>
+        <IconButton onClick={onToggleAgent}>
+          <BrainCircuit className="h-4 w-4" />
+        </IconButton>
         <IconButton>
           <CircleUserRound className="h-4 w-4" />
         </IconButton>
@@ -82,10 +86,11 @@ export function TopNav({ active, onChange, searchPlaceholder = 'SEARCH...' }: To
   );
 }
 
-function IconButton({ children }: { children: React.ReactNode }) {
+function IconButton({ children, onClick }: { children: React.ReactNode, onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex h-8 w-8 items-center justify-center border border-(--color-term-border) text-(--color-term-muted) hover:border-(--color-term-accent) hover:text-(--color-term-accent)"
     >
       {children}

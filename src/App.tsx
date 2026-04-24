@@ -7,6 +7,8 @@ import { NewsPage } from './terminal/pages/News';
 import { ResearchPage } from './terminal/pages/Research';
 import { MarketPage } from './terminal/pages/Market';
 import { CryptoPage } from './terminal/pages/Crypto';
+import { LoginPage } from './terminal/pages/Login';
+import { useAuth } from './contexts/AuthContext';
 
 const VALID_VIEWS: readonly TerminalView[] = [
   'dashboard',
@@ -35,6 +37,7 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
 };
 
 export default function App() {
+  const { user, loading } = useAuth();
   const [view, setView] = useState<TerminalView>(() => parseHashView());
 
   useEffect(() => {
@@ -48,6 +51,18 @@ export default function App() {
   }, []);
 
   const handleChange = useCallback((next: TerminalView) => setView(next), []);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-(--color-term-bg)">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-(--color-term-accent) border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>

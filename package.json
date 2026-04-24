@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "node --env-file=.env --import=./node_modules/tsx/dist/esm/index.mjs server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

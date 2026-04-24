@@ -1,3 +1,4 @@
+import 'dotenv/config'; // ← MUST be first — loads .env before any module reads process.env
 import express from 'express';
 import * as path from 'path';
 import * as https from 'https';
@@ -183,12 +184,21 @@ class NativeYahooApi {
 
   public static async chart(symbol: string, opts: ChartOptions = {}): Promise<{ quotes: HistoricalData[] }> {
     const interval = opts.interval || '1d';
-    const p1 = opts.period1 ? Math.floor(new Date(opts.period1).getTime() / 1000) : Math.floor(Date.now()/1000) - 31536000;
+    
+    // Support processing numeric string gracefully
+    const getUnixTs = (val: string | number) => {
+      const num = Number(val);
+      if (!isNaN(num)) return Math.floor(num / (num > 1e11 ? 1000 : 1)); // Handle ms vs sec
+      return Math.floor(new Date(val).getTime() / 1000);
+    };
+
+    const p1 = opts.period1 ? getUnixTs(opts.period1) : Math.floor(Date.now() / 1000) - 31536000;
+    
     let url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&period1=${p1}`;
     if (opts.period2) {
-      url += `&period2=${Math.floor(new Date(opts.period2).getTime() / 1000)}`;
+      url += `&period2=${getUnixTs(opts.period2)}`;
     } else {
-      url += `&period2=${Math.floor(Date.now()/1000)}`;
+      url += `&period2=${Math.floor(Date.now() / 1000)}`;
     }
     const cacheKey = `chart:${symbol}:${interval}:${p1}`;
     try {
