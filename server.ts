@@ -106,10 +106,7 @@ function toTradingViewSymbol(input: string): string {
   return sym;
 }
 
-function parseSymbol(input: string): string {
-  let sym = input.trim().toUpperCase();
-  return sym;
-}
+// REMOVED: local parseSymbol to fix conflict with import
 
 /**
  * Calls OpenRouter with automatic fallback to other free models on failure
@@ -531,7 +528,7 @@ function isMarketOpen(symbol: string): boolean {
   return totalNyMinutes >= (9 * 60 + 30) && totalNyMinutes < (16 * 60);
 }
 
-app.ws('/ws', (ws) => {
+(app as any).ws('/ws', (ws) => {
   const subs = new Set<string>();
   ws.on('message', (msg: string) => {
     try {
@@ -726,7 +723,7 @@ app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
 
 app.get('/api/portfolio/history', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const list = await historyRepo.getSnapshotsByUser(req.userId!);
+    const list = await historyRepo.getHistoryByUser(req.userId!);
     res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.recordedAt })));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
