@@ -91,9 +91,10 @@ def get_overview(symbol: str) -> Dict[str, Any]:
             sym_only = parts[1]
 
         try:
-            raw_ind = ind.scrape(exchange=exchange, symbol=sym_only, timeframe="1d")
+            raw_ind = ind.scrape(exchange=exchange, symbol=sym_only, timeframe="1d", allIndicators=True)
             data_ind = flatten_response(raw_ind)
-        except Exception:  # noqa: BLE001
+        except Exception as e:
+            print(f"[python] indicators fallback failed for {exchange}:{sym_only}: {e}", file=sys.stderr)
             data_ind = {}
 
         mapped = data_ov.copy() if isinstance(data_ov, dict) else {}
@@ -120,11 +121,9 @@ def get_overview(symbol: str) -> Dict[str, Any]:
                 score = data_ind.get("Recommend.All")
 
             if score is not None:
-                mapped["recommendation_any_score"] = score
-                mapped["recommendation_any"] = get_recommendation_text(float(score))
-            else:
-                mapped["recommendation_any_score"] = 0
-                mapped["recommendation_any"] = "NEUTRAL"
+                mapped['recommendation_any_score'] = score
+                mapped['recommendation_any'] = get_recommendation_text(score)
+            # else: leave both keys absent so the frontend can detect missing data
 
         return {"status": "success", "data": mapped}
     except Exception as exc:  # noqa: BLE001
@@ -148,7 +147,9 @@ def get_news(exchange: str, symbol: str) -> Dict[str, Any]:
         _, _, news_scraper, _, _ = _load_scrapers()
         raw = news_scraper.scrape_headlines(symbol=symbol, exchange=exchange)
         data = flatten_response(raw)
-        return {"status": "success", "data": data}
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "message": str(exc)}
-
+        return {"status": "success", "data": data or []}
+    except Exception as e:
+        # Return empty list with a message so the frontend degrades gracefully
+        # instead of surfacing an error (common when TV's news endpoint 403s).
+        print(f"[python] news fetch failed for {exchange}:{symbol}: {e}", file=sys.stderr)
+        return {"status": "success", "data": [], "message": str(e)}

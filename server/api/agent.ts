@@ -22,6 +22,7 @@ import * as tradesRepo      from '../repositories/tradesRepo.js';
 import * as settingsRepo    from '../repositories/settingsRepo.js';
 import { calcIndicators }    from '../utils/technical.js';
 import { analyzeSentiment }  from '../utils/sentiment.js';
+import { getBestFreeModel }  from '../utils/modelSelector.js';
 
 export const agentRouter = Router();
 
@@ -65,7 +66,7 @@ agentRouter.post('/dynamic-strategy', async (req: AuthRequest, res) => {
     const codeResponse = await callOpenRouter([
       { role: 'system', content: systemInstruction },
       { role: 'user', content: prompt }
-    ], FREE_MODEL_PRIMARY, openrouterKey);
+    ], undefined, openrouterKey);
 
     // 2. Clean up markdown if any
     let cleanCode = codeResponse.replace(/```(?:javascript|js)?\n/i, '').replace(/```$/m, '').trim();
@@ -103,7 +104,9 @@ agentRouter.post('/dynamic-strategy', async (req: AuthRequest, res) => {
 
 // ── 環境變數 ──────────────────────────────────────────────────────────────────
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const FREE_MODEL_PRIMARY = 'nousresearch/hermes-3-llama-3.1-405b:free';
+// Last-resort static fallback when dynamic model discovery and OpenRouter
+// both fail. The primary model is resolved dynamically via getBestFreeModel()
+// so it stays aligned with /api/ai/summarize.
 const FREE_MODEL_FALLBACK = 'mistralai/mistral-7b-instruct:free';
 
 function getApiKey(): string {
@@ -119,11 +122,13 @@ interface OpenRouterMessage {
 
 async function callOpenRouter(
   messages: OpenRouterMessage[],
-  model: string = FREE_MODEL_PRIMARY,
+  model?: string,
   reqApiKey?: string
 ): Promise<string> {
   const apiKey = reqApiKey || getApiKey();
   if (!apiKey) throw new Error('OPENROUTER_API_KEY 未設定');
+
+  const resolvedModel = model ?? await getBestFreeModel();
 
   const res = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
@@ -134,7 +139,7 @@ async function callOpenRouter(
       'X-Title':       'Hermes AI Trading Agent',
     },
     body: JSON.stringify({
-      model,
+      model: resolvedModel,
       messages,
       temperature:  0.7,
       max_tokens:   1024,
@@ -146,8 +151,8 @@ async function callOpenRouter(
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     // Fallback to secondary free model on rate-limit or model unavailable
-    if ((res.status === 429 || res.status === 503) && model !== FREE_MODEL_FALLBACK) {
-      console.warn(`[Hermes] ${model} 不可用 (${res.status})，切換至備援模型`);
+    if ((res.status === 429 || res.status === 503) && resolvedModel !== FREE_MODEL_FALLBACK) {
+      console.warn(`[Hermes] ${resolvedModel} 不可用 (${res.status})，切換至備援模型`);
       return callOpenRouter(messages, FREE_MODEL_FALLBACK, reqApiKey);
     }
     throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 200)}`);
@@ -304,7 +309,8 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
       }
     }
 
-    const rawReply = await callOpenRouter(messages, FREE_MODEL_PRIMARY, openrouterKey);
+    const chatModel = await getBestFreeModel();
+    const rawReply = await callOpenRouter(messages, chatModel, openrouterKey);
     const { cleanText, skills } = parseExtractedSkills(rawReply);
 
     // 持久化萃取出的技能/偏好
@@ -324,7 +330,7 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
     res.json({
       reply:           cleanText,
       extractedSkills: skills,
-      model:           FREE_MODEL_PRIMARY,
+      model:           chatModel,
     });
 
   } catch (err: unknown) {
@@ -490,6 +496,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
     ];
 
     // Phase 1: Call LLM with Tools (non-streaming for tool handling, stream text chunks)
+    const streamModel = await getBestFreeModel();
     const apiRes = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
@@ -499,7 +506,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
         'X-Title':       'FIN-TERMINAL Agent',
       },
       body: JSON.stringify({
-        model:       FREE_MODEL_PRIMARY,
+        model:       streamModel,
         messages,
         tools:       AGENT_TOOLS,
         tool_choice: 'auto',
@@ -569,7 +576,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
           content: `以下是工具執行結果，請用 ${locale} 為使用者做一個簡潔的摘要說明：\n${JSON.stringify(toolResults, null, 2)}`,
         },
       ];
-      const summaryText = await callOpenRouter(toolResultMessages, FREE_MODEL_PRIMARY, openrouterKey).catch(() => '已完成工具呼叫。');
+      const summaryText = await callOpenRouter(toolResultMessages, streamModel, openrouterKey).catch(() => '已完成工具呼叫。');
       sseWrite('text', { delta: summaryText });
     } else {
       // Pure text response — emit as delta chunks (split by sentence for perceived streaming)

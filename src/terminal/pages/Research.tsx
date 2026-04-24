@@ -167,49 +167,38 @@ function ValuationPanel({ tv }: { tv: any }) {
   );
 }
 
-function normalizeRecommendation(score: number): 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL' {
-  if (score > 0.5) return 'STRONG_BUY';
-  if (score > 0.1) return 'BUY';
-  if (score < -0.5) return 'STRONG_SELL';
-  if (score < -0.1) return 'SELL';
-  return 'NEUTRAL';
-}
+function ConsensusPanel({ tv }: { tv: any }) {
+  const hasData = tv?.recommendation_any != null && typeof tv?.recommendation_any_score === 'number';
+  const rec = hasData ? tv.recommendation_any : 'N/A';
+  const score = hasData ? tv.recommendation_any_score : 0; // -1 to 1
 
-function toNum(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-}
-
-function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators: Record<string, unknown> }) {
-  const overviewScore = toNum(tv?.recommendation_any_score);
-  const indicatorScore = toNum(tvIndicators?.['Recommend.All']);
-  const score = overviewScore ?? indicatorScore ?? 0; // -1 to 1
-  const recRaw = (tv?.recommendation_any as string | undefined) ?? normalizeRecommendation(score);
-  const rec = String(recRaw).replace(/\s+/g, '_').toUpperCase();
-  
   const buy = rec.includes('BUY') ? 70 : rec === 'NEUTRAL' ? 20 : 10;
   const hold = rec === 'NEUTRAL' ? 60 : 20;
   const sell = rec.includes('SELL') ? 70 : 10;
   const total = buy + hold + sell;
 
-  const hasData = overviewScore != null || indicatorScore != null;
-
   return (
     <Panel title="分析師共識 & 技術指標">
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4">
-        <div className={cn("text-[26px] font-bold tracking-[0.2em]", rec.includes('BUY') ? 'text-sky-400' : rec.includes('SELL') ? 'text-rose-400' : 'text-amber-400')}>
-          {rec.replace('STRONG_', '').replace('_', ' ')}
+        <div className={cn("text-[26px] font-bold tracking-[0.2em]",
+          !hasData ? 'text-zinc-500' :
+          rec.includes('BUY') ? 'text-sky-400' :
+          rec.includes('SELL') ? 'text-rose-400' :
+          'text-amber-400')}>
+          {hasData ? rec.replace('STRONG_', '').replace('_', ' ') : 'N/A'}
         </div>
         <div className="text-right text-[11px]">
           <div className="text-(--color-term-muted)">
-            技術評分: <span className="text-(--color-term-text) tabular-nums">{(score * 100).toFixed(0)}</span>
+            技術評分: <span className="text-(--color-term-text) tabular-nums">{hasData ? (score * 100).toFixed(0) : '---'}</span>
           </div>
           <div className="text-(--color-term-muted)">
-             趨勢方向: <span className={cn("tabular-nums", score >= 0 ? 'text-sky-400' : 'text-rose-400')}>{score >= 0 ? '看多' : '看空'}</span>
+             趨勢方向: <span className={cn("tabular-nums",
+               !hasData ? 'text-zinc-500' :
+               score > 0 ? 'text-sky-400' :
+               score < 0 ? 'text-rose-400' :
+               'text-amber-400')}>
+               {!hasData ? '---' : score > 0 ? '看多' : score < 0 ? '看空' : '中立'}
+             </span>
           </div>
         </div>
       </div>
