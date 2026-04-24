@@ -6,6 +6,7 @@ export type TerminalView =
   | 'research'
   | 'news'
   | 'alerts'
+  | 'screener'
   | 'settings';
 
 export interface TickerSummary {

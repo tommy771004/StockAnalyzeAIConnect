@@ -9,6 +9,7 @@ import { MarketPage } from './terminal/pages/Market';
 import { CryptoPage } from './terminal/pages/Crypto';
 import { SettingsPage } from './terminal/pages/Settings';
 import { AlertsPage } from './terminal/pages/Alerts';
+import { ScreenerPage } from './terminal/pages/Screener';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
 
@@ -20,6 +21,7 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'research',
   'news',
   'alerts',
+  'screener',
   'settings'
 ];
 
@@ -39,6 +41,7 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   research: 'Search AAPL...',
   news: '搜尋 . . .',
   alerts: 'SEARCH ALERTS...',
+  screener: 'SCREENER ACTIVE...',
   settings: 'SEARCH SETTINGS...',
 };
 
@@ -80,6 +83,7 @@ export default function App() {
       {view === 'news' && <NewsPage />}
       {view === 'settings' && <SettingsPage />}
       {view === 'alerts' && <AlertsPage />}
+      {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
     </Layout>
   );
 }

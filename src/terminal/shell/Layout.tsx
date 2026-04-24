@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import type { TerminalView } from '../types';
 import { TopNav } from './TopNav';
 import { TickerTape } from './TickerTape';
 import { Sidebar } from './Sidebar';
-import { useState } from 'react';
 import { Footer } from './Footer';
 import { AgentPanel } from './AgentPanel';
 import { useMarketData } from '../hooks/useMarketData';
+import { BarChart3, Bell, LayoutDashboard, Target, Globe } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface LayoutProps {
   active: TerminalView;
@@ -15,29 +16,100 @@ interface LayoutProps {
   children: ReactNode;
 }
 
+/** Bottom nav items shown on mobile only (most-used views) */
+const BOTTOM_NAV: Array<{ id: TerminalView; icon: React.ReactNode; label: string }> = [
+  { id: 'dashboard', icon: <LayoutDashboard className="h-5 w-5" />, label: '儀表板' },
+  { id: 'market',    icon: <Globe className="h-5 w-5" />,            label: '市場' },
+  { id: 'screener',  icon: <Target className="h-5 w-5" />,           label: '選股' },
+  { id: 'portfolio', icon: <BarChart3 className="h-5 w-5" />,        label: '持倉' },
+  { id: 'alerts',    icon: <Bell className="h-5 w-5" />,             label: '預警' },
+];
+
 export function Layout({ active, onChange, searchPlaceholder, children }: LayoutProps) {
   const [isAgentOpen, setIsAgentOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   const toggleAgent = () => setIsAgentOpen((prev) => !prev);
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+
   const { indices } = useMarketData();
 
-  const tickerItems = indices.map(idx => ({
+  const tickerItems = indices.map((idx) => ({
     label: idx.symbol.replace('^', ''),
     value: idx.regularMarketPrice?.toLocaleString() || '---',
-    changePct: idx.regularMarketChangePercent || 0
+    changePct: idx.regularMarketChangePercent || 0,
   }));
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-(--color-term-bg) text-(--color-term-text)">
-      <TopNav active={active} onChange={onChange} searchPlaceholder={searchPlaceholder} onToggleAgent={toggleAgent} />
-      <TickerTape items={tickerItems.length > 0 ? tickerItems : [{ label: 'MARKET', value: 'LOADING...', changePct: 0 }]} />
+    <div className="flex h-screen w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
+      {/* Top navigation */}
+      <TopNav
+        active={active}
+        onChange={onChange}
+        searchPlaceholder={searchPlaceholder}
+        onToggleAgent={toggleAgent}
+        onToggleSidebar={toggleSidebar}
+      />
+
+      {/* Scrolling ticker tape */}
+      <TickerTape
+        items={
+          tickerItems.length > 0
+            ? tickerItems
+            : [{ label: 'MARKET', value: 'LOADING...', changePct: 0 }]
+        }
+      />
+
+      {/* Main content area */}
       <div className="flex min-h-0 flex-1 relative">
-        <Sidebar active={active} onChange={onChange} />
-        <main className="min-h-0 flex-1 overflow-hidden p-3">{children}</main>
-        
-        {/* The sliding Agent Panel */}
+        {/* Sidebar — controls its own mobile drawer state */}
+        <Sidebar
+          active={active}
+          onChange={onChange}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+
+        {/* Page content — add bottom padding on mobile to clear bottom nav */}
+        <main className="min-h-0 flex-1 overflow-hidden p-3 pb-16 md:pb-3">
+          {children}
+        </main>
+
+        {/* AI Agent sliding panel */}
         <AgentPanel isOpen={isAgentOpen} onClose={() => setIsAgentOpen(false)} />
       </div>
+
+      {/* Footer — desktop only */}
       <Footer />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-(--color-term-border) bg-(--color-term-bg)"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {BOTTOM_NAV.map((item) => {
+          const isActive = active === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onChange(item.id)}
+              className={cn(
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] tracking-widest transition-colors',
+                isActive
+                  ? 'text-(--color-term-accent)'
+                  : 'text-(--color-term-muted)',
+              )}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {isActive && (
+                <span className="absolute top-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

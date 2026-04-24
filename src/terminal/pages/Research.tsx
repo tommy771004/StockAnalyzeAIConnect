@@ -13,6 +13,19 @@ export function ResearchPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const { data, loading } = useResearchData(activeSymbol);
 
+  // Listen for global symbol-search events (from TopNav search bar and Screener page)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const sym = (e as CustomEvent<string>).detail;
+      if (sym) {
+        setActiveSymbol(sym.toUpperCase());
+        setSearchInput('');
+      }
+    };
+    window.addEventListener('symbol-search', handler);
+    return () => window.removeEventListener('symbol-search', handler);
+  }, []);
+
   useEffect(() => {
     const fetchSummary = async () => {
       setAiLoading(true);
@@ -167,7 +180,7 @@ function ValuationPanel({ tv }: { tv: any }) {
   );
 }
 
-function ConsensusPanel({ tv }: { tv: any }) {
+function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators?: any }) {
   const hasData = tv?.recommendation_any != null && typeof tv?.recommendation_any_score === 'number';
   const rec = hasData ? tv.recommendation_any : 'N/A';
   const score = hasData ? tv.recommendation_any_score : 0; // -1 to 1

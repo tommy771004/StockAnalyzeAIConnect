@@ -87,8 +87,11 @@ export default function StockScreener({ onSelectSymbol }: Props) {
   const handleTemplate = (t: typeof TEMPLATES[0]) => {
     setActiveTemplate(t.id);
     setCustomFilters(t.filters);
+    // Pass filters explicitly to avoid stale closure over customFilters state
     runScan(t.filters);
   };
+
+  const hasMoreResults = sorted.length > visibleCount;
 
   const handleSort = (key: SortKey) => {
     setVisibleCount(50);
@@ -361,14 +364,16 @@ export default function StockScreener({ onSelectSymbol }: Props) {
               ))}
             </tbody>
           </table>
-            <div className="flex justify-center p-6 border-t border-[var(--border-color)]">
-              <button type="button" onClick={() => setVisibleCount(v => v + 50)}
-                className="px-6 py-2 text-xs font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-black/20"
-                style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface)', border: '1px solid var(--md-outline-variant)' }}
-              >
-                載入更多項目 ({visibleCount}/{sorted.length})
-              </button>
-            </div>
+            {hasMoreResults && (
+              <div className="flex justify-center p-6 border-t border-[var(--border-color)]">
+                <button type="button" onClick={() => setVisibleCount(v => v + 50)}
+                  className="px-6 py-2 text-xs font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-black/20"
+                  style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface)', border: '1px solid var(--md-outline-variant)' }}
+                >
+                  載入更多 ({visibleCount}/{sorted.length})
+                </button>
+              </div>
+            )}
         </div>
       )}
     </motion.div>
