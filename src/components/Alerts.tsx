@@ -58,7 +58,7 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
         <span className={cn("font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1", compact ? "label-meta" : "text-xs")}>
           <Bell size={compact ? 10 : 12} aria-hidden="true" /> 警示設定
         </span>
-        <button type="button" onClick={(e) => {}}
+        <button type="button" onClick={() => { setAdding(v => !v); setError(''); }}
           aria-label={adding ? '取消新增警示' : '新增警示'}
           aria-expanded={adding}
           className="text-emerald-400 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400 rounded"
@@ -75,7 +75,7 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
           className={cn("flex items-center gap-1.5 text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg", compact ? "p-1.5 text-xs mb-1" : "p-2 text-sm mb-2")}
         >
           <AlertCircle size={compact ? 10 : 12} aria-hidden="true" /> {error}
-          <button type="button" onClick={(e) => {}} aria-label="關閉錯誤訊息" className="ml-auto"><X size={compact ? 10 : 12} aria-hidden="true" /></button>
+          <button type="button" onClick={() => setError('')} aria-label="關閉錯誤訊息" className="ml-auto"><X size={compact ? 10 : 12} aria-hidden="true" /></button>
         </div>
       )}
 
@@ -88,7 +88,7 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
             </select>
             <input aria-label="目標價格" type="number" min="0" step="0.01" value={target} onChange={e => setTarget(e.target.value)} placeholder="價格" className={cn("flex-1 bg-black/30 border border-white/8 rounded-lg px-2 py-1 text-[var(--text-color)] font-mono", compact ? "text-xs" : "text-sm")} />
           </div>
-          <button type="button">新增警示</button>
+          <button type="button" onClick={addAlert} disabled={!target} className={cn("w-full rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-500/25 transition-colors", compact ? "py-1 text-xs" : "py-1.5 text-sm")}>新增警示</button>
         </div>
       )}
 
@@ -98,15 +98,15 @@ export const Alerts: React.FC<AlertsProps> = React.memo(({ symbol }) => {
             <span>{a.condition === 'above' ? '↑' : '↓'} {a.target}</span>
             {deleteConfirmId === a.id ? (
               <div className="flex items-center gap-1">
-                <button type="button" onClick={(e) => {}} aria-label="確認刪除警示" className="text-rose-400 hover:text-rose-300">
+                <button type="button" onClick={() => deleteAlert(a.id)} aria-label="確認刪除警示" className="text-rose-400 hover:text-rose-300">
                   <AlertCircle size={compact ? 12 : 14} aria-hidden="true" />
                 </button>
-                <button type="button" onClick={(e) => {}} aria-label="取消刪除" className="text-zinc-500 hover:text-[var(--text-color)] opacity-70">
+                <button type="button" onClick={() => setDeleteConfirmId(null)} aria-label="取消刪除" className="text-zinc-500 hover:text-[var(--text-color)] opacity-70">
                   <X size={compact ? 12 : 14} aria-hidden="true" />
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={(e) => {}} aria-label={`刪除 ${a.symbol} 警示`} className="text-zinc-500 hover:text-rose-400"><X size={compact ? 12 : 14} aria-hidden="true" /></button>
+              <button type="button" onClick={() => setDeleteConfirmId(a.id)} aria-label={`刪除 ${a.symbol} 警示`} className="text-zinc-500 hover:text-rose-400"><X size={compact ? 12 : 14} aria-hidden="true" /></button>
             )}
           </div>
         ))}

@@ -57,7 +57,15 @@ def get_overview(symbol: str):
             mapped['market_cap_calc'] = data_ov.get('market_cap_calc') or data_ov.get('market_cap_basic')
             mapped['pe_ratio'] = data_ov.get('price_earnings_ttm')
             mapped['eps_ttm'] = data_ov.get('earnings_per_share_basic_ttm') or data_ov.get('earnings_per_share_diluted_ttm')
-            
+
+            inst_pct = (
+                data_ov.get('institutional_holders_pct')
+                or data_ov.get('institutional_holdings_pct')
+                or data_ov.get('institutional_percent')
+            )
+            if inst_pct is not None:
+                mapped['institutional_holders_pct'] = inst_pct
+
             close = data_ov.get('close')
             change_abs = data_ov.get('change_abs')
             if close is not None and change_abs is not None:
