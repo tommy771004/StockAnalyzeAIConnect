@@ -550,7 +550,11 @@ ${newsText}
   } catch (e: any) {
     console.error(`[AI] Summarize Error for ${sym}:`, e);
     const errMsg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ 
+    
+    // Pass through 402 Payment Required status
+    const status = errMsg.includes('402') ? 402 : 500;
+    
+    res.status(status).json({ 
       error: `AI 摘要生成失敗: ${errMsg}`,
       symbol: sym,
       timestamp: new Date().toISOString()

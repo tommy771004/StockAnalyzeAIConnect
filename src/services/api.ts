@@ -38,6 +38,10 @@ declare global {
       openExternal:  (url: string) => Promise<void>;
       getVersion:    () => Promise<string>;
       getDataPath:   () => Promise<string>;
+      showNotification?: (title: string, body: string) => void;
+      minimize?: () => void;
+      maximize?: () => void;
+      close?: () => void;
     };
   }
 }
@@ -54,6 +58,15 @@ const IS_ELECTRON = typeof window !== 'undefined' && !!window.api?.isElectron;
 const E = () => {
   if (!window.api) throw new Error('Electron API not available');
   return window.api;
+};
+
+// ── Electron Specific ──────────────────────────────────────────────────────────
+export const showNotification = (title: string, body: string) => {
+  if (IS_ELECTRON && window.api?.showNotification) {
+    window.api.showNotification(title, body);
+  } else if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
 };
 
 // ── Stock ─────────────────────────────────────────────────────────────────────

@@ -114,7 +114,7 @@ async function routeModel(opts: ModelRouteOptions): Promise<string> {
 // ─── Retry Logic (Transient-Only) ─────────────────────────────────────────────
 
 /** HTTP status codes considered transient and retryable */
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const RETRYABLE_STATUS = new Set([429, 502, 503, 504]); // 500 is often not transient in this app, removed it
 const MAX_RETRIES = 3;
 
 async function sleep(ms: number): Promise<void> {
@@ -285,87 +285,114 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
     );
   }
 
-  // ── 3. Route model ────────────────────────────────────────────────────────
-  const model = await routeModel({
-    promptLength: opts.prompt.length,
-    itemCount:    opts.itemCount,
-    forceModel:   opts.forceModel,
-    tier:         opts.tier,
-  });
+  // ── 3. Resolve Candidate Models (for auto-fallback) ──────────────────────
+  const models = opts.forceModel 
+    ? [opts.forceModel] 
+    : await getTopFreeModels(3);
 
-  console.log(`[LLM] routing → model=${model} tier=${opts.tier ?? 'free'} chars=${opts.prompt.length}`);
+  let lastError: Error | null = null;
 
-  // ── 4. Build messages (with prompt caching for long system prompts) ───────
-  const messages = opts.systemPrompt
-    ? buildCachedMessages(opts.systemPrompt, opts.prompt, opts.history)
-    : [
-        ...(opts.history ?? []),
-        { role: 'user' as const, content: opts.prompt },
-      ];
+  for (const model of models) {
+    try {
+      console.log(`[LLM] attempt → model=${model} tier=${opts.tier ?? 'free'} chars=${opts.prompt.length}`);
 
-  // ── 5. Fetch with retry ───────────────────────────────────────────────────
-  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      // ── 4. Build messages (with prompt caching for long system prompts) ───────
+      const messages = opts.systemPrompt
+        ? buildCachedMessages(opts.systemPrompt, opts.prompt, opts.history)
+        : [
+            ...(opts.history ?? []),
+            { role: 'user' as const, content: opts.prompt },
+          ];
 
-  const result = await fetchWithRetry(OPENROUTER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer':  'https://hermes-ai.trading',
-      'X-Title':       'Hermes AI Trading',
-      'X-Request-Id':  requestId,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.3,
-      max_tokens:  opts.maxTokens  ?? 1024,
-      stream:      false,
-      ...(opts.jsonMode && { response_format: { type: 'json_object' } }),
-    }),
-    signal: AbortSignal.timeout(35_000),
-  });
+      // ── 5. Fetch with retry ───────────────────────────────────────────────────
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  if (!result.ok) {
-    // If it's an auth error, give a clear message
-    if (result.status === 401) {
-      throw new Error('OpenRouter API key is invalid or expired. Please update it in Settings.');
+      const result = await fetchWithRetry(OPENROUTER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer':  'https://hermes-ai.trading',
+          'X-Title':       'Hermes AI Trading',
+          'X-Request-Id':  requestId,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: opts.temperature ?? 0.3,
+          max_tokens:  opts.maxTokens  ?? 1024,
+          stream:      false,
+          ...(opts.jsonMode && { response_format: { type: 'json_object' } }),
+        }),
+        signal: AbortSignal.timeout(35_000),
+      });
+
+      if (!result.ok) {
+        // If it's an auth error, fail immediately (no point rotating)
+        if (result.status === 401) {
+          throw new Error('OpenRouter API key is invalid or expired. Please update it in Settings.');
+        }
+        
+        // If it's a credit/quota issue (402) or rate limit (429) or server error (5xx)
+        // AND we have more models to try, then continue to next model.
+        if (models.indexOf(model) < models.length - 1) {
+          console.warn(`[LLM] Model ${model} failed (${result.status}), trying next candidate...`);
+          continue; 
+        }
+
+        // Specific 402 handling for the last attempt
+        if (result.status === 402) {
+          const json = JSON.parse(result.body).error || {};
+          throw new Error(`OpenRouter 402: ${json.message || '餘額不足 (Insufficient Credits)'}`);
+        }
+        throw new Error(`OpenRouter ${result.status}: ${result.body.slice(0, 200)}`);
+      }
+
+      // If we reach here, the call succeeded!
+      const json = JSON.parse(result.body) as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?:   { prompt_tokens?: number; completion_tokens?: number };
+      };
+
+      const text = json?.choices?.[0]?.message?.content ?? '';
+      if (!text) throw new Error('LLM returned empty content');
+
+      // ── 6. Track cost (immutable) ─────────────────────────────────────────────
+      const inputTokens  = json.usage?.prompt_tokens      ?? 0;
+      const outputTokens = json.usage?.completion_tokens  ?? 0;
+      const pricing      = pricingFor(model);
+      const costUsd =
+        (inputTokens  / 1_000_000) * pricing.input +
+        (outputTokens / 1_000_000) * pricing.output;
+
+      const record: CostRecord = {
+        requestId,
+        model,
+        inputTokens,
+        outputTokens,
+        costUsd,
+        ts: Date.now(),
+      };
+
+      tracker = addRecord(tracker, record);
+
+      console.log(
+        `[LLM] done  model=${model} in=${inputTokens} out=${outputTokens} cost=$${costUsd.toFixed(6)} total=$${totalCost(tracker).toFixed(6)}`,
+      );
+
+      return { text, model, tracker, totalCostUsd: totalCost(tracker) };
+
+    } catch (err: any) {
+      lastError = err;
+      // If it's the last model, or it's an auth error, rethrow
+      if (models.indexOf(model) === models.length - 1 || err.message.includes('API key')) {
+        throw err;
+      }
+      console.warn(`[LLM] Error with model ${model}: ${err.message}. Retrying with next model...`);
     }
-    throw new Error(`OpenRouter ${result.status}: ${result.body.slice(0, 200)}`);
   }
 
-  const json = JSON.parse(result.body) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    usage?:   { prompt_tokens?: number; completion_tokens?: number };
-  };
-
-  const text = json?.choices?.[0]?.message?.content ?? '';
-  if (!text) throw new Error('LLM returned empty content');
-
-  // ── 6. Track cost (immutable) ─────────────────────────────────────────────
-  const inputTokens  = json.usage?.prompt_tokens      ?? 0;
-  const outputTokens = json.usage?.completion_tokens  ?? 0;
-  const pricing      = pricingFor(model);
-  const costUsd =
-    (inputTokens  / 1_000_000) * pricing.input +
-    (outputTokens / 1_000_000) * pricing.output;
-
-  const record: CostRecord = {
-    requestId,
-    model,
-    inputTokens,
-    outputTokens,
-    costUsd,
-    ts: Date.now(),
-  };
-
-  tracker = addRecord(tracker, record);
-
-  console.log(
-    `[LLM] done  model=${model} in=${inputTokens} out=${outputTokens} cost=$${costUsd.toFixed(6)} total=$${totalCost(tracker).toFixed(6)}`,
-  );
-
-  return { text, model, tracker, totalCostUsd: totalCost(tracker) };
+  throw lastError || new Error('All candidate models failed');
 }
 
 /**

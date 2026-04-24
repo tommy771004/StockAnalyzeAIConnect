@@ -42,7 +42,10 @@ export function TopNav({
   };
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-(--color-term-border) bg-(--color-term-bg) px-3 md:px-5 shrink-0 relative">
+    <header 
+      className="flex h-14 items-center gap-3 border-b border-(--color-term-border) bg-(--color-term-bg) px-3 md:px-5 shrink-0 relative electron-drag"
+      style={{ WebkitAppRegion: 'drag' } as any}
+    >
       {/* Mobile: Hamburger */}
       <button
         type="button"
@@ -100,7 +103,7 @@ export function TopNav({
       {/* Right-side actions */}
       <div className="ml-auto flex items-center gap-2">
         {/* Desktop search */}
-        <div className="relative hidden lg:block">
+        <div className="relative hidden lg:block" style={{ WebkitAppRegion: 'no-drag' } as any}>
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--color-term-muted)" />
           <input
             className="h-8 w-48 xl:w-56 border border-(--color-term-border) bg-(--color-term-surface) pl-7 pr-2 text-[12px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none transition-colors"
@@ -147,11 +150,27 @@ export function TopNav({
             'hidden sm:flex items-center gap-2 px-2 py-1 border border-(--color-term-border) hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-all group',
             active === 'settings' && 'border-(--color-term-accent) text-(--color-term-accent) bg-(--color-term-accent)/5',
           )}
+          style={{ WebkitAppRegion: 'no-drag' } as any}
           title={t('settings.title')}
         >
           <CircleUserRound className="h-4 w-4 group-hover:scale-110 transition-transform" />
           <span className="text-[10px] font-bold tracking-widest hidden xl:block">{t('topnav.settings')}</span>
         </button>
+
+        {/* Electron Window Controls */}
+        {typeof window !== 'undefined' && window.api?.isElectron && (
+          <div className="flex items-center gap-1 ml-2 border-l border-(--color-term-border) pl-2" style={{ WebkitAppRegion: 'no-drag' } as any}>
+            <button onClick={() => window.api?.minimize()} className="p-1 hover:text-white transition-colors text-zinc-400">
+              <svg width="12" height="12" viewBox="0 0 12 12"><rect fill="currentColor" width="10" height="1" x="1" y="6"></rect></svg>
+            </button>
+            <button onClick={() => window.api?.maximize()} className="p-1 hover:text-white transition-colors text-zinc-400">
+              <svg width="12" height="12" viewBox="0 0 12 12"><rect width="9" height="9" x="1.5" y="1.5" fill="none" stroke="currentColor"></rect></svg>
+            </button>
+            <button onClick={() => window.api?.close()} className="p-1 hover:bg-red-500 hover:text-white transition-colors text-zinc-400 rounded-sm">
+              <svg width="12" height="12" viewBox="0 0 12 12"><polygon fill="currentColor" fillRule="evenodd" points="11 1.576 6.583 6 11 10.424 10.424 11 6 6.583 1.576 11 1 10.424 5.417 6 1 1.576 1.576 1 6 5.417 10.424 1"></polygon></svg>
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
@@ -177,6 +196,7 @@ function IconButton({
         'flex h-8 w-8 items-center justify-center border border-(--color-term-border) text-(--color-term-muted) hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-all',
         className,
       )}
+      style={{ WebkitAppRegion: 'no-drag' } as any}
     >
       {children}
     </button>
