@@ -36,55 +36,10 @@ try {
 }
 
 // --- OpenRouter Model Management ---
-let cachedFreeModels: string[] = [];
-let lastModelFetch = 0;
-const CACHE_DURATION = 3600 * 1000; // 1 hour
-
-/**
- * Dynamically fetches and selects the best available free model from OpenRouter
- */
-export async function getBestFreeModel(): Promise<string> {
-  const now = Date.now();
-  if (cachedFreeModels.length > 0 && (now - lastModelFetch < CACHE_DURATION)) {
-    return cachedFreeModels[0];
-  }
-
-  try {
-    console.log('[AI] Fetching latest free models from OpenRouter...');
-    const res = await fetch('https://openrouter.ai/api/v1/models');
-    if (!res.ok) throw new Error('Failed to fetch models');
-
-    const json = await res.json() as any;
-    const allModels = json.data || [];
-
-    const freeModels = allModels
-      .filter((m: any) => m.pricing?.prompt === '0' && m.pricing?.completion === '0')
-      .map((m: any) => m.id);
-
-    if (freeModels.length > 0) {
-      freeModels.sort((a: string, b: string) => {
-        const getScore = (id: string) => {
-          id = id.toLowerCase();
-          if (id.includes('70b') || id.includes('large')) return 100;
-          if (id.includes('pro')) return 80;
-          if (id.includes('flash')) return 60;
-          if (id.includes('gemini')) return 50;
-          return 0;
-        };
-        return getScore(b) - getScore(a);
-      });
-
-      cachedFreeModels = freeModels;
-      lastModelFetch = now;
-      console.log(`[AI] Selected top free model: ${cachedFreeModels[0]}`);
-      return cachedFreeModels[0];
-    }
-  } catch (err) {
-    console.warn('[AI] Error fetching free models, falling back to default:', (err as Error).message);
-  }
-
-  return 'google/gemini-2.0-flash-exp:free';
-}
+// Shared implementation lives in server/utils/modelSelector.ts so /api/ai
+// and /api/agent/chat pick the same dynamic free model.
+import { getBestFreeModel, getTopFreeModels } from './server/utils/modelSelector.js';
+export { getBestFreeModel };
 
 /**
  * Converts various symbol formats to TradingView canonical format
@@ -115,10 +70,7 @@ async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Pr
   const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
   if (!apiKey) throw new Error('AI key missing');
 
-  // Ensure we have models
-  await getBestFreeModel();
-  const modelsToTry = cachedFreeModels.slice(0, 3);
-  if (modelsToTry.length === 0) modelsToTry.push('google/gemini-2.0-flash-exp:free');
+  const modelsToTry = await getTopFreeModels(3);
 
   let lastError: any = null;
 

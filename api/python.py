@@ -47,9 +47,10 @@ def get_overview(symbol: str):
             sym_only = parts[1]
 
         try:
-            raw_ind = ind.scrape(exchange=exchange, symbol=sym_only, timeframe="1d")
+            raw_ind = ind.scrape(exchange=exchange, symbol=sym_only, timeframe="1d", allIndicators=True)
             data_ind = flatten_response(raw_ind)
-        except:
+        except Exception as e:
+            print(f"[python] indicators fallback failed for {exchange}:{sym_only}: {e}", file=sys.stderr)
             data_ind = {}
 
         mapped = data_ov.copy() if isinstance(data_ov, dict) else {}
@@ -78,9 +79,7 @@ def get_overview(symbol: str):
             if score is not None:
                 mapped['recommendation_any_score'] = score
                 mapped['recommendation_any'] = get_recommendation_text(score)
-            else:
-                mapped['recommendation_any_score'] = 0
-                mapped['recommendation_any'] = "NEUTRAL"
+            # else: leave both keys absent so the frontend can detect missing data
 
         return {"status": "success", "data": mapped}
     except Exception as e:
@@ -100,6 +99,9 @@ def get_news(exchange: str, symbol: str):
     try:
         raw = news_scraper.scrape_headlines(symbol=symbol, exchange=exchange)
         data = flatten_response(raw)
-        return {"status": "success", "data": data}
+        return {"status": "success", "data": data or []}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        # Return empty list with a message so the frontend degrades gracefully
+        # instead of surfacing an error (common when TV's news endpoint 403s).
+        print(f"[python] news fetch failed for {exchange}:{symbol}: {e}", file=sys.stderr)
+        return {"status": "success", "data": [], "message": str(e)}

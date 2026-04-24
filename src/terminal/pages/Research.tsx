@@ -163,28 +163,37 @@ function ValuationPanel({ tv }: { tv: any }) {
 }
 
 function ConsensusPanel({ tv }: { tv: any }) {
-  const rec = tv?.recommendation_any || 'NEUTRAL';
-  const score = tv?.recommendation_any_score ?? 0; // -1 to 1
-  
+  const hasData = tv?.recommendation_any != null && typeof tv?.recommendation_any_score === 'number';
+  const rec = hasData ? tv.recommendation_any : 'N/A';
+  const score = hasData ? tv.recommendation_any_score : 0; // -1 to 1
+
   const buy = rec.includes('BUY') ? 70 : rec === 'NEUTRAL' ? 20 : 10;
   const hold = rec === 'NEUTRAL' ? 60 : 20;
   const sell = rec.includes('SELL') ? 70 : 10;
   const total = buy + hold + sell;
 
-  const hasData = tv?.recommendation_any != null;
-
   return (
     <Panel title="分析師共識 & 技術指標">
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4">
-        <div className={cn("text-[26px] font-bold tracking-[0.2em]", rec.includes('BUY') ? 'text-sky-400' : rec.includes('SELL') ? 'text-rose-400' : 'text-amber-400')}>
-          {rec.replace('STRONG_', '').replace('_', ' ')}
+        <div className={cn("text-[26px] font-bold tracking-[0.2em]",
+          !hasData ? 'text-zinc-500' :
+          rec.includes('BUY') ? 'text-sky-400' :
+          rec.includes('SELL') ? 'text-rose-400' :
+          'text-amber-400')}>
+          {hasData ? rec.replace('STRONG_', '').replace('_', ' ') : 'N/A'}
         </div>
         <div className="text-right text-[11px]">
           <div className="text-(--color-term-muted)">
-            技術評分: <span className="text-(--color-term-text) tabular-nums">{(score * 100).toFixed(0)}</span>
+            技術評分: <span className="text-(--color-term-text) tabular-nums">{hasData ? (score * 100).toFixed(0) : '---'}</span>
           </div>
           <div className="text-(--color-term-muted)">
-             趨勢方向: <span className={cn("tabular-nums", score >= 0 ? 'text-sky-400' : 'text-rose-400')}>{score >= 0 ? '看多' : '看空'}</span>
+             趨勢方向: <span className={cn("tabular-nums",
+               !hasData ? 'text-zinc-500' :
+               score > 0 ? 'text-sky-400' :
+               score < 0 ? 'text-rose-400' :
+               'text-amber-400')}>
+               {!hasData ? '---' : score > 0 ? '看多' : score < 0 ? '看空' : '中立'}
+             </span>
           </div>
         </div>
       </div>
