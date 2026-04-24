@@ -8,7 +8,7 @@
  * - Click to navigate to TradingCore for deep analysis
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { Filter, Loader2, ArrowUpDown, ChevronDown, X, RefreshCw, Target } from 'lucide-react';
+import { Filter, Loader2, ArrowUpDown, ChevronDown, X, RefreshCw, Target as TargetIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import * as api from '../services/api';
@@ -133,7 +133,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className={cn("font-black tracking-tight", compact ? "text-xl" : "text-2xl")} style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
-            <Target className="inline mr-2" size={compact ? 20 : 24} style={{ color: 'var(--md-primary)' }} />
+            <TargetIcon className="inline mr-2" size={compact ? 20 : 24} style={{ color: 'var(--md-primary)' }} />
             智慧選股器
           </h1>
           <p className="text-xs mt-1" style={{ color: 'var(--md-outline)' }}>XQ-Style Technical Screener — 多條件批量揁描</p>
@@ -280,7 +280,7 @@ export default function StockScreener({ onSelectSymbol }: Props) {
       {!loading && results.length === 0 && !error && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Target className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--md-outline-variant)' }} />
+            <TargetIcon className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--md-outline-variant)' }} />
             <p className="text-sm" style={{ color: 'var(--md-outline)' }}>選擇筛選模板或自訂條件，開始揁描</p>
             <p className="text-xs mt-1" style={{ color: 'var(--md-outline-variant)' }}>預設揁描台股 + 美股 + 加密貨幣共 {DEFAULT_SYMBOLS.length} 殔</p>
           </div>

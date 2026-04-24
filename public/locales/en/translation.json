@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "market": "Markets",
+    "crypto": "Crypto",
+    "portfolio": "Portfolio",
+    "research": "Research",
+    "screener": "Screener",
+    "news": "News",
+    "alerts": "Alerts",
+    "settings": "Settings"
+  },
+  "seo": {
+    "title": "Hermes AI Trading Terminal",
+    "desc": "Professional real-time AI stock analysis and algorithmic trading terminal."
+  },
+  "settings": {
+    "title": "Account Settings",
+    "language": "Language",
+    "apiKey": "OpenRouter API Key",
+    "apiKeyDesc": "Set your custom API key for AI generation."
+  }
+}

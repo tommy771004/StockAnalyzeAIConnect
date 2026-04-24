@@ -1,5 +1,6 @@
 import React from 'react';
-import { Bell, CircleUserRound, Search, BrainCircuit, Menu, Target } from 'lucide-react';
+import { Bell, CircleUserRound, Search, BrainCircuit, Menu, Target, Languages } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { TerminalView } from '../types';
 
@@ -9,13 +10,13 @@ interface Tab {
 }
 
 const tabs: Tab[] = [
-  { id: 'dashboard', label: '儀表板' },
-  { id: 'market',    label: '市場' },
-  { id: 'crypto',    label: '加密' },
-  { id: 'portfolio', label: '持倉' },
-  { id: 'research',  label: '研究' },
-  { id: 'screener',  label: '選股' },
-  { id: 'news',      label: '新聞' },
+  { id: 'dashboard', label: 'dashboard' },
+  { id: 'market',    label: 'market' },
+  { id: 'crypto',    label: 'crypto' },
+  { id: 'portfolio', label: 'portfolio' },
+  { id: 'research',  label: 'research' },
+  { id: 'screener',  label: 'screener' },
+  { id: 'news',      label: 'news' },
 ];
 
 interface TopNavProps {
@@ -33,6 +34,13 @@ export function TopNav({
   onToggleAgent,
   onToggleSidebar,
 }: TopNavProps) {
+  const { t, i18n } = useTranslation();
+
+  const toggleLanguage = () => {
+    const nextLng = i18n.language.startsWith('zh') ? 'en' : 'zh';
+    i18n.changeLanguage(nextLng);
+  };
+
   return (
     <header className="flex h-14 items-center gap-3 border-b border-(--color-term-border) bg-(--color-term-bg) px-3 md:px-5 shrink-0 relative">
       {/* Mobile: Hamburger */}
@@ -76,7 +84,7 @@ export function TopNav({
               {tab.id === 'screener' && (
                 <Target className="inline h-3 w-3 mr-1 -mt-0.5" />
               )}
-              {tab.label}
+              {t(`nav.${tab.id}`)}
               {isActive && (
                 <>
                   <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" />
@@ -109,6 +117,13 @@ export function TopNav({
             }}
           />
         </div>
+
+        {/* Language toggle */}
+        <IconButton onClick={toggleLanguage} title={t('settings.language', 'Language')}>
+          <div className="flex items-center justify-center font-bold text-[10px]">
+            {i18n.language.startsWith('zh') ? 'EN' : '中'}
+          </div>
+        </IconButton>
 
         {/* AI Agent toggle */}
         <IconButton onClick={onToggleAgent} title="AI Agent">

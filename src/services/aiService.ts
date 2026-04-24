@@ -155,15 +155,15 @@ async function callOpenRouter(
       return callOpenRouter(prompt, model, false, _tried);
     }
 
-    // On rate-limit / overload / removed-endpoint / internal error, rotate to next free model
-    if (st === 429 || st === 503 || st === 502 || st === 500 || st === 404 || st === 522) {
+    // On rate-limit / overload / removed-endpoint / internal error / out of credits, rotate to next free model
+    if (st === 429 || st === 503 || st === 502 || st === 500 || st === 404 || st === 522 || st === 402) {
       // Invalidate cache on 404 so stale model list is refreshed
       if (st === 404) _freeModelsCache.ts = 0;
 
       const freeModels = await getOpenRouterFreeModels(apiKey);
       const next = freeModels.find(m => !_tried.has(m));
       if (next) {
-        console.warn(`[aiService] ${model} 限流/不可用 (${st})，自動切換至 ${next}`);
+        console.warn(`[aiService] ${model} 限流/無額度/不可用 (${st})，自動切換至 ${next}`);
         return callOpenRouter(prompt, next, jsonMode, _tried);
       }
       // All known free models exhausted in this request
@@ -653,6 +653,8 @@ export type AgentStreamChunk =
  *     if (chunk.kind === 'ui_component') setComponents(prev => [...prev, chunk.component]);
  *   }});
  */
+import i18n from '../i18n';
+
 export async function streamAgentChat(params: {
   message:     string;
   symbol?:     string;
@@ -660,7 +662,7 @@ export async function streamAgentChat(params: {
   locale?:     string;
   onChunk:     (chunk: AgentStreamChunk) => void;
 }): Promise<void> {
-  const { message, symbol, history = [], locale = 'zh-TW', onChunk } = params;
+  const { message, symbol, history = [], locale = i18n.language || 'zh-TW', onChunk } = params;
 
   const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 

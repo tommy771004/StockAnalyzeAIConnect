@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "dashboard": "儀表板",
+    "market": "市場",
+    "crypto": "加密貨幣",
+    "portfolio": "持倉",
+    "research": "研究",
+    "screener": "選股",
+    "news": "新聞",
+    "alerts": "預警",
+    "settings": "設定"
+  },
+  "seo": {
+    "title": "Hermes AI 量化交易終端",
+    "desc": "專業級即時 AI 股票分析與量化交易終端機。"
+  },
+  "settings": {
+    "title": "帳戶設定",
+    "language": "系統語言",
+    "apiKey": "OpenRouter API 金鑰",
+    "apiKeyDesc": "設定自訂金鑰以使用 AI 生成功能。"
+  }
+}

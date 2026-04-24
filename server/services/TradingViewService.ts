@@ -86,8 +86,13 @@ async function call<T>(path: string, params: Record<string, string | number | un
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
 
+  const headers: Record<string, string> = {};
+  if (isVercel && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  }
+
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url, { signal: ctrl.signal, headers });
     if (!res.ok) throw new Error(`[TV] ${res.status} ${res.statusText} ← ${url}`);
     const body = (await res.json()) as TVResponse<T>;
     if (body.status !== 'success') throw new Error(`[TV] ${body.message ?? 'upstream error'}`);
