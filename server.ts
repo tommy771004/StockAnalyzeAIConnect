@@ -20,9 +20,11 @@ import * as historyRepo from './server/repositories/portfolioHistoryRepo.js';
 import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter } from './server/api/agent.js';
+import { ecpayRouter } from './server/api/ecpay.js';
 import { startAutonomousAgent } from './server/services/autonomousAgent.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
+import { callAISimple } from './server/utils/llmPipeline.js';
 
 // ─── Error helper (Fix #4) ────────────────────────────────────────────────────
 // Centralises: (a) `e instanceof Error` narrowing, (b) no raw DB/stack leaks
@@ -84,80 +86,8 @@ function toTradingViewSymbol(input: string): string {
 /**
  * Calls OpenRouter with automatic fallback to other free models on failure
  */
-async function callAIWithFallback(prompt: string, jsonMode: boolean = false, userId?: string): Promise<string> {
-  let apiKey = '';
-
-  // 1. Try user-provided key from DB first (if userId available)
-  if (userId) {
-    try {
-      const dbKey = await settingsRepo.getSetting<string>(userId, 'OPENROUTER_API_KEY');
-      if (dbKey && dbKey.trim() && !dbKey.includes('sk-or-v1-YOUR_KEY')) {
-        apiKey = dbKey.trim();
-      }
-    } catch (err) {
-      console.warn(`[AI] Failed to load key from settings for user ${userId}`);
-    }
-  }
-
-  // 2. Fallback to system-wide env key
-  if (!apiKey) {
-    apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-    // Ignore placeholder keys
-    if (apiKey.includes('sk-or-v1-YOUR_KEY') || !apiKey) {
-      apiKey = '';
-    }
-  }
-
-  if (!apiKey) throw new Error('AI key missing — please set your OpenRouter API Key in Settings');
-
-  const modelsToTry = await getTopFreeModels(3);
-
-  let lastError: any = null;
-
-  for (const modelId of modelsToTry) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout per attempt
-
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://hermes-ai.trading',
-          'X-Title': 'Hermes AI Trading'
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-          ...(jsonMode && { response_format: { type: 'json_object' } })
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errText = await res.text();
-        console.warn(`[AI] Model ${modelId} failed (${res.status}): ${errText.slice(0, 100)}`);
-        continue; // Try next model
-      }
-
-      const json = await res.json() as any;
-      const content = json?.choices?.[0]?.message?.content;
-      if (content) {
-        console.log(`[AI] Success with model: ${modelId}`);
-        return content;
-      }
-    } catch (err: any) {
-      console.warn(`[AI] Error calling ${modelId}:`, err.message);
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error('All AI models failed to respond');
-}
+// callAIWithFallback removed — replaced by callAISimple from server/utils/llmPipeline.ts
+// (cost-aware-llm-pipeline: model routing, immutable cost tracking, retry, prompt caching)
 
 const UA_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -566,7 +496,7 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
   }
 
   try {
-    const text = await callAIWithFallback(prompt, jsonMode, req.userId);
+    const text = await callAISimple(prompt, jsonMode, req.userId);
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
@@ -613,7 +543,7 @@ ${newsText}
 3. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
-    const resultText = await callAIWithFallback(prompt, false, req.userId);
+    const resultText = await callAISimple(prompt, false, req.userId);
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {
@@ -1122,6 +1052,10 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
 });
 
 app.use('/api/agent', authMiddleware, agentRouter);
+
+// ECPay payment routes — notify endpoint is called by ECPay server (no auth),
+// checkout endpoint requires auth to associate order with user.
+app.use('/api/payment/ecpay', ecpayRouter);
 
 
 app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
