@@ -98,10 +98,17 @@ export const trades = pgTable('trades', {
   createdAt:   timestamp('created_at').defaultNow().notNull(),
 },
 (t) => [
-  // Supabase/Postgres best-practice: index every FK column used in WHERE/ORDER BY
+  // Rule: skills/03_Backend_Security.md §1 "Performance Indexing"
+  // Basic FK index for per-user queries
   index('trades_user_id_idx').on(t.userId),
+  // Composite: time-series range queries (e.g. equity curve in backtest)
   index('trades_user_created_idx').on(t.userId, t.createdAt),
-  index('trades_ticker_idx').on(t.ticker),
+  // Composite: per-symbol backtest scan (userId + ticker + date DESC)
+  index('trades_user_ticker_created_idx').on(t.userId, t.ticker, t.createdAt),
+  // Composite: paper vs real trade filtering (userId + mode + date)
+  index('trades_user_mode_created_idx').on(t.userId, t.mode, t.createdAt),
+  // Covering index for win-rate & P&L aggregations (ticker + status)
+  index('trades_ticker_status_idx').on(t.ticker, t.status),
 ]);
 
 export const tradesRelations = relations(trades, ({ one }) => ({

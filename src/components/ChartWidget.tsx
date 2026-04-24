@@ -2,20 +2,27 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createChart, IChartApi, ISeriesApi, ColorType, Time, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries } from 'lightweight-charts';
 import { useSettings } from '../contexts/SettingsContext';
 import { HistoricalData } from '../types';
-import { safeCn } from '../utils/helpers';
+import { cn as safeCn } from '../lib/utils';
 import { Loader2, Settings2, BarChart3, TrendingUp, Activity, Plus, Maximize2, Layers } from 'lucide-react';
 import { calcSMA, calcRSI, calcMACD } from '../lib/indicators';
+import type { TickData } from '../workers/socket.worker';
 
-interface Props { 
+interface Props {
   symbol?: string;
-  data?: HistoricalData[]; 
+  data?: HistoricalData[];
+  /**
+   * When true, ChartWidget creates a socket.worker.ts Worker and subscribes to
+   * live TICK_UPDATE messages.  Ticks update the chart directly via series.update()
+   * on mainSeriesRef — no React state is touched (Rule: Frontend Performance §2).
+   */
+  liveMode?: boolean;
   focusMode?: boolean;
   onTimeframeChange?: (timeframe: string) => void;
 }
 
 type ChartType = 'candle' | 'line' | 'area';
 
-const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], focusMode = false, onTimeframeChange }) => {
+const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, onTimeframeChange }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
@@ -25,6 +32,8 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], focusMode = 
   const indicRef = useRef<{rsi: number[], macd: any[]}>({rsi: [], macd: []});
   const logicalRangeRef = useRef<any>(null);
   const prevChartTypeRef = useRef<ChartType | null>(null);
+  // Worker ref — never triggers re-render; lives in the background thread
+  const workerRef = useRef<Worker | null>(null);
   
   const { settings } = useSettings();
   const [chartType, setChartType] = useState<ChartType>('candle');
@@ -70,6 +79,45 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], focusMode = 
     isInitializedRef.current = false;
     logicalRangeRef.current = null;
   }, [symbol]);
+
+  /**
+   * Live-mode Worker integration (Rule: Frontend Performance §2 "Golden Rule")
+   * - Worker is created once and subscribes to the current symbol.
+   * - Incoming TICK_UPDATE messages call series.update() directly via useRef.
+   * - No useState / Zustand — zero re-renders on tick.
+   */
+  useEffect(() => {
+    if (!liveMode) return;
+
+    const wsUrl = (import.meta.env.VITE_WS_URL as string | undefined) ?? `ws://${location.host}/ws`;
+    const worker = new Worker(new URL('../workers/socket.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+
+    worker.postMessage({ type: 'CONNECT', wsUrl });
+    worker.postMessage({ type: 'SUBSCRIBE', symbol });
+
+    worker.addEventListener('message', (event: MessageEvent) => {
+      const msg = event.data as { type: string; symbol: string; data: TickData };
+      if (msg.type !== 'TICK_UPDATE' || msg.symbol !== symbol) return;
+      if (!mainSeriesRef.current) return;
+
+      const tick = msg.data;
+      mainSeriesRef.current.update({
+        time: Math.floor(tick.timestamp / 1000) as Time,
+        open:  tick.price,
+        high:  tick.price,
+        low:   tick.price,
+        close: tick.price,
+      });
+    });
+
+    return () => {
+      worker.postMessage({ type: 'UNSUBSCRIBE', symbol });
+      worker.postMessage({ type: 'DISCONNECT' });
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, [liveMode, symbol]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
