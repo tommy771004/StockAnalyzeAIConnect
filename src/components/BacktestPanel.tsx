@@ -95,7 +95,9 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
              <Activity size={16} />
              <span className="text-xs font-black tracking-widest uppercase">DYNAMIC AGENT</span>
            </div>
-           <button type="button"> {isRunning ? 'GENERATING...' : 'GENERATE & RUN'}
+           <button type="button" onClick={handleDynamicRun} disabled={isRunning || !history?.length}
+             className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition">
+             {isRunning ? 'GENERATING...' : 'GENERATE & RUN'}
            </button>
          </div>
          {/* Agent UI specific input for dynamic strategy */}
@@ -153,7 +155,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
              <div className="grid grid-cols-2 gap-2 mt-auto relative">
                 {/* Code overlay button */}
                 {generatedCode && (
-                  <button type="button" onClick={(e) => {}}
+                  <button type="button" onClick={() => { console.log('[BacktestPanel] Generated strategy code:\n', generatedCode); }}
                      className="absolute -top-6 right-0 text-[10px] text-zinc-400 hover:text-indigo-400 flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded"
                      title="View Code in DevTools Console"
                   >

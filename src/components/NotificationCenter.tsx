@@ -74,7 +74,8 @@ export default function NotificationCenter({ open, onClose }: { open: boolean, o
     <div className="fixed top-16 right-2 sm:right-4 z-50 p-4 glass-card shadow-2xl w-[calc(100vw-1rem)] sm:w-80 max-h-[70vh] overflow-auto">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-sm font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>通知中心</h3>
-        <button type="button">
+        <button type="button" onClick={onClose} aria-label="關閉通知中心"
+          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/5 text-[var(--md-outline)] hover:text-[var(--md-on-surface)] transition">
           <X size={16} />
         </button>
       </div>

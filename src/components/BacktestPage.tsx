@@ -867,7 +867,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
           {/* Strategy preview cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-5xl px-6">
             {STRATEGIES.map((s, idx)=>(
-              <button key={`strat-btn-${idx}`} type="button" onClick={(e) => {}}
+              <button key={`strat-btn-${idx}`} type="button" onClick={() => setStrategy(s.id)}
                   className="p-6 rounded-[2rem] text-left transition hover:scale-[1.03] active:scale-95 relative overflow-hidden"
                 style={strategy===s.id
                   ? { background: 'rgba(128,131,255,0.12)', border: `1px solid ${s.color}40` }

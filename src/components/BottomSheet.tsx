@@ -111,7 +111,8 @@ const BottomSheetInner: React.FC<Props> = ({
             {title && (
               <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.08]">
                 <h2 className="text-sm font-bold text-white">{title}</h2>
-                <button type="button">
+                <button type="button" onClick={onClose} aria-label="關閉"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/5 transition">
                   <X size={16} />
                 </button>
               </div>

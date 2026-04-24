@@ -115,7 +115,13 @@ export default function LiveTradingConsole() {
         )}
       </AnimatePresence>
 
-      <button type="button"> {status === 'executing' ? <Loader2 size={16} className="animate-spin"/> : <Send size={compact ? 14 : 16} />}
+      <button type="button" onClick={handleSubmit} disabled={status === 'executing'}
+        className={cn("flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-widest border transition disabled:opacity-50 disabled:cursor-not-allowed",
+          compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm",
+          side === 'BUY'
+            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+            : 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25')}>
+        {status === 'executing' ? <Loader2 size={16} className="animate-spin"/> : <Send size={compact ? 14 : 16} />}
         {status === 'executing' ? '執行中…' : side === 'BUY' ? '執行買入' : '執行賣出'}
       </button>
 
@@ -141,8 +147,11 @@ export default function LiveTradingConsole() {
               </div>
               <p className="text-xs text-rose-300 mb-5 font-bold">此操作將使用真實資金，確認後無法撤銷。</p>
               <div className="flex gap-3">
-                <button type="button" onClick={(e) => {}} className="flex-1 bg-zinc-900 text-zinc-400 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-black text-xs uppercase tracking-widest border border-zinc-800">取消</button>
-                <button type="button">確認執行</button>
+                <button type="button" onClick={() => setShowConfirm(false)} className="flex-1 bg-zinc-900 text-zinc-400 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-black text-xs uppercase tracking-widest border border-zinc-800">取消</button>
+                <button type="button" onClick={executeTrade}
+                  className="flex-1 bg-rose-500/15 text-rose-300 py-2.5 rounded-xl hover:bg-rose-500/25 transition-colors font-black text-xs uppercase tracking-widest border border-rose-500/30">
+                  確認執行
+                </button>
               </div>
             </motion.div>
           </motion.div>
