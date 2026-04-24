@@ -63,40 +63,42 @@ interface HouseDisclosureEntry {
 }
 
 async function fetchHouseDisclosureRecent(ticker?: string): Promise<CongressTrade[]> {
-  // House Clerk periodic data (updated weekly)
-  // We use a lightweight JSON proxy maintained by unitedstates.io community
-  const url = 'https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json';
+  // Use Kadoa Congress Trading Monitor (Free & Updated Daily)
+  const url = 'https://raw.githubusercontent.com/kadoa-org/congress-trading-monitor/main/public/data/trades.json';
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) throw new Error(`House Disclosure fetch failed: ${res.status}`);
+  const res = await fetch(url, { 
+    headers: { 'User-Agent': 'StockAnalyzeAI/1.0' },
+    signal: AbortSignal.timeout(25_000) 
+  });
+  if (!res.ok) throw new Error(`Congress Data fetch failed: ${res.status}`);
 
   const raw = await res.json() as Array<{
-    representative:     string;
+    filer_name:         string;
     transaction_date:   string;
-    disclosure_date:    string;
-    ticker:             string;
-    asset_description:  string;
-    type:               string;
-    amount:             string;
-    comment?:           string;
-    party?:             string;
-    state?:             string;
+    filing_date:        string;
+    ticker:             string | null;
+    transaction_type:   string;
+    amount_range_label: string;
+    comment?:           string | null;
+    party?:             string | null;
+    state?:             string | null;
+    chamber?:           string | null;
   }>;
 
   return raw
     .filter(r => !ticker || r.ticker?.toUpperCase() === ticker.toUpperCase())
     .slice(0, 200)
     .map(r => ({
-      politician:   r.representative,
+      politician:   r.filer_name,
       party:        (r.party?.startsWith('D') ? 'D' : r.party?.startsWith('R') ? 'R' : 'I') as CongressTrade['party'],
-      chamber:      'House' as const,
+      chamber:      (r.chamber?.toLowerCase() === 'senate' ? 'Senate' : 'House') as CongressTrade['chamber'],
       ticker:       r.ticker?.toUpperCase() ?? '---',
       tradeDate:    r.transaction_date ?? '',
-      reportedDate: r.disclosure_date  ?? '',
-      action:       (r.type?.includes('Sale') ? 'Sell' : r.type?.includes('Purchase') ? 'Buy' : 'Exchange') as CongressTrade['action'],
-      amount:       r.amount   ?? '',
-      comment:      r.comment  ?? '',
-      state:        r.state    ?? '',
+      reportedDate: r.filing_date       ?? '',
+      action:       (r.transaction_type?.includes('Sale') ? 'Sell' : r.transaction_type?.includes('Purchase') ? 'Buy' : 'Exchange') as CongressTrade['action'],
+      amount:       r.amount_range_label ?? '',
+      comment:      r.comment ?? '',
+      state:        r.state   ?? '',
     }))
     .sort((a, b) => b.tradeDate.localeCompare(a.tradeDate));
 }
