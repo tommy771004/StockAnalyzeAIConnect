@@ -1,12 +1,18 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/python/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/server.ts"
+  "version": 2,
+  "framework": null,
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "functions": {
+    "server.ts": {
+      "runtime": "@vercel/node",
+      "memory": 1024,
+      "maxDuration": 60
     }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/server.ts" },
+    { "source": "/:path*",     "destination": "/index.html" }
   ]
 }
