@@ -888,10 +888,40 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     TV.getNewsHeadlines(tvSymbol),
     NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: String(Date.now() - 90 * 24 * 3600 * 1000) })
   ]);
+
+  const quoteVal: any = quote.status === 'fulfilled' ? quote.value : null;
+  const yahooQuote: any = Array.isArray(quoteVal) ? quoteVal[0] : quoteVal;
+  const tvOverviewVal: any = tvOverview.status === 'fulfilled'
+    ? (tvOverview.value as any)?.data || tvOverview.value
+    : null;
+
+  // Yahoo-derived baseline so the Valuation panel still populates when the TV
+  // scraper has no coverage (common for TWSE/TPEX symbols). TV values take
+  // precedence where present.
+  const yahooBaseline = yahooQuote ? {
+    market_cap_calc: yahooQuote.marketCap,
+    pe_ratio: yahooQuote.trailingPE,
+    eps_ttm: yahooQuote.epsTrailingTwelveMonths,
+    prev_close: yahooQuote.regularMarketPreviousClose,
+    close: yahooQuote.regularMarketPrice,
+    description: yahooQuote.longName ?? yahooQuote.shortName,
+    exchange: yahooQuote.fullExchangeName,
+  } : {};
+
+  const mergedOverview = (() => {
+    const out: Record<string, any> = { ...yahooBaseline };
+    if (tvOverviewVal && typeof tvOverviewVal === 'object') {
+      for (const [k, v] of Object.entries(tvOverviewVal)) {
+        if (v !== null && v !== undefined && v !== '') out[k] = v;
+      }
+    }
+    return Object.keys(out).length ? out : null;
+  })();
+
   res.json({
     symbol: { input, canonical, yahoo: yahooSymbol },
-    quote: quote.status === 'fulfilled' ? quote.value : null,
-    tvOverview: tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null,
+    quote: quoteVal,
+    tvOverview: mergedOverview,
     tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
     tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
     history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
