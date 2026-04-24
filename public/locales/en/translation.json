@@ -8,7 +8,8 @@
     "screener": "Screener",
     "news": "News",
     "alerts": "Alerts",
-    "settings": "Settings"
+    "settings": "Settings",
+    "login": "Login"
   },
   "seo": {
     "title": "Hermes AI Trading Terminal",
@@ -19,5 +20,127 @@
     "language": "Language",
     "apiKey": "OpenRouter API Key",
     "apiKeyDesc": "Set your custom API key for AI generation."
+  },
+  "footer": {
+    "status": "System Status",
+    "statusOk": "Operational",
+    "statusError": "Degraded",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "support": "Contact Support"
+  },
+  "market": {
+    "title": "Market Overview",
+    "watchlist": "Watchlist",
+    "editList": "Edit List",
+    "addSymbol": "Add Symbol",
+    "removeSymbol": "Remove",
+    "confirmRemove": "Confirm Remove",
+    "cancel": "Cancel",
+    "indices": "Major Indices",
+    "sectors": "Sector Performance",
+    "noData": "No data available",
+    "loading": "Loading..."
+  },
+  "ticker": {
+    "manage": "Manage Ticker",
+    "add": "Add Symbol",
+    "placeholder": "Enter symbol (e.g. AAPL, 2330.TW)",
+    "saved": "Saved",
+    "reset": "Reset to Default"
+  },
+  "screener": {
+    "title": "Smart Screener",
+    "runScan": "Run Scan",
+    "scanning": "Scanning...",
+    "filters": "Filters",
+    "hideFilters": "Hide Filters",
+    "showFilters": "Custom Filters",
+    "customSymbols": "Custom Symbols",
+    "clearFilters": "Clear Filters",
+    "runCustom": "Run Custom Scan",
+    "results": "matched",
+    "scanned": "scanned",
+    "loadMore": "Load More",
+    "empty": "Select a template or expand custom filters to begin scanning"
+  },
+  "research": {
+    "title": "Research",
+    "search": "Search symbol",
+    "aiSummary": "AI Analysis",
+    "generating": "Generating...",
+    "noData": "No data available",
+    "overview": "Overview",
+    "indicators": "Indicators",
+    "news": "News"
+  },
+  "portfolio": {
+    "title": "Portfolio",
+    "addPosition": "Add Position",
+    "deleteConfirm": "Confirm delete this position?",
+    "symbol": "Symbol",
+    "shares": "Shares",
+    "cost": "Avg Cost",
+    "price": "Price",
+    "value": "Value",
+    "pnl": "P/L",
+    "noPositions": "No positions yet",
+    "noTrades": "No trade history",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "refresh": "Refresh Prices",
+    "totalEquity": "Total Equity",
+    "allocationTitle": "Asset Allocation",
+    "tradeLog": "Trade Log"
+  },
+  "alerts": {
+    "title": "Price Alerts",
+    "add": "Add Alert",
+    "symbol": "Symbol",
+    "condition": "Condition",
+    "target": "Target Price",
+    "above": "Price Above",
+    "below": "Price Below",
+    "submit": "Activate Alert",
+    "triggered": "Triggered",
+    "watching": "Watching",
+    "active": "Active Alerts",
+    "delete": "Delete",
+    "noAlerts": "No alerts configured"
+  },
+  "news": {
+    "title": "Market News",
+    "loading": "Loading news...",
+    "noNews": "No news available",
+    "readMore": "Read More",
+    "bookmark": "Bookmark",
+    "share": "Share"
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "loginTitle": "Sign In to Terminal",
+    "loginSubtitle": "Enter your credentials to continue",
+    "loggingIn": "Signing in...",
+    "loginError": "Invalid email or password"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "search": "Search",
+    "refresh": "Refresh",
+    "noData": "No data"
   }
 }

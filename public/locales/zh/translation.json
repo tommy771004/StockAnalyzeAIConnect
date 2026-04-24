@@ -8,7 +8,8 @@
     "screener": "選股",
     "news": "新聞",
     "alerts": "預警",
-    "settings": "設定"
+    "settings": "設定",
+    "login": "登入"
   },
   "seo": {
     "title": "Hermes AI 量化交易終端",
@@ -19,5 +20,127 @@
     "language": "系統語言",
     "apiKey": "OpenRouter API 金鑰",
     "apiKeyDesc": "設定自訂金鑰以使用 AI 生成功能。"
+  },
+  "footer": {
+    "status": "系統狀態",
+    "statusOk": "正常",
+    "statusError": "異常",
+    "terms": "服務條款",
+    "privacy": "隱私政策",
+    "support": "聯絡支援"
+  },
+  "market": {
+    "title": "市場總覽",
+    "watchlist": "自選清單",
+    "editList": "編輯清單",
+    "addSymbol": "新增代碼",
+    "removeSymbol": "移除",
+    "confirmRemove": "確認移除",
+    "cancel": "取消",
+    "indices": "主要指數",
+    "sectors": "類股表現",
+    "noData": "暫無資料",
+    "loading": "載入中..."
+  },
+  "ticker": {
+    "manage": "管理跑馬燈",
+    "add": "新增標的",
+    "placeholder": "輸入代號 (如 AAPL, 2330.TW)",
+    "saved": "已儲存",
+    "reset": "恢復預設"
+  },
+  "screener": {
+    "title": "智慧選股器",
+    "runScan": "開始掃描",
+    "scanning": "掃描中...",
+    "filters": "篩選條件",
+    "hideFilters": "隱藏條件",
+    "showFilters": "展開條件",
+    "customSymbols": "自訂代碼",
+    "clearFilters": "清除條件",
+    "runCustom": "執行自訂掃描",
+    "results": "符合條件",
+    "scanned": "掃描標的",
+    "loadMore": "載入更多",
+    "empty": "請選擇篩選模板或展開自訂條件"
+  },
+  "research": {
+    "title": "標的研究",
+    "search": "搜尋標的",
+    "aiSummary": "AI 摘要分析",
+    "generating": "生成中...",
+    "noData": "暫無數據",
+    "overview": "概覽",
+    "indicators": "技術指標",
+    "news": "相關新聞"
+  },
+  "portfolio": {
+    "title": "持倉管理",
+    "addPosition": "新增持倉",
+    "deleteConfirm": "確定刪除此持倉？",
+    "symbol": "代號",
+    "shares": "股數",
+    "cost": "成本",
+    "price": "現價",
+    "value": "市值",
+    "pnl": "損益",
+    "noPositions": "目前無持倉",
+    "noTrades": "尚無交易紀錄",
+    "confirm": "確認",
+    "cancel": "取消",
+    "refresh": "刷新現價",
+    "totalEquity": "總權益",
+    "allocationTitle": "資產分配",
+    "tradeLog": "交易紀錄"
+  },
+  "alerts": {
+    "title": "預警通知",
+    "add": "新增預警",
+    "symbol": "代號",
+    "condition": "條件",
+    "target": "目標價",
+    "above": "高於",
+    "below": "低於",
+    "submit": "啟動預警",
+    "triggered": "已觸發",
+    "watching": "追蹤中",
+    "active": "進行中的預警",
+    "delete": "刪除",
+    "noAlerts": "目前沒有設定任何預警"
+  },
+  "news": {
+    "title": "市場新聞",
+    "loading": "新聞載入中...",
+    "noNews": "暫無相關新聞",
+    "readMore": "閱讀全文",
+    "bookmark": "收藏",
+    "share": "分享"
+  },
+  "auth": {
+    "login": "登入",
+    "logout": "登出",
+    "register": "註冊",
+    "email": "電子郵件",
+    "password": "密碼",
+    "name": "名稱",
+    "loginTitle": "登入終端機",
+    "loginSubtitle": "請輸入您的帳號與密碼",
+    "loggingIn": "登入中...",
+    "loginError": "帳號或密碼錯誤"
+  },
+  "common": {
+    "loading": "載入中...",
+    "error": "發生錯誤",
+    "retry": "重試",
+    "save": "儲存",
+    "cancel": "取消",
+    "confirm": "確認",
+    "delete": "刪除",
+    "edit": "編輯",
+    "add": "新增",
+    "close": "關閉",
+    "search": "搜尋",
+    "refresh": "重新整理",
+    "noData": "暫無資料"
   }
 }

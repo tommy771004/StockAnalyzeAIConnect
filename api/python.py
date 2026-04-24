@@ -4,15 +4,16 @@ import sys
 from typing import Any, Dict, Optional, Tuple
 
 # ── Compatibility shim ────────────────────────────────────────────────────────
-# tradingview-scraper relies on pkg_resources (from setuptools < 82).
-# Vercel's Python 3.12 runtime does NOT include setuptools by default.
-# We eagerly import it here so any missing-dependency error surfaces with a
-# clear message instead of a cryptic mid-request failure.
+# tradingview-scraper relies on pkg_resources (setuptools < 82).
+# Suppress the PkgResourcesDeprecationWarning to keep Vercel logs clean.
+import warnings as _warnings
 try:
-    import pkg_resources  # noqa: F401
+    with _warnings.catch_warnings():
+        _warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
+        _warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
+        import pkg_resources  # noqa: F401
 except ModuleNotFoundError:
-    # Last-ditch attempt: inject a minimal stub so the rest of the code
-    # can at least start up and return a structured error response.
+    # Last-ditch stub so the app starts and returns a structured error
     import types as _types
     pkg_resources = _types.ModuleType("pkg_resources")  # type: ignore[assignment]
     sys.modules["pkg_resources"] = pkg_resources
@@ -32,6 +33,8 @@ def _load_scrapers() -> ScraperBundle:
     """
     Lazy-load tradingview-scraper at request time so import failures
     do not crash the whole Vercel function during cold start.
+    All UserWarnings (pkg_resources deprecation, etc.) are suppressed here
+    so Vercel logs stay clean.
     """
     global _scrapers, _scraper_init_error
 
@@ -39,11 +42,14 @@ def _load_scrapers() -> ScraperBundle:
         return _scrapers
 
     try:
-        from tradingview_scraper.symbols.overview import Overview
-        from tradingview_scraper.symbols.technicals import Indicators
-        from tradingview_scraper.symbols.news import NewsScraper
-        from tradingview_scraper.symbols.ideas import Ideas
-        from tradingview_scraper.symbols.cal import CalendarScraper
+        with _warnings.catch_warnings():
+            _warnings.filterwarnings("ignore", category=UserWarning)
+            _warnings.filterwarnings("ignore", category=DeprecationWarning)
+            from tradingview_scraper.symbols.overview import Overview
+            from tradingview_scraper.symbols.technicals import Indicators
+            from tradingview_scraper.symbols.news import NewsScraper
+            from tradingview_scraper.symbols.ideas import Ideas
+            from tradingview_scraper.symbols.cal import CalendarScraper
 
         _scrapers = (
             Overview(),
