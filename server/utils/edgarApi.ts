@@ -71,23 +71,20 @@ let tickerMap: Record<string, { cik_str: string; title: string }> | null = null;
 
 async function getTickerMap(): Promise<Record<string, { cik_str: string; title: string }>> {
   if (tickerMap) return tickerMap;
-  const data = await edgarGet<Record<string, { cik_str: string; title: string }>>(
-    `${EDGAR_BASE}/files/company_tickers.json`,
+  
+  // SEC ticker map is hosted on www.sec.gov, not data.sec.gov
+  const data = await edgarGet<any>(
+    'https://www.sec.gov/files/company_tickers.json',
   );
-  // Reindex by ticker (uppercase)
-  const byTicker: typeof tickerMap = {};
-  for (const item of Object.values(data)) {
-    // item has { cik_str, title } and key is serial number; we need to reverse
-    // Actually the format is { "0": { cik_str, title }, "1": {...} }
-    // We need to also get the ticker field
-    // The actual format has a 'ticker' field too
-  }
-  // The actual company_tickers.json format:
-  // { "0": { "cik_str": "320193", "ticker": "AAPL", "title": "Apple Inc." }, ... }
-  const raw = data as unknown as Record<string, { cik_str: string; ticker: string; title: string }>;
+
   const result: Record<string, { cik_str: string; title: string }> = {};
-  for (const item of Object.values(raw)) {
-    result[item.ticker.toUpperCase()] = { cik_str: item.cik_str, title: item.title };
+  for (const item of Object.values(data) as any[]) {
+    if (item.ticker) {
+      result[item.ticker.toUpperCase()] = { 
+        cik_str: String(item.cik_str), 
+        title: item.title 
+      };
+    }
   }
   tickerMap = result;
   return result;

@@ -65,7 +65,7 @@ interface HouseDisclosureEntry {
 async function fetchHouseDisclosureRecent(ticker?: string): Promise<CongressTrade[]> {
   // House Clerk periodic data (updated weekly)
   // We use a lightweight JSON proxy maintained by unitedstates.io community
-  const url = 'https://house-stock-watcher-data.s3-us-gov-west-1.amazonaws.com/data/all_transactions.json';
+  const url = 'https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json';
 
   const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`House Disclosure fetch failed: ${res.status}`);
