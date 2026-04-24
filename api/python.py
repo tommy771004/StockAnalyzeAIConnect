@@ -3,6 +3,20 @@ from __future__ import annotations
 import sys
 from typing import Any, Dict, Optional, Tuple
 
+# ── Compatibility shim ────────────────────────────────────────────────────────
+# tradingview-scraper relies on pkg_resources (from setuptools < 82).
+# Vercel's Python 3.12 runtime does NOT include setuptools by default.
+# We eagerly import it here so any missing-dependency error surfaces with a
+# clear message instead of a cryptic mid-request failure.
+try:
+    import pkg_resources  # noqa: F401
+except ModuleNotFoundError:
+    # Last-ditch attempt: inject a minimal stub so the rest of the code
+    # can at least start up and return a structured error response.
+    import types as _types
+    pkg_resources = _types.ModuleType("pkg_resources")  # type: ignore[assignment]
+    sys.modules["pkg_resources"] = pkg_resources
+
 from fastapi import FastAPI
 
 # Vercel infrastructure handle
