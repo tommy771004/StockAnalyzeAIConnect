@@ -73,9 +73,13 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma5SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma20SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma60SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const dataRef = useRef<any[]>([]);
-  const indicRef = useRef<{rsi: number[], macd: any[]}>({rsi: [], macd: []});
+  const indicRef = useRef<{rsi: number[], macd: any[], sma5: (number|null)[], sma20: (number|null)[], sma60: (number|null)[]}>({
+    rsi: [], macd: [], sma5: [], sma20: [], sma60: []
+  });
   const logicalRangeRef = useRef<any>(null);
   const prevChartTypeRef = useRef<ChartType | null>(null);
   // Worker ref — never triggers re-render; lives in the background thread
@@ -83,7 +87,9 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   
   const { settings } = useSettings();
   const [chartType, setChartType] = useState<ChartType>('candle');
-  const [showSMA, setShowSMA] = useState(true);
+  const [showSMA5, setShowSMA5] = useState(false);
+  const [showSMA20, setShowSMA20] = useState(true);
+  const [showSMA60, setShowSMA60] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
   
   const [hoverData, setHoverData] = useState<any>(null);
@@ -116,7 +122,10 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
     const closes = processedData.map(d => d.close);
     indicRef.current = {
       rsi: calcRSI(closes, 14),
-      macd: calcMACD(closes)
+      macd: calcMACD(closes),
+      sma5: calcSMA(closes, 5),
+      sma20: calcSMA(closes, 20),
+      sma60: calcSMA(closes, 60),
     };
   }, [processedData]);
 
@@ -289,14 +298,25 @@ tickMarkFormatter: (time: number) => {
     });
     volumeSeriesRef.current = volumeSeries;
 
-    // Add SMA
-    const smaSeries = chart.addSeries(LineSeries, {
-      color: '#f59e0b',
+    // Add SMAs
+    sma5SeriesRef.current = chart.addSeries(LineSeries, {
+      color: '#3b82f6', // Blue
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
-    smaSeriesRef.current = smaSeries;
+    sma20SeriesRef.current = chart.addSeries(LineSeries, {
+      color: '#f59e0b', // Amber/Yellow
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    sma60SeriesRef.current = chart.addSeries(LineSeries, {
+      color: '#a855f7', // Purple
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
 
     // Preserve logical range when chart is recreated
     // Crosshair move handler
@@ -313,11 +333,13 @@ tickMarkFormatter: (time: number) => {
         const timeVal = param.time;
         
         // Safety check for series availability
-        if (!mainSeriesRef.current || !volumeSeriesRef.current || !smaSeriesRef.current) return;
+        if (!mainSeriesRef.current || !volumeSeriesRef.current) return;
 
         const mainData = param.seriesData.get(mainSeriesRef.current!) as any;
         const volData = param.seriesData.get(volumeSeriesRef.current!) as any;
-        const smaVal = param.seriesData.get(smaSeriesRef.current!) as any;
+        const sma5Val = param.seriesData.get(sma5SeriesRef.current!) as any;
+        const sma20Val = param.seriesData.get(sma20SeriesRef.current!) as any;
+        const sma60Val = param.seriesData.get(sma60SeriesRef.current!) as any;
 
         // Use ref-based data to avoid stale closures
         const localData = dataRef.current;
@@ -346,7 +368,9 @@ tickMarkFormatter: (time: number) => {
           low: mainData?.low ?? currentItem?.low ?? 0,
           close: mainData?.close ?? mainData?.value ?? currentItem?.close ?? 0,
           volume: volData?.value ?? currentItem?.value ?? 0,
-          sma: smaVal?.value ?? null,
+          sma5: sma5Val?.value ?? null,
+          sma20: sma20Val?.value ?? null,
+          sma60: sma60Val?.value ?? null,
           rsi: localIndic.rsi?.[dataIndex] ?? null,
           macd: localIndic.macd?.[dataIndex]?.histogram ?? null,
         });
@@ -465,17 +489,26 @@ tickMarkFormatter: (time: number) => {
         volumeSeriesRef.current.setData([]);
       }
 
-      // SMA (20)
-      if (showSMA && smaSeriesRef.current) {
-        const closes = uniqueData.map(d => d.close);
-        const smaValues = calcSMA(closes, 20);
-        const smaData = uniqueData
-          .map((d, i) => ({ time: d.time, value: smaValues[i] }))
-          .filter(v => v.value !== null) as { time: Time, value: number }[];
-        smaSeriesRef.current.setData(smaData);
-      } else if (smaSeriesRef.current) {
-        smaSeriesRef.current.setData([]);
-      }
+      // SMAs
+      const closes = uniqueData.map(d => d.close);
+      
+      const updateSMA = (ref: React.MutableRefObject<ISeriesApi<"Line"> | null>, show: boolean, period: number) => {
+        if (ref.current) {
+          if (show) {
+            const smaValues = calcSMA(closes, period);
+            const smaData = uniqueData
+              .map((d, i) => ({ time: d.time, value: smaValues[i] }))
+              .filter(v => v.value !== null) as { time: Time, value: number }[];
+            ref.current.setData(smaData);
+          } else {
+            ref.current.setData([]);
+          }
+        }
+      };
+
+      updateSMA(sma5SeriesRef, showSMA5, 5);
+      updateSMA(sma20SeriesRef, showSMA20, 20);
+      updateSMA(sma60SeriesRef, showSMA60, 60);
 
       // 3. Handle viewport
       if (!isInitializedRef.current) {
@@ -493,7 +526,7 @@ tickMarkFormatter: (time: number) => {
     } catch (err) {
       console.warn("Failed to update chart series or data", err);
     }
-  }, [processedData, chartType, showSMA, showVolume, isDark, symbol]);
+  }, [processedData, chartType, showSMA5, showSMA20, showSMA60, showVolume, isDark, symbol]);
 
   return (
     <div className={safeCn(
@@ -524,17 +557,39 @@ tickMarkFormatter: (time: number) => {
           <div className="h-4 w-px bg-zinc-300/30 dark:bg-zinc-700/30 mx-2" />
 
           {/* Indicators */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button 
-              onClick={() => setShowSMA(!showSMA)}
+              onClick={() => setShowSMA5(!showSMA5)}
               className={safeCn(
-                "px-3 py-1.5 text-xs font-bold rounded-md transition-all border shrink-0",
-                showSMA 
-                  ? "bg-amber-500/20 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]" 
+                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
+                showSMA5 
+                  ? "bg-blue-500/20 border-blue-500/40 text-blue-500" 
                   : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
               )}
             >
-              SMA(20)
+              MA5
+            </button>
+            <button 
+              onClick={() => setShowSMA20(!showSMA20)}
+              className={safeCn(
+                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
+                showSMA20 
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-500" 
+                  : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+              )}
+            >
+              MA20
+            </button>
+            <button 
+              onClick={() => setShowSMA60(!showSMA60)}
+              className={safeCn(
+                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
+                showSMA60 
+                  ? "bg-purple-500/20 border-purple-500/40 text-purple-500" 
+                  : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+              )}
+            >
+              MA60
             </button>
             <button 
               onClick={() => setShowVolume(!showVolume)}
@@ -630,10 +685,22 @@ tickMarkFormatter: (time: number) => {
                <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('chart.volBase', '成交量')}:</span>
                <span className="text-[11px] font-mono font-bold text-zinc-300">{(Number(hoverData.volume ?? 0) / 1000).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}K</span>
              </div>
-             {hoverData.sma !== undefined && hoverData.sma !== null && (
+             {hoverData.sma5 !== null && (
                <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-amber-500 font-bold uppercase">SMA:</span>
-                 <span className="text-[11px] font-mono font-bold text-amber-400">{Number(hoverData.sma).toFixed(2)}</span>
+                 <span className="text-[10px] text-blue-500 font-bold uppercase">MA5:</span>
+                 <span className="text-[11px] font-mono font-bold text-blue-400">{Number(hoverData.sma5).toFixed(2)}</span>
+               </div>
+             )}
+             {hoverData.sma20 !== null && (
+               <div className="flex justify-between items-center">
+                 <span className="text-[10px] text-amber-500 font-bold uppercase">MA20:</span>
+                 <span className="text-[11px] font-mono font-bold text-amber-400">{Number(hoverData.sma20).toFixed(2)}</span>
+               </div>
+             )}
+             {hoverData.sma60 !== null && (
+               <div className="flex justify-between items-center">
+                 <span className="text-[10px] text-purple-500 font-bold uppercase">MA60:</span>
+                 <span className="text-[11px] font-mono font-bold text-purple-400">{Number(hoverData.sma60).toFixed(2)}</span>
                </div>
              )}
              {hoverData.rsi !== undefined && hoverData.rsi !== null && (

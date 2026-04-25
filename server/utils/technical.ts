@@ -20,16 +20,20 @@ export interface OHLCV {
 }
 
 export interface TechnicalResult {
+  sma5:        (number | null)[];
   sma20:       (number | null)[];
   sma50:       (number | null)[];
+  sma60:       (number | null)[];
   macdLine:    (number | null)[];
   macdSignal:  (number | null)[];
   macdHist:    (number | null)[];
   rsi14:       (number | null)[];
   /** 最新各指標值（最後一根K棒） */
   latest: {
+    sma5:       number | null;
     sma20:      number | null;
     sma50:      number | null;
+    sma60:      number | null;
     macdLine:   number | null;
     macdSignal: number | null;
     macdHist:   number | null;
@@ -101,8 +105,10 @@ function rsiWilder(data: number[], period: number = 14): (number | null)[] {
 export function calcIndicators(candles: OHLCV[]): TechnicalResult {
   const closes = candles.map(c => c.close);
 
+  const sma5      = sma(closes, 5);
   const sma20     = sma(closes, 20);
   const sma50     = sma(closes, 50);
+  const sma60     = sma(closes, 60);
   const ema12     = ema(closes, 12);
   const ema26     = ema(closes, 26);
   const macdLine  = ema12.map((v, i) =>
@@ -120,8 +126,10 @@ export function calcIndicators(candles: OHLCV[]): TechnicalResult {
 
   const last = closes.length - 1;
   const latest = {
+    sma5:       sma5[last],
     sma20:      sma20[last],
     sma50:      sma50[last],
+    sma60:      sma60[last],
     macdLine:   macdLine[last],
     macdSignal: macdSignal[last],
     macdHist:   macdHist[last],
@@ -130,7 +138,19 @@ export function calcIndicators(candles: OHLCV[]): TechnicalResult {
 
   const { recommendation, score } = generateRecommendation(closes[last], latest);
 
-  return { sma20, sma50, macdLine, macdSignal, macdHist, rsi14, latest, recommendation, score };
+  return {
+    sma5,
+    sma20,
+    sma50,
+    sma60,
+    macdLine,
+    macdSignal,
+    macdHist,
+    rsi14,
+    latest,
+    recommendation,
+    score,
+  };
 }
 
 // ── 綜合建議邏輯 ──────────────────────────────────────────────────────────────

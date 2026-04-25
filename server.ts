@@ -74,11 +74,9 @@ try {
   console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
 }
 
-// --- OpenRouter Model Management ---
-// Shared implementation lives in server/utils/modelSelector.ts so /api/ai
-// and /api/agent/chat pick the same dynamic free model.
 import { getBestFreeModel, getTopFreeModels } from './server/utils/modelSelector.js';
 export { getBestFreeModel };
+import * as News from './server/services/NewsService.js';
 
 /**
  * Converts various symbol formats to TradingView canonical format
@@ -902,10 +900,44 @@ app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   catch (e) { handleApiError(res, e); }
 });
 
-app.get('/api/news/feed', authMiddleware, async (_req, res) => {
+app.get('/api/news/feed', authMiddleware, async (req, res) => {
+  const category = (req.query.category as string) || '焦點';
   try {
-    const data = await NativeYahooApi.search('Market');
-    res.json(data.news || []);
+    if (category === 'Market' || category === '國際') {
+      const data = await NativeYahooApi.search(category === 'Market' ? 'Market' : 'International Finance');
+      return res.json(data.news || []);
+    }
+    
+    // Use WantGoo for Taiwan/Industry news
+    const news = await News.getWantGooNews(category);
+    res.json(news);
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.post('/api/ai/news-analyze', authMiddleware, async (req: AuthRequest, res) => {
+  const { title, content, articleId } = req.body;
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+
+  try {
+    let fullContent = content || '';
+    
+    // If no content but we have an articleId, try to fetch it
+    if (!fullContent && articleId && /^\d+$/.test(articleId)) {
+      fullContent = await News.getNewsContent(articleId);
+    }
+
+    const prompt = `你是一位專業的金融分析師。請針對以下新聞提供深入的 AI 摘要與市場影響分析。
+新聞標題：${title}
+新聞內容：${fullContent || '（僅提供標題）'}
+
+請提供：
+1. 重點摘要（3點以內）
+2. 市場影響分析（對相關產業或大盤的潛在影響）
+3. 投資者觀察重點
+請以繁體中文回答，維持專業、簡潔的風格。`;
+
+    const resultText = await callAISimple(prompt, false, req.userId, 'free');
+    res.json({ text: resultText });
   } catch (e) { handleApiError(res, e); }
 });
 

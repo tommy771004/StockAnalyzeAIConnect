@@ -406,7 +406,16 @@ export const openExternal  = (url: string): void => {
 export const getPortfolioHistory = (): Promise<any[]> => fetchJ<any[]>('/api/portfolio/history');
 
 /** 獲取全域市場新聞情報流 */
-export const getNewsFeed = (): Promise<any[]> => fetchJ<any[]>('/api/news/feed');
+export const getNewsFeed = (category?: string): Promise<any[]> => 
+  fetchJ<any[]>(`/api/news/feed${category ? `?category=${encodeURIComponent(category)}` : ''}`);
+
+/** AI 新聞分析 */
+export const analyzeNews = (data: { title: string; content?: string; articleId?: string }): Promise<{ text: string }> =>
+  fetchJ<{ text: string }>('/api/ai/news-analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
 
 // ── AutoTrading ──────────────────────────────────────────────────────────────
 export const getAutotradingStatus = () => fetchJ<any>('/api/autotrading/status');

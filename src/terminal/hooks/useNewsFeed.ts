@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as api from '../../services/api';
 
-export function useNewsFeed(symbol?: string) {
+export function useNewsFeed(symbol?: string, category: string = '焦點') {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -9,10 +9,10 @@ export function useNewsFeed(symbol?: string) {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        // 若無代號，則獲取全域市場新聞 (Market Feed)
+        // 若有代號，獲取標的新聞；若無，則按分類獲取市場新聞
         const feed = symbol 
           ? (await api.getInsights(symbol)).tvNews 
-          : await api.getNewsFeed();
+          : await api.getNewsFeed(category);
         setNews(feed || []);
       } catch (err) {
         console.error('News fetch error:', err);
@@ -21,7 +21,7 @@ export function useNewsFeed(symbol?: string) {
       }
     };
     fetchNews();
-  }, [symbol]);
+  }, [symbol, category]);
 
   return { news, loading };
 }
