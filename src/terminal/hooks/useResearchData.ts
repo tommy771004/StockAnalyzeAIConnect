@@ -13,7 +13,10 @@ export function useResearchData(symbol: string, timeframe: string = '1d') {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await api.getInsights(symbol, timeframe);
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('資料載入逾時，請重新整理')), 30000)
+        );
+        const res = await Promise.race([api.getInsights(symbol, timeframe), timeout]);
         if (isMounted) {
           setData(res);
           setError(null);

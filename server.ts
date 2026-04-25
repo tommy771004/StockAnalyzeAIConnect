@@ -191,7 +191,8 @@ class NativeYahooApi {
         headers: {
           'User-Agent': UA_CHROME,
           'Cookie': this.cookie
-        }
+        },
+        signal: AbortSignal.timeout(10000),
       });
 
       if (res2.ok) {
