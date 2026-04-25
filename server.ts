@@ -1242,85 +1242,89 @@ async function resolveQueryToYahooSymbol(query: string): Promise<string> {
 
 app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const rawInput = req.params.symbol as string;
-  let yahooSymbol = await resolveQueryToYahooSymbol(rawInput);
-  
-  // Re-parse to get canonical for TradingView, since Yahoo Symbol is resolved
-  const tvSymbol = toTradingViewSymbol(yahooSymbol);
+  try {
+    let yahooSymbol = await resolveQueryToYahooSymbol(rawInput);
+    
+    // Re-parse to get canonical for TradingView, since Yahoo Symbol is resolved
+    const tvSymbol = toTradingViewSymbol(yahooSymbol);
 
-  console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
+    console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
 
-  const requestedTimeframe = (req.query.timeframe as string) || '1M';
-  
-  let interval: '1m' | '5m' | '15m' | '1h' | '1d' = '1h';
-  let periodDays = 30;
-  switch (requestedTimeframe) {
-    case '1D': interval = '1m'; periodDays = 1; break;
-    case '5D': interval = '5m'; periodDays = 5; break;
-    case '1W': interval = '15m'; periodDays = 7; break;
-    case '1M': interval = '1h'; periodDays = 30; break;
-    case '6M': interval = '1d'; periodDays = 180; break;
-    case '1Y': interval = '1d'; periodDays = 365; break;
-    case 'YTD': interval = '1d'; periodDays = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); break;
-    default: interval = '1d'; periodDays = 90;
-  }
-  const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
-
-  const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
-    NativeYahooApi.quote(yahooSymbol as string),
-    TV.getOverview(tvSymbol),
-    TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d'), // keeping TV indicators behavior safely
-    TV.getNewsHeadlines(tvSymbol),
-    NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }),
-    NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']),
-  ]);
-
-  const quoteVal: any = quote.status === 'fulfilled' ? quote.value : null;
-  const yahooQuote: any = Array.isArray(quoteVal) ? quoteVal[0] : quoteVal;
-  const tvOverviewVal: any = tvOverview.status === 'fulfilled'
-    ? (tvOverview.value as any)?.data || tvOverview.value
-    : null;
-
-  // Yahoo majorHoldersBreakdown.institutionsPercentHeld is a 0-1 fraction.
-  // Convert to percent to match the frontend's toFixed(1) + '%' rendering.
-  const holdersVal: any = holdersSummary.status === 'fulfilled' ? holdersSummary.value : null;
-  const instRaw = holdersVal?.majorHoldersBreakdown?.institutionsPercentHeld;
-  const instFraction = typeof instRaw === 'number'
-    ? instRaw
-    : typeof instRaw?.raw === 'number' ? instRaw.raw : undefined;
-  const institutionalPct = typeof instFraction === 'number' ? instFraction * 100 : undefined;
-
-  // Yahoo-derived baseline so the Valuation panel still populates when the TV
-  // scraper has no coverage (common for TWSE/TPEX symbols). TV values take
-  // precedence where present.
-  const yahooBaseline: Record<string, any> = yahooQuote ? {
-    market_cap_calc: yahooQuote.marketCap,
-    pe_ratio: yahooQuote.trailingPE,
-    eps_ttm: yahooQuote.epsTrailingTwelveMonths,
-    prev_close: yahooQuote.regularMarketPreviousClose,
-    close: yahooQuote.regularMarketPrice,
-    description: yahooQuote.longName ?? yahooQuote.shortName,
-    exchange: yahooQuote.fullExchangeName,
-  } : {};
-  if (institutionalPct !== undefined) yahooBaseline.institutional_holders_pct = institutionalPct;
-
-  const mergedOverview = (() => {
-    const out: Record<string, any> = { ...yahooBaseline };
-    if (tvOverviewVal && typeof tvOverviewVal === 'object') {
-      for (const [k, v] of Object.entries(tvOverviewVal)) {
-        if (v !== null && v !== undefined && v !== '') out[k] = v;
-      }
+    const requestedTimeframe = (req.query.timeframe as string) || '1M';
+    
+    let interval: '1m' | '5m' | '15m' | '1h' | '1d' = '1h';
+    let periodDays = 30;
+    switch (requestedTimeframe) {
+      case '1D': interval = '1m'; periodDays = 1; break;
+      case '5D': interval = '5m'; periodDays = 5; break;
+      case '1W': interval = '15m'; periodDays = 7; break;
+      case '1M': interval = '1h'; periodDays = 30; break;
+      case '6M': interval = '1d'; periodDays = 180; break;
+      case '1Y': interval = '1d'; periodDays = 365; break;
+      case 'YTD': interval = '1d'; periodDays = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); break;
+      default: interval = '1d'; periodDays = 90;
     }
-    return Object.keys(out).length ? out : null;
-  })();
+    const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
 
-  res.json({
-    symbol: { input, canonical, yahoo: yahooSymbol },
-    quote: quoteVal,
-    tvOverview: mergedOverview,
-    tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
-    tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
-    history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
-  });
+    const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
+      NativeYahooApi.quote(yahooSymbol as string),
+      TV.getOverview(tvSymbol),
+      TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d'), // keeping TV indicators behavior safely
+      TV.getNewsHeadlines(tvSymbol),
+      NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }),
+      NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']),
+    ]);
+
+    const quoteVal: any = quote.status === 'fulfilled' ? quote.value : null;
+    const yahooQuote: any = Array.isArray(quoteVal) ? quoteVal[0] : quoteVal;
+    const tvOverviewVal: any = tvOverview.status === 'fulfilled'
+      ? (tvOverview.value as any)?.data || tvOverview.value
+      : null;
+
+    // Yahoo majorHoldersBreakdown.institutionsPercentHeld is a 0-1 fraction.
+    // Convert to percent to match the frontend's toFixed(1) + '%' rendering.
+    const holdersVal: any = holdersSummary.status === 'fulfilled' ? holdersSummary.value : null;
+    const instRaw = holdersVal?.majorHoldersBreakdown?.institutionsPercentHeld;
+    const instFraction = typeof instRaw === 'number'
+      ? instRaw
+      : typeof instRaw?.raw === 'number' ? instRaw.raw : undefined;
+    const institutionalPct = typeof instFraction === 'number' ? instFraction * 100 : undefined;
+
+    // Yahoo-derived baseline so the Valuation panel still populates when the TV
+    // scraper has no coverage (common for TWSE/TPEX symbols). TV values take
+    // precedence where present.
+    const yahooBaseline: Record<string, any> = yahooQuote ? {
+      market_cap_calc: yahooQuote.marketCap,
+      pe_ratio: yahooQuote.trailingPE,
+      eps_ttm: yahooQuote.epsTrailingTwelveMonths,
+      prev_close: yahooQuote.regularMarketPreviousClose,
+      close: yahooQuote.regularMarketPrice,
+      description: yahooQuote.longName ?? yahooQuote.shortName,
+      exchange: yahooQuote.fullExchangeName,
+    } : {};
+    if (institutionalPct !== undefined) yahooBaseline.institutional_holders_pct = institutionalPct;
+
+    const mergedOverview = (() => {
+      const out: Record<string, any> = { ...yahooBaseline };
+      if (tvOverviewVal && typeof tvOverviewVal === 'object') {
+        for (const [k, v] of Object.entries(tvOverviewVal)) {
+          if (v !== null && v !== undefined && v !== '') out[k] = v;
+        }
+      }
+      return Object.keys(out).length ? out : null;
+    })();
+
+    res.json({
+      symbol: { input: rawInput, canonical: parseSymbol(tvSymbol), yahoo: yahooSymbol },
+      quote: quoteVal,
+      tvOverview: mergedOverview,
+      tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
+      tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
+      history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
 });
 
 app.get('/api/tv/overview/:symbol', authMiddleware, async (req: AuthRequest, res) => {
