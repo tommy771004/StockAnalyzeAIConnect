@@ -59,19 +59,51 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   const { settings, format } = useSettings();
   const compact = settings.compactMode;
 
-  const [results, setResults] = useState<ScreenerResult[]>([]);
+  // PERSISTENCE: Use localStorage to keep state between navigations
+  const [results, setResults] = useState<ScreenerResult[]>(() => {
+    try {
+      const saved = localStorage.getItem('screener_results');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
-  const [customFilters, setCustomFilters] = useState<ScreenerFilters>({});
+
+  const [customFilters, setCustomFilters] = useState<ScreenerFilters>(() => {
+    try {
+      const saved = localStorage.getItem('screener_filters');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
   const [showFilters, setShowFilters] = useState(false);
-  const [customSymbols, setCustomSymbols] = useState('');
-  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [customSymbols, setCustomSymbols] = useState(() => localStorage.getItem('screener_symbols') || '');
+  const [selectedSectors, setSelectedSectors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('screener_sectors');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Save state to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('screener_results', JSON.stringify(results));
+    localStorage.setItem('screener_filters', JSON.stringify(customFilters));
+    localStorage.setItem('screener_symbols', customSymbols);
+    localStorage.setItem('screener_sectors', JSON.stringify(selectedSectors));
+  }, [results, customFilters, customSymbols, selectedSectors]);
+
   const [sortKey, setSortKey] = useState<SortKey>('changePct');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [scannedCount, setScannedCount] = useState(0);
+  const [scannedCount, setScannedCount] = useState(() => Number(localStorage.getItem('screener_scanned_count')) || 0);
   const [visibleCount, setVisibleCount] = useState(50);
-  const [viewMode, setViewMode] = useState<'list' | 'chart'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'chart'>(() => (localStorage.getItem('screener_view') as any) || 'list');
+
+  React.useEffect(() => {
+    localStorage.setItem('screener_view', viewMode);
+    localStorage.setItem('screener_scanned_count', scannedCount.toString());
+  }, [viewMode, scannedCount]);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const runScan = useCallback(async (filters?: ScreenerFilters) => {
@@ -101,6 +133,9 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
       } else {
         // User selected a sector or typed something that returned no results
         syms = [];
+        if (selectedSectors.length > 0) {
+          setError(t('screener.noSymbolsInSector', '所選類別目前查無資料，請稍後再試或換個類別'));
+        }
       }
 
       if (syms.length === 0 && (selectedSectors.length > 0 || customSymbols.trim() !== '')) {

@@ -135,7 +135,7 @@ function ArticleReader({ item, t }: { item: any; t: any }) {
         </h1>
         <div className="mb-6 rounded-md border border-(--color-term-border) p-4 bg-(--color-term-surface)/40">
             <div className="mb-2 text-[10px] tracking-widest text-(--color-term-muted)">{t('news.aiSummary', 'AI 摘要與分析')}</div>
-            <p className="text-[13.5px] leading-relaxed text-(--color-term-text)/90 italic">
+            <p className="text-sm leading-relaxed text-(--color-term-text)/90 font-sans tracking-wide">
                {t('news.summaryText', '這是一篇關於市場動態的即時報導，發佈於 {{time}}。點擊上方「原始來源」即可查看完整深度報導。', { time: new Date(item.published * 1000).toLocaleString() })}
             </p>
         </div>

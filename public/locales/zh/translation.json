@@ -125,6 +125,8 @@
     "customSymbolsPlaceholder": "自訂代碼 (留空使用預設清單)",
     "runCustomScan": "執行自訂掃描",
     "clearFiltersBtn": "清除條件",
+    "noSymbolsInSector": "所選類別目前查無資料，請稍後再試或換個類別",
+    "scanFailed": "掃描執行失敗",
     "scannedInfoSimple": "掃描 {{scanned}} 檔標的 → 符合條件 {{matched}} 檔",
     "emptyDesc1": "請選擇左上方篩選模板或展開自訂條件，開始掃描",
     "emptyDesc2": "預設掃描台股 + 美股 + 加密貨幣共 {{count}} 檔",

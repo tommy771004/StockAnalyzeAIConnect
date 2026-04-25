@@ -99,7 +99,7 @@ export function AlphaReport() {
             </button>
           </div>
           <div className="p-8">
-            <div className="text-[14px] leading-relaxed text-white/90 font-serif whitespace-pre-wrap first-letter:text-3xl first-letter:font-bold first-letter:mr-1 first-letter:float-left">
+            <div className="text-[14px] leading-relaxed text-white/90 font-sans whitespace-pre-wrap tracking-wide first-letter:text-3xl first-letter:font-bold first-letter:mr-1 first-letter:float-left">
               {report.aiCommentary}
             </div>
           </div>

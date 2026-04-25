@@ -434,7 +434,7 @@ function AISummaryPanel({ summary, loading, persona, modelName }: { summary: str
             <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">正在以 {PERSONA_LABEL[persona] ?? persona} 分析...</span>
           </div>
         ) : (
-          <p className="text-[13px] leading-relaxed text-zinc-200 italic whitespace-pre-wrap">
+          <p className="text-sm leading-relaxed text-zinc-100 font-sans whitespace-pre-wrap tracking-wide">
             {summary}
           </p>
         )}
