@@ -13,6 +13,7 @@ import type {
   IBrokerAdapter, BrokerConfig, AccountBalance, Order,
   OrderResult, Position, OrderStatus, MarketType,
 } from './BrokerAdapter.js';
+import * as TWSeService from '../TWSeService.js';
 
 const COMMISSION_RATE = 0.001425; // 手續費 0.1425%
 const TRANSACTION_TAX_STOCK = 0.003; // 股票交易稅 0.3%（賣出時）
@@ -44,9 +45,13 @@ export class SimulatedAdapter implements IBrokerAdapter {
   }
 
   async getBalance(): Promise<AccountBalance> {
-    const positionsValue = Array.from(this._positions.values()).reduce((sum, p) => {
-      return sum + (p.qty * p.avgCost); // 使用成本價估算
-    }, 0);
+    let positionsValue = 0;
+    const positionsList = Array.from(this._positions.values());
+    
+    for (const p of positionsList) {
+      const currentPrice = await this._getSimulatedMarketPrice(p.symbol);
+      positionsValue += (p.qty * currentPrice);
+    }
 
     return {
       totalAssets: this._balance + positionsValue,
@@ -66,7 +71,7 @@ export class SimulatedAdapter implements IBrokerAdapter {
     const orderId = `SIM-${Date.now()}-${this._orderCounter}`;
 
     // 模擬即時成交（MARKET order）
-    const fillPrice = order.price ?? this._getSimulatedMarketPrice(order.symbol);
+    const fillPrice = order.price && order.price > 0 ? order.price : await this._getSimulatedMarketPrice(order.symbol);
     if (!fillPrice || fillPrice <= 0) {
       return { orderId, status: 'REJECTED', filledQty: 0, filledPrice: 0, timestamp: Date.now(), message: '無法取得報價' };
     }
@@ -90,11 +95,23 @@ export class SimulatedAdapter implements IBrokerAdapter {
     }
 
     // 執行成交
-    this._balance -= order.side === 'BUY' ? totalCost : 0;
-    if (order.side === 'SELL') this._balance += (orderValue - commission - tax);
+    if (order.side === 'BUY') {
+      this._balance -= totalCost;
+    } else {
+      this._balance += (orderValue - commission - tax);
+    }
+
+    const posBefore = this._positions.get(order.symbol);
+    const avgCostBefore = posBefore?.avgCost ?? fillPrice;
 
     this._updatePosition(order.symbol, order.side, order.qty, fillPrice, order.marketType ?? 'TW_STOCK');
-    this._dailyPnl += order.side === 'SELL' ? (fillPrice - (this._positions.get(order.symbol)?.avgCost ?? fillPrice)) * order.qty - commission - tax : -commission;
+    
+    if (order.side === 'SELL') {
+      const realizedPnL = (fillPrice - avgCostBefore) * order.qty - commission - tax;
+      this._dailyPnl += realizedPnL;
+    } else {
+      this._dailyPnl -= commission; // 買入只扣手續費作為當日損益影響
+    }
 
     return {
       orderId,
@@ -110,24 +127,34 @@ export class SimulatedAdapter implements IBrokerAdapter {
   }
 
   async getPositions(): Promise<Position[]> {
-    return Array.from(this._positions.values()).map(p => ({
-      symbol: p.symbol,
-      qty: p.qty,
-      avgCost: p.avgCost,
-      currentPrice: this._getSimulatedMarketPrice(p.symbol),
-      unrealizedPnl: (this._getSimulatedMarketPrice(p.symbol) - p.avgCost) * p.qty,
-      marketType: p.marketType,
+    const positionsList = Array.from(this._positions.values());
+    const results = await Promise.all(positionsList.map(async p => {
+      const currentPrice = await this._getSimulatedMarketPrice(p.symbol);
+      return {
+        symbol: p.symbol,
+        qty: p.qty,
+        avgCost: p.avgCost,
+        currentPrice,
+        unrealizedPnl: (currentPrice - p.avgCost) * p.qty,
+        marketType: p.marketType,
+      };
     }));
+    return results;
   }
 
   async getOpenOrders() { return []; }
 
-  /** 從上次已知價格取模擬報價（生產環境應由 TWSE/Yahoo 補充） */
-  private _getSimulatedMarketPrice(symbol: string): number {
-    // 使用持倉平均成本作為當前模擬報價
+  /** 從 TWSE 服務獲取真實報價 */
+  private async _getSimulatedMarketPrice(symbol: string): Promise<number> {
+    try {
+      const quote = await TWSeService.realtimeQuote(symbol);
+      if (quote && quote.price > 0) return quote.price;
+    } catch (e) {
+      console.warn(`[SimAdapter] Failed to fetch price for ${symbol}, falling back to last cost.`);
+    }
+
     const pos = this._positions.get(symbol);
-    if (pos) return pos.avgCost * (1 + (Math.random() - 0.5) * 0.02);
-    // 預設台股約 100 TWD
+    if (pos) return pos.avgCost;
     return 100;
   }
 

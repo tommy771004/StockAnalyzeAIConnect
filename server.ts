@@ -25,13 +25,21 @@ import { researchRouter } from './server/api/research.js';
 import {
   startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
   getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
-  setWsBroadcast,
+  setWsBroadcast, getLossStreakCount, resetCircuitBreaker,
 } from './server/services/autonomousAgent.js';
 import { riskManager } from './server/services/RiskManager.js';
 import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
 import { callAISimple } from './server/utils/llmPipeline.js';
+import { runAdvancedBacktest } from './server/services/backtestEngine.js';
+import { processCommanderCommand } from './server/services/commanderService.js';
+import { runOptimizationScan } from './server/services/optimizerService.js';
+import { generateWeeklyReport } from './server/services/reportService.js';
+
+
+
+
 
 // ─── Error helper (Fix #4) ────────────────────────────────────────────────────
 // Centralises: (a) `e instanceof Error` narrowing, (b) no raw DB/stack leaks
@@ -56,7 +64,8 @@ try {
   dbAvailable = true;
   // Only start these in non-vercel environments
   if (!process.env.VERCEL) {
-    startAutonomousAgent();
+    // 修正：異步啟動自動交易引擎並恢復配置 (P1)
+    startAutonomousAgent().catch(e => console.error('[AutoAgent] 啟動失敗:', e));
   }
 } catch (e) {
   console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
@@ -517,12 +526,21 @@ app.get('/api/autotrading/status', authMiddleware, (_req, res) => {
   res.json({
     status: getAgentStatus(),
     config: getAgentConfig(),
-    riskStats: riskManager.getStats(),
+    riskStats: {
+      ...riskManager.getStats(),
+      lossStreakCount: getLossStreakCount()
+    },
   });
+});
+
+app.post('/api/autotrading/status/reset', authMiddleware, (_req, res) => {
+  const result = resetCircuitBreaker();
+  res.json(result);
 });
 
 app.post('/api/autotrading/start', authMiddleware, (req: AuthRequest, res) => {
   const cfg = req.body ?? {};
+  if (req.userId) cfg.userId = req.userId; // 注入使用者 ID 以利持久化 (P1)
   const result = startAgent(cfg);
   res.json(result);
 });
@@ -542,6 +560,7 @@ app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
 });
 
 app.put('/api/autotrading/config', authMiddleware, (req: AuthRequest, res) => {
+  if (req.userId) req.body.userId = req.userId; // 注入使用者 ID (P1)
   updateAgentConfig(req.body);
   res.json({ ok: true, config: getAgentConfig() });
 });
@@ -592,6 +611,70 @@ app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequ
   const result = await simulatedAdapter.connect({ brokerId: 'simulated', mode: mode ?? 'simulated' });
   res.json(result);
 });
+
+app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, res) => {
+  const { symbol, period, config } = req.body;
+  try {
+    // 修正: NativeYahooApi 返回的格式是 { quotes: [...] }
+    const historyData = await NativeYahooApi.chart(symbol, { 
+      period1: Math.floor(Date.now() / 1000) - (period || 180) * 86400,
+      interval: '1d' 
+    });
+    
+    // 直接使用 quotes 陣列，並確保格式正確
+    const quotes = historyData.quotes.map((q: any) => ({
+      date: q.date instanceof Date ? q.date.toISOString() : q.date,
+      close: q.close
+    })).filter((q: any) => q.close != null);
+
+    const result = await runAdvancedBacktest(symbol, quotes, config);
+
+    res.json({ ok: true, data: result });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+
+app.post('/api/autotrading/command', authMiddleware, async (req: AuthRequest, res) => {
+  const { command } = req.body;
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const result = await processCommanderCommand(req.userId, command);
+  res.json(result);
+});
+
+app.post('/api/autotrading/optimize', authMiddleware, async (req: AuthRequest, res) => {
+  const { symbol, period } = req.body;
+  try {
+    const historyData = await NativeYahooApi.chart(symbol, { 
+      period1: Math.floor(Date.now() / 1000) - (period || 60) * 86400,
+      interval: '1d' 
+    });
+    const quotes = historyData.quotes.map((q: any) => ({
+      date: q.date,
+      close: q.close
+    })).filter((q: any) => q.close != null);
+
+    const proposal = await runOptimizationScan(symbol, quotes);
+    res.json({ ok: true, proposal });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/report', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const report = await generateWeeklyReport(req.userId);
+    res.json({ ok: true, report });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+
+
+
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString(), vercel: !!(process.env.VERCEL || process.env.VERCEL_ENV), node: process.version, db: dbAvailable });

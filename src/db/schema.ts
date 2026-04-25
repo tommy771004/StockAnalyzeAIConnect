@@ -234,6 +234,39 @@ export const paymentOrdersRelations = relations(paymentOrders, ({ one }) => ({
   user: one(users, { fields: [paymentOrders.userId], references: [users.id] }),
 }));
 
+// ─── autotrading_configs ──────────────────────────────────────────────────────
+export const autotradingConfigs = pgTable('autotrading_configs', {
+  id:              serial('id').primaryKey(),
+  userId:          uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  mode:            text('mode').notNull(),
+  strategies:      text('strategies').array().notNull(),
+  params:          jsonb('params').notNull(),
+  symbols:         text('symbols').array().notNull(),
+  tickIntervalMs:  bigint('tick_interval_ms', { mode: 'number' }).notNull(),
+  budgetLimitTwd:  numeric('budget_limit_twd').notNull(),
+  maxDailyLossTwd: numeric('max_daily_loss_twd').notNull(),
+  status:          text('status').notNull().default('stopped'),
+  lossStreakCount: bigint('loss_streak_count', { mode: 'number' }).notNull().default(0),
+  posTrack:        jsonb('pos_track'),
+  updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const autotradingConfigsRelations = relations(autotradingConfigs, ({ one }) => ({
+  user: one(users, { fields: [autotradingConfigs.userId], references: [users.id] }),
+}));
+
+// ─── autotrading_logs ─────────────────────────────────────────────────────────
+export const autotradingLogs = pgTable('autotrading_logs', {
+  id:         text('id').primaryKey(),
+  timestamp:  timestamp('timestamp').notNull(),
+  level:      text('level').notNull(),
+  source:     text('source').notNull(),
+  message:    text('message').notNull(),
+  symbol:     text('symbol'),
+  confidence: bigint('confidence', { mode: 'number' }),
+  action:     text('action'),
+});
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -255,3 +288,7 @@ export type PortfolioHistory = typeof portfolioHistory.$inferSelect;
 export type NewPortfolioHistory = typeof portfolioHistory.$inferInsert;
 export type PaymentOrder = typeof paymentOrders.$inferSelect;
 export type NewPaymentOrder = typeof paymentOrders.$inferInsert;
+export type AutotradingConfig = typeof autotradingConfigs.$inferSelect;
+export type NewAutotradingConfig = typeof autotradingConfigs.$inferInsert;
+export type AutotradingLog = typeof autotradingLogs.$inferSelect;
+export type NewAutotradingLog = typeof autotradingLogs.$inferInsert;

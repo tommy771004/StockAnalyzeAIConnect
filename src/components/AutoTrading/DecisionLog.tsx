@@ -47,7 +47,8 @@ export function DecisionLog({ logs, autoScroll = true }: Props) {
           </div>
         ) : (
           logs.map(log => (
-            <div key={log.id} className="flex gap-2 leading-relaxed hover:bg-white/3 px-1 rounded">
+            <React.Fragment key={log.id}>
+              <div className="flex gap-2 leading-relaxed hover:bg-white/3 px-1 rounded">
               <span className="text-(--color-term-muted) shrink-0">[{formatTs(log.timestamp)}]</span>
               <span className={cn('font-bold shrink-0', LOG_LEVEL_COLORS[log.level])}>
                 [{log.level}]
@@ -67,7 +68,17 @@ export function DecisionLog({ logs, autoScroll = true }: Props) {
                 </span>
               )}
             </div>
-          ))
+            {log.reasoning && log.reasoning.length > 0 && (
+              <div className="ml-8 mb-2 space-y-0.5 border-l border-white/5 pl-3">
+                {log.reasoning.map((reason, idx) => (
+                  <div key={idx} className="text-[9px] text-white/40 flex items-start gap-1.5">
+                    <span className="text-violet-400/50 mt-1">▹</span>
+                    <span>{reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </React.Fragment>
         )}
         <div ref={endRef} />
       </div>

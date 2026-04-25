@@ -1,0 +1,149 @@
+/**
+ * src/components/AutoTrading/StrategySandbox.tsx
+ * 策略沙盒實驗室：管理影子策略與進行 A/B 測試
+ */
+import React, { useState } from 'react';
+import { FlaskConical, Copy, ArrowUpCircle, Trash2, Zap, Sliders, ChevronRight } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import type { AgentConfig, StrategyParams } from './types';
+
+interface Props {
+  config: AgentConfig;
+  onUpdateShadow: (name: string, patch: Partial<AgentConfig>) => void;
+  onPromote: (params: StrategyParams) => void;
+  onDelete: (name: string) => void;
+}
+
+export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }: Props) {
+  const [editingName, setEditingName] = useState<string | null>(null);
+
+  const cloneCurrent = () => {
+    const name = `Sandbox_${Math.floor(Math.random() * 1000)}`;
+    onUpdateShadow(name, { params: JSON.parse(JSON.stringify(config.params)), symbols: config.symbols });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-sm">
+        <div className="flex items-center gap-3">
+          <FlaskConical className="h-5 w-5 text-cyan-400 animate-pulse" />
+          <div>
+            <div className="text-[11px] font-bold text-white uppercase tracking-widest">Strategy Sandbox Lab</div>
+            <div className="text-[9px] text-cyan-400/70">進行 A/B 測試，在不冒險的情況下優化參數</div>
+          </div>
+        </div>
+        <button
+          onClick={cloneCurrent}
+          className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded text-[10px] font-bold flex items-center gap-2 transition-all"
+        >
+          <Copy className="h-3.5 w-3.5" /> CLONE CURRENT TO LAB
+        </button>
+      </div>
+
+      {/* Sandbox List */}
+      <div className="grid grid-cols-1 gap-3">
+        {Object.entries(config.shadowConfigs || {}).map(([name, shadow]) => (
+          <div key={name} className="bg-black/40 border border-white/5 rounded-sm p-4 hover:border-cyan-500/30 transition-colors group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-[12px] font-mono font-bold text-white uppercase">{name}</span>
+                <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40">SHADOW MODE</span>
+              </div>
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                   onClick={() => onPromote(shadow.params!)}
+                   className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded" title="升級為正式策略"
+                >
+                  <ArrowUpCircle className="h-4 w-4" />
+                </button>
+                <button 
+                   onClick={() => onDelete(name)}
+                   className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded" title="刪除實驗"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Params Preview/Editor */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <div className="text-[8px] text-white/30 uppercase">RSI Period</div>
+                <div className="text-[12px] font-mono text-cyan-300">{shadow.params?.RSI_REVERSION?.period || '--'}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[8px] text-white/30 uppercase">Stop Loss</div>
+                <div className="text-[12px] font-mono text-rose-300">{shadow.params?.stopLossPct}%</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[8px] text-white/30 uppercase">Take Profit</div>
+                <div className="text-[12px] font-mono text-emerald-300">{shadow.params?.takeProfitPct}%</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[8px] text-white/30 uppercase">AI Threshold</div>
+                <div className="text-[12px] font-mono text-violet-300">{shadow.params?.AI_LLM?.confidenceThreshold}%</div>
+              </div>
+            </div>
+
+            {/* Status & Quick Actions */}
+            <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-4">
+              {editingName === name && (
+                <div className="grid grid-cols-2 gap-4 bg-white/2 p-3 rounded border border-white/5 animate-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] text-white/30 uppercase">RSI Period</label>
+                    <input 
+                      type="number" 
+                      value={shadow.params?.RSI_REVERSION?.period ?? 14} 
+                      onChange={(e) => onUpdateShadow(name, { 
+                        params: { 
+                          ...shadow.params, 
+                          RSI_REVERSION: { ...shadow.params?.RSI_REVERSION, period: Number(e.target.value) } 
+                        } 
+                      })}
+                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] text-white/30 uppercase">Stop Loss (%)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      value={shadow.params?.stopLossPct ?? 5} 
+                      onChange={(e) => onUpdateShadow(name, { params: { ...shadow.params, stopLossPct: Number(e.target.value) } })}
+                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                     <Zap className="h-3 w-3 text-cyan-400" />
+                     <span className="text-[10px] text-white/60">正在並行觀察中...</span>
+                  </div>
+                </div>
+                <button 
+                  className="text-[10px] text-cyan-400 flex items-center gap-1 hover:underline"
+                  onClick={() => setEditingName(editingName === name ? null : name)}
+                >
+                  <Sliders className="h-3 w-3" /> {editingName === name ? 'CLOSE LAB SETTINGS' : 'MODIFY LAB PARAMS'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {(!config.shadowConfigs || Object.keys(config.shadowConfigs).length === 0) && (
+          <div className="h-[150px] border border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center opacity-30">
+             <FlaskConical className="h-6 w-6 mb-2" />
+             <div className="text-[10px] uppercase tracking-widest">Lab is Empty</div>
+             <div className="text-[8px] mt-1 text-center max-w-[200px]">點擊上方按鈕克隆目前的策略到實驗室，開始進行 A/B 測試。</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

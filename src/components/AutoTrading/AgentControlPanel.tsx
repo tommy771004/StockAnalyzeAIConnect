@@ -1,175 +1,158 @@
 /**
  * src/components/AutoTrading/AgentControlPanel.tsx
- * 主控制面板 — 啟動/停止引擎、模式切換、策略/標的設定
+ * 主控制面板 (重構優化版) — 導航中心與核心狀態管理
  */
 import React, { useState } from 'react';
-import { Play, Square, Settings2, Plus, X, Cpu } from 'lucide-react';
+import { 
+  BarChart3, Settings2, Cpu, LayoutGrid, ShieldCheck, Activity, MessageSquareCode, 
+  AlertTriangle, FlaskConical, BookOpen, Users 
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { AgentStatus, AgentConfig, StrategyType, TradingMode } from './types';
-import { STRATEGY_LABELS } from './types';
+import * as api from '../../services/api';
+import type { AgentStatus, AgentConfig, StrategyType, TradingMode, StrategyParams, DecisionHeat, EquitySnapshot } from './types';
+
+// Tab Components (P2 Refactor)
+import { MonitorTab } from './MonitorTab';
+import { StrategyTab } from './StrategyTab';
+import { BrokerSettings } from './BrokerSettings';
+import { BacktestPanel } from './BacktestPanel';
+import { CommanderTerminal } from './CommanderTerminal';
+import { StrategySandbox } from './StrategySandbox';
+import { AlphaReport } from './AlphaReport';
+import { CopyTradingPanel } from './CopyTradingPanel';
 
 interface Props {
   status: AgentStatus;
   config: AgentConfig | null;
+  decisionHeats: Record<string, DecisionHeat>;
+  globalSentiment: number;
+  equityHistory: EquitySnapshot[];
   onStart: (cfg: Partial<AgentConfig>) => void;
   onStop: () => void;
 }
 
-export function AgentControlPanel({ status, config, onStart, onStop }: Props) {
-  const [mode, setMode] = useState<TradingMode>(config?.mode ?? 'simulated');
+export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
+  const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts'>('monitor');
+  
+  // State from parent config or defaults
+  const [mode] = useState<TradingMode>(config?.mode ?? 'simulated');
   const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? ['RSI_REVERSION']);
+  const [params, setParams] = useState<StrategyParams>(config?.params ?? {
+    RSI_REVERSION: { period: 14, overbought: 70, oversold: 30, weight: 0.2 },
+    BOLLINGER_BREAKOUT: { period: 20, stdDev: 2, weight: 0.2 },
+    MACD_CROSS: { fast: 12, slow: 26, signal: 9, weight: 0.2 },
+    AI_LLM: { confidenceThreshold: 65, weight: 0.6 },
+    stopLossPct: 5.0,
+    takeProfitPct: 15.0,
+    trailingStopPct: 3.0,
+    maxAllocationPerTrade: 0.1,
+    enableMTF: true
+  });
   const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? ['2330.TW', '2317.TW']);
-  const [newSymbol, setNewSymbol] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-
   const isRunning = status === 'running';
 
-  const toggleStrategy = (s: StrategyType) => {
-    setStrategies(prev =>
-      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-    );
-  };
-
-  const addSymbol = () => {
-    const sym = newSymbol.trim().toUpperCase();
-    if (sym && !symbols.includes(sym)) {
-      setSymbols(prev => [...prev, sym]);
+  // Sync state with backend config when it changes
+  React.useEffect(() => {
+    if (config) {
+      if (config.strategies) setStrategies(config.strategies);
+      if (config.params) setParams(config.params);
+      if (config.symbols) setSymbols(config.symbols);
     }
-    setNewSymbol('');
+  }, [config]);
+
+  const updateConfig = (patch: Partial<AgentConfig>) => {
+    onStart({ mode, strategies, params, symbols, ...patch });
   };
 
   return (
-    <div className="border border-(--color-term-border) rounded-sm p-3 space-y-3">
-      {/* Header */}
+    <div className="border border-(--color-term-border) rounded-sm p-3 space-y-4">
+      {/* 1. Header & System Guard */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-(--color-term-accent)" />
-          <span className="text-[11px] font-bold tracking-[0.15em] text-(--color-term-text) uppercase">
-            QUANTUM_CORE_V1
-          </span>
+        <div className="flex items-center gap-3">
+           <div className={cn("p-2 rounded-full", isRunning ? "bg-emerald-500/10" : "bg-white/5")}>
+              <Cpu className={cn("h-4 w-4", isRunning ? "text-emerald-400 animate-pulse" : "text-white/20")} />
+           </div>
+           <div>
+              <div className="text-[11px] font-bold text-white uppercase tracking-wider">AI_COMMAND_CENTER v3.0</div>
+              <div className="text-[9px] text-(--color-term-muted) font-mono">STATUS: {status.toUpperCase()}</div>
+           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowSettings(s => !s)}
-          className="text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
-        >
-          <Settings2 className="h-4 w-4" />
-        </button>
+
+        {status === 'cooldown' && (
+          <button 
+            onClick={() => api.resetCircuitBreaker()}
+            className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold rounded animate-pulse"
+          >
+            <AlertTriangle className="h-3 w-3" /> RESET_BREAKER
+          </button>
+        )}
       </div>
 
-      {/* Mode Switch */}
-      <div className="flex gap-1.5">
-        {(['simulated', 'real'] as TradingMode[]).map(m => (
+      {/* 2. Navigation Matrix */}
+      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide border-b border-white/5">
+        {[
+          { id: 'monitor', icon: <Activity className="h-3.5 w-3.5" />, label: 'Monitor' },
+          { id: 'strategy', icon: <LayoutGrid className="h-3.5 w-3.5" />, label: 'Strategy' },
+          { id: 'lab', icon: <FlaskConical className="h-3.5 w-3.5" />, label: 'Lab' },
+          { id: 'accounts', icon: <Users className="h-3.5 w-3.5" />, label: 'Accounts' },
+          { id: 'journal', icon: <BookOpen className="h-3.5 w-3.5" />, label: 'Journal' },
+          { id: 'backtest', icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Backtest' },
+          { id: 'commander', icon: <MessageSquareCode className="h-3.5 w-3.5" />, label: 'Chat' },
+          { id: 'broker', icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Broker' },
+        ].map(t => (
           <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            disabled={isRunning}
+            key={t.id}
+            onClick={() => setActiveTab(t.id as any)}
             className={cn(
-              'flex-1 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border transition disabled:opacity-40',
-              mode === m
-                ? m === 'real'
-                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                  : 'bg-(--color-term-accent)/10 text-(--color-term-accent) border-(--color-term-accent)/30'
-                : 'bg-(--color-term-surface) text-(--color-term-muted) border-(--color-term-border) hover:bg-(--color-term-panel)'
+              "flex items-center gap-2 px-4 py-2 rounded-t-sm transition-all relative",
+              activeTab === t.id ? "bg-white/5 text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-violet-500" : "text-white/30 hover:text-white"
             )}
           >
-            {m === 'simulated' ? '模擬模式' : '⚠️ 真實模式'}
+            {t.icon}
+            <span className="text-[9px] font-bold uppercase tracking-widest">{t.label}</span>
           </button>
         ))}
       </div>
 
-      {/* Strategy Selector (collapsible) */}
-      {showSettings && (
-        <div className="space-y-2">
-          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">AI 策略選擇</div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {(Object.keys(STRATEGY_LABELS) as StrategyType[]).map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => toggleStrategy(s)}
-                disabled={isRunning}
-                className={cn(
-                  'text-left p-2 rounded border text-[10px] transition disabled:opacity-40',
-                  strategies.includes(s)
-                    ? 'border-violet-500/40 bg-violet-500/10 text-violet-300'
-                    : 'border-(--color-term-border) bg-(--color-term-surface) text-(--color-term-muted) hover:bg-(--color-term-panel)'
-                )}
-              >
-                <div className="font-bold">{STRATEGY_LABELS[s].name}</div>
-                <div className="text-[9px] opacity-70 mt-0.5">{STRATEGY_LABELS[s].desc}</div>
-              </button>
-            ))}
-          </div>
+      {/* 3. Dynamic Tab Content */}
+      <div className="min-h-[450px]">
+        {activeTab === 'monitor' && (
+          <MonitorTab 
+            symbols={symbols} 
+            isRunning={isRunning} 
+            decisionHeats={decisionHeats}
+            globalSentiment={globalSentiment}
+            equityHistory={equityHistory}
+            onStart={() => onStart({ mode, strategies, params, symbols })} 
+            onStop={onStop} 
+          />
+        )}
 
-          {/* Symbol Management */}
-          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest mt-2">監控標的</div>
-          <div className="flex gap-1.5">
-            <input
-              type="text"
-              value={newSymbol}
-              onChange={e => setNewSymbol(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addSymbol()}
-              placeholder="2330.TW / AAPL"
-              disabled={isRunning}
-              className="flex-1 bg-(--color-term-surface) border border-(--color-term-border) rounded px-2 py-1 text-[11px] font-mono text-(--color-term-text) placeholder-(--color-term-muted) focus:outline-none focus:border-(--color-term-accent) disabled:opacity-40"
-            />
-            <button
-              type="button"
-              onClick={addSymbol}
-              disabled={isRunning}
-              className="px-2 py-1 rounded border border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) hover:bg-(--color-term-panel) disabled:opacity-40"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {symbols.map(sym => (
-              <span key={sym} className="flex items-center gap-1 text-[10px] font-mono bg-(--color-term-panel) border border-(--color-term-border) rounded px-2 py-0.5 text-(--color-term-accent)">
-                {sym}
-                {!isRunning && (
-                  <button type="button" onClick={() => setSymbols(prev => prev.filter(s => s !== sym))}>
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        {activeTab === 'strategy' && (
+          <StrategyTab 
+            strategies={strategies} 
+            params={params} 
+            onStrategiesChange={setStrategies} 
+            onParamsChange={setParams} 
+            isRunning={isRunning}
+            activeHeat={config?.decisionHeat?.score}
+          />
+        )}
 
-      {/* Start / Stop */}
-      {isRunning ? (
-        <button
-          type="button"
-          onClick={onStop}
-          className="w-full py-2.5 rounded text-sm font-bold uppercase tracking-widest border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 flex items-center justify-center gap-2 transition"
-        >
-          <Square className="h-4 w-4" />
-          停止 AI 引擎
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onStart({ mode, strategies, symbols })}
-          disabled={strategies.length === 0 || symbols.length === 0}
-          className="w-full py-2.5 rounded text-sm font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Play className="h-4 w-4" />
-          啟動 AI 引擎
-        </button>
-      )}
+        {activeTab === 'lab' && (
+          <StrategySandbox 
+            config={config!} 
+            onUpdateShadow={(n, p) => updateConfig({ shadowConfigs: { ...config?.shadowConfigs, [n]: p } })} 
+            onPromote={p => updateConfig({ params: p })} 
+            onDelete={n => { const next = { ...config?.shadowConfigs }; delete next[n]; updateConfig({ shadowConfigs: next }); }} 
+          />
+        )}
 
-      {/* Status badge */}
-      <div className="flex items-center justify-center gap-1.5">
-        <span className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-(--color-term-muted)'
-        )} />
-        <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">
-          {status === 'running' ? 'LIVE_MODE' : 'STANDBY'}
-        </span>
+        {activeTab === 'journal' && <AlphaReport />}
+        {activeTab === 'accounts' && <CopyTradingPanel />}
+        {activeTab === 'backtest' && <BacktestPanel symbol={symbols[0]} config={{ mode, strategies, params, symbols, symbolConfigs: {} }} />}
+        {activeTab === 'commander' && <CommanderTerminal />}
+        {activeTab === 'broker' && <BrokerSettings onConnect={async (c) => { const res = await fetch('/api/autotrading/broker/connect', { method: 'POST', body: JSON.stringify(c) }); return res.json(); }} disabled={isRunning} />}
       </div>
     </div>
   );

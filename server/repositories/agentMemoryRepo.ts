@@ -1,71 +1,36 @@
 /**
  * server/repositories/agentMemoryRepo.ts
- * Drizzle 存取層：Hermes Agent 長期記憶庫
+ * 處理 AI 交易記憶的存取，實現進化功能
  */
 import { db } from '../../src/db/index.js';
-import { agentMemories, type AgentMemoryType } from '../../src/db/schema.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { agentMemories } from '../../src/db/schema.js';
+import { eq, desc, and } from 'drizzle-orm';
 
-export interface MemoryEntry {
-  id: number;
-  userId: string;
-  memoryType: AgentMemoryType;
-  content: unknown;
-  createdAt: Date;
-}
+export const agentMemoryRepo = {
+  /**
+   * 存入一條新記憶 (教訓、技能或偏好)
+   */
+  async saveMemory(userId: string, type: 'PREFERENCE' | 'SKILL' | 'CONTEXT', content: any) {
+    return await db.insert(agentMemories).values({
+      userId,
+      memoryType: type,
+      content,
+      createdAt: new Date()
+    });
+  },
 
-/** 取得某使用者所有記憶（依 createdAt 降冪，最多 limit 筆） */
-export async function getMemoriesByUser(
-  userId: string,
-  limit = 50,
-): Promise<MemoryEntry[]> {
-  const rows = await db
-    .select()
-    .from(agentMemories)
-    .where(eq(agentMemories.userId, userId))
-    .orderBy(desc(agentMemories.createdAt))
-    .limit(limit);
-
-  return rows as MemoryEntry[];
-}
-
-/** 依類型篩選記憶 */
-export async function getMemoriesByType(
-  userId: string,
-  memoryType: AgentMemoryType,
-  limit = 20,
-): Promise<MemoryEntry[]> {
-  const rows = await db
-    .select()
-    .from(agentMemories)
-    .where(and(eq(agentMemories.userId, userId), eq(agentMemories.memoryType, memoryType)))
-    .orderBy(desc(agentMemories.createdAt))
-    .limit(limit);
-
-  return rows as MemoryEntry[];
-}
-
-/** 新增一筆記憶 */
-export async function createMemory(params: {
-  userId: string;
-  memoryType: AgentMemoryType;
-  content: unknown;
-}): Promise<MemoryEntry> {
-  const [row] = await db
-    .insert(agentMemories)
-    .values({
-      userId:     params.userId,
-      memoryType: params.memoryType,
-      content:    params.content as Record<string, unknown>,
-    })
-    .returning();
-
-  return row as MemoryEntry;
-}
-
-/** 刪除單筆記憶 */
-export async function deleteMemory(id: number, userId: string): Promise<void> {
-  await db
-    .delete(agentMemories)
-    .where(and(eq(agentMemories.id, id), eq(agentMemories.userId, userId)));
-}
+  /**
+   * 獲取最近的相關記憶
+   */
+  async getRelevantMemories(userId: string, symbol?: string, limit = 5) {
+    // 簡單實作：按時間排序獲取最近的記憶
+    // 實務上可根據 content 內的 symbol 進行篩選
+    const results = await db.select()
+      .from(agentMemories)
+      .where(eq(agentMemories.userId, userId))
+      .orderBy(desc(agentMemories.createdAt))
+      .limit(limit);
+    
+    return results;
+  }
+};

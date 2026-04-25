@@ -92,6 +92,19 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
             </div>
           </div>
         )}
+
+        {/* Loss Streak Badge */}
+        {riskStats && (
+          <div className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded">
+             <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">連損計數 (Loss Streak)</span>
+             <span className={cn(
+               "text-[12px] font-bold font-mono",
+               riskStats.lossStreakCount > 0 ? "text-amber-400" : "text-emerald-400"
+             )}>
+               {riskStats.lossStreakCount}
+             </span>
+          </div>
+        )}
       </div>
 
       {/* Kill Switch */}

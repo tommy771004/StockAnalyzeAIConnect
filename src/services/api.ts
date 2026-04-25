@@ -386,4 +386,12 @@ export const getPortfolioHistory = (): Promise<any[]> => fetchJ<any[]>('/api/por
 /** 獲取全域市場新聞情報流 */
 export const getNewsFeed = (): Promise<any[]> => fetchJ<any[]>('/api/news/feed');
 
-
+// ── AutoTrading ──────────────────────────────────────────────────────────────
+export const getAutotradingStatus = () => fetchJ<any>('/api/autotrading/status');
+export const resetCircuitBreaker = () => fetchJ<any>('/api/autotrading/status/reset', { method: 'POST' });
+export const startAutotrading = (config: any) => fetchJ<any>('/api/autotrading/start', { 
+  method: 'POST', 
+  headers: { 'Content-Type': 'application/json' }, 
+  body: JSON.stringify(config) 
+});
+export const stopAutotrading = () => fetchJ<any>('/api/autotrading/stop', { method: 'POST' });

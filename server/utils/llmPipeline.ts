@@ -111,6 +111,19 @@ async function routeModel(opts: ModelRouteOptions): Promise<string> {
   return second || best;
 }
 
+/**
+ * 根據權重獲取免費模型
+ * tier: 1 = 最強免費模型 (主 Agent)
+ * tier: 2 = 穩定免費模型 (子 Agent)
+ * tier: 3 = 備援免費模型
+ */
+export async function getFreeModelByTier(tier: 1 | 2 | 3 = 1): Promise<string> {
+  const models = await getTopFreeModels(3);
+  if (tier === 1) return models[0] || '_default_free';
+  if (tier === 2) return models[1] || models[0] || '_default_free';
+  return models[2] || models[1] || models[0] || '_default_free';
+}
+
 // ─── Retry Logic (Transient-Only) ─────────────────────────────────────────────
 
 /** HTTP status codes considered transient and retryable */

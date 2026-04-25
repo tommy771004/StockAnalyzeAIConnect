@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { AgentLog, AccountBalance, Position, AgentStatus, AgentConfig, RiskStats } from './types';
+import type { AgentLog, AccountBalance, Position, AgentStatus, AgentConfig, RiskStats, DecisionHeat, EquitySnapshot } from './types';
 
 const WS_PATH = '/ws/autotrading';
 const RECONNECT_DELAY_MS = 3000;
@@ -17,6 +17,9 @@ interface AutotradingState {
   logs: AgentLog[];
   balance: AccountBalance | null;
   positions: Position[];
+  decisionHeats: Record<string, DecisionHeat>;
+  globalSentiment: number;
+  equityHistory: EquitySnapshot[];
   connected: boolean;
 }
 
@@ -28,6 +31,9 @@ export function useAutotradingWS() {
     logs: [],
     balance: null,
     positions: [],
+    decisionHeats: {},
+    globalSentiment: 50,
+    equityHistory: [],
     connected: false,
   });
 
@@ -77,6 +83,21 @@ export function useAutotradingWS() {
               return { ...prev, balance: msg.data };
             case 'positions_update':
               return { ...prev, positions: msg.data ?? [] };
+            case 'decision_heat':
+              return {
+                ...prev,
+                decisionHeats: {
+                  ...prev.decisionHeats,
+                  [msg.data.symbol]: msg.data
+                }
+              };
+            case 'global_sentiment':
+              return { ...prev, globalSentiment: msg.data.score };
+            case 'equity_update':
+              return { 
+                ...prev, 
+                equityHistory: [...prev.equityHistory, msg.data].slice(-100) 
+              };
             default:
               return prev;
           }

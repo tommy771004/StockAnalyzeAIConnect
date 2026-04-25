@@ -107,6 +107,9 @@ export function AutoTradingPage() {
           <AgentControlPanel
             status={ws.status}
             config={ws.config}
+            decisionHeats={ws.decisionHeats}
+            globalSentiment={ws.globalSentiment}
+            equityHistory={ws.equityHistory}
             onStart={handleStart}
             onStop={handleStop}
           />

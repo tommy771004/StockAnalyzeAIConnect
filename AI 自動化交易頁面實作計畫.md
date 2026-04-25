@@ -165,3 +165,40 @@ interface IBrokerAdapter {
 - 設定模擬模式，新增 2330.TW 監控，啟動 AI 引擎
 - 確認 AI 決策 Log 開始出現，停損上限設定後超過閾值自動停止
 - 測試緊急平倉（Kill Switch）按鈕清空所有部位
+
+---
+
+## 📅 目前實作進度 (Current Implementation Status)
+
+**已完成 (Implemented):**
+1. **路由 / 類型系統**
+   - `types.ts` 中已加入 `'autotrading'` 至 `TerminalView`。
+   - `App.tsx` 已成功整合 `AutoTradingPage` 路由。
+   - 已建立前端基礎框架（Sidebar/Nav 等相關連動）。
+2. **前端頁面與子元件**
+   - 已建立 `AutoTradingPage.tsx` 主頁面包裝元件。
+   - `src/components/AutoTrading/` 目錄已包含：
+     - `AgentControlPanel.tsx` (啟動/停止 AI, Kill Switch)
+     - `StrategySelector.tsx`, `StrategySandbox.tsx`, `StrategyFlowBuilder.tsx` (策略選擇與沙盒)
+     - `AssetMonitor.tsx` (監控表)
+     - `DecisionLog.tsx`, `DecisionHeatmap.tsx` (決策日誌與熱圖)
+     - `RiskControlPanel.tsx` (風險控制設定)
+     - `BrokerSettings.tsx` (券商設定)
+     - `AccountSummary.tsx` (帳戶總結)
+     - `useAutotradingWS.ts` (WebSocket 狀態管理)
+3. **台灣券商串接層 (Broker Adapters)**
+   - 已定義 `BrokerAdapter.ts` 介面。
+   - 已實作 `SimulatedAdapter.ts` 作為預設的模擬券商。
+   - 已預留/建立 `SinopacAdapter.ts` (永豐)、`KGIAdapter.ts` (群益)、`YuantaAdapter.ts` (元大) 的實作骨架。
+4. **AI 自動交易核心引擎與資料層**
+   - `server/services/autonomousAgent.ts` 已經重構包含多策略及自動化交易核心邏輯。
+   - `server/repos/autotradingRepo.ts` 和 `server/repositories/autotradingConfigRepo.ts` 等資料庫介面已建立。
+
+**待優化 / 待完成 (Pending for Next Steps):**
+1. **真實券商 API (Live Trading) 串接**：
+   - 永豐/群益/元大等券商的 Python 微服務與 COM 元件橋接。
+   - Q1 提到的「真實下單開關」與金鑰驗證機制整合。
+2. **選擇權/期貨支援**：
+   - Q2 提到的 Greeks 計算與期貨保證金計算（目前重心仍在個股）。
+3. **WebSocket/後端 API (Backend API) 完善**：
+   - 確保 `server/api/` (如 `agent.ts`) 和 WebSocket 端點完全吻合 `AutoTradingPage.tsx` 的前端呼叫 (`/api/autotrading/*`)，並測試端到端（End-to-End）連線。
