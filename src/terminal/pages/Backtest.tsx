@@ -1,4 +1,4 @@
-import { BacktestPage } from '../../components/BacktestPage';
+import BacktestPage from '../../components/BacktestPage';
 
 export function BacktestTerminalPage() {
   return (
