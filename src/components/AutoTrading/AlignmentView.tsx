@@ -181,7 +181,7 @@ export function AlignmentView({ sessionId }: Props) {
       {/* Insights */}
       <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-sm text-[9px] text-blue-300 space-y-1">
         <div className="font-bold">提示：</div>
-        <div>• Slippage > 2% 表示實盤成交價差於回測假設</div>
+        <div>• Slippage {'>'} 2% 表示實盤成交價差於回測假設</div>
         <div>• PnL Dev 反映實際執行與回測的獲利差異</div>
         <div>• Unmatched 交易可能由於執行時間或價格變動而未能配對</div>
       </div>

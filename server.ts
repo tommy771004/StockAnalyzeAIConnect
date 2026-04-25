@@ -866,7 +866,8 @@ app.get('/api/autotrading/alignment', authMiddleware, async (req: AuthRequest, r
     }
 
     const btTrades = await backtestRepo.getTradesBySession(sessionId);
-    const trades = await tradesRepo.listByUser(req.userId, { symbol: session.symbol });
+    const allTrades = await tradesRepo.getTradesByUser(req.userId);
+    const trades = allTrades.filter(t => t.ticker === session.symbol);
 
     // Pair trades by entry/exit dates (within tolerance)
     interface PairedTrade {
