@@ -47,7 +47,7 @@ export function Panel({
 
   const headerInner = (
     <>
-      {isCollapsible && (
+      {isCollapsible ? (
         <ChevronDown
           className={cn(
             'h-3 w-3 shrink-0 text-(--color-term-muted) transition-transform duration-200',
@@ -55,9 +55,9 @@ export function Panel({
           )}
           aria-hidden="true"
         />
-      )}
+      ) : null}
       <h2 className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.28em] text-(--color-term-muted) uppercase">
-        {icon && <span className="text-(--color-term-accent)">{icon}</span>}
+        {icon ? <span className="text-(--color-term-accent)">{icon}</span> : null}
         {title}
       </h2>
     </>
@@ -75,7 +75,7 @@ export function Panel({
         isCollapsed && '!flex-none !h-auto !min-h-0',
       )}
     >
-      {(title || actions) && (
+      {(title || actions) ? (
         <header
           className={cn(
             'flex h-9 shrink-0 items-center justify-between border-b px-3',
@@ -96,16 +96,16 @@ export function Panel({
           ) : (
             <div className="flex min-w-0 flex-1 items-center gap-2">{headerInner}</div>
           )}
-          {actions && (
+          {actions ? (
             <div
               className="flex items-center gap-2 text-(--color-term-muted)"
               onClick={(e) => { if (isCollapsible) e.stopPropagation(); }}
             >
               {actions}
             </div>
-          )}
+          ) : null}
         </header>
-      )}
+      ) : null}
       {isCollapsible ? (
         <AnimatePresence initial={false}>
           {isOpen && (

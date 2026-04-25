@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Activity, RefreshCw, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as api from '../services/api';
@@ -15,21 +16,13 @@ interface Holding {
 }
 
 export default function PaperTradingDashboard() {
-  const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalAssets, setTotalAssets] = useState(0);
-  const [todayPnl, setTodayPnl] = useState(0);
-
-  const fetchPositions = useCallback(async () => {
-    try {
-      setError(null);
+  const { data, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['paper-trading-positions'],
+    queryFn: async () => {
       const posData = await api.getPositions();
       const positions = Array.isArray(posData.positions) ? posData.positions : [];
       if (positions.length === 0) {
-        setHoldings([]);
-        setLoading(false);
-        return;
+        return { holdings: [], totalAssets: 0, todayPnl: 0 };
       }
 
       // Fetch live quotes for all held symbols
@@ -55,26 +48,17 @@ export default function PaperTradingDashboard() {
         };
       });
 
-      setHoldings(newHoldings);
-      setTotalAssets(newHoldings.reduce((s, h) => new Decimal(s).plus(new Decimal(h.currentPrice).times(h.qty)).toNumber(), 0));
-      setTodayPnl(newHoldings.reduce((s, h) => new Decimal(s).plus(h.pnl).toNumber(), 0));
-    } catch(e) {
-      console.warn('[PaperTrading] refreshPrices:', e);
-      setError(e instanceof Error ? e.message : '連線異常');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const totalAssets = newHoldings.reduce((s, h) => new Decimal(s).plus(new Decimal(h.currentPrice).times(h.qty)).toNumber(), 0);
+      const todayPnl = newHoldings.reduce((s, h) => new Decimal(s).plus(h.pnl).toNumber(), 0);
+      
+      return { holdings: newHoldings, totalAssets, todayPnl };
+    },
+    refetchInterval: 30000,
+  });
 
-  useEffect(() => { fetchPositions(); }, [fetchPositions]);
-
-  // Refresh prices every 30s — stable ref to avoid interval reset
-  const fetchRef = useRef(fetchPositions);
-  fetchRef.current = fetchPositions;
-  useEffect(() => {
-    const interval = setInterval(() => fetchRef.current(), 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const holdings = data?.holdings ?? [];
+  const totalAssets = data?.totalAssets ?? 0;
+  const todayPnl = data?.todayPnl ?? 0;
 
   const winCount = holdings.filter(h => h.pnl > 0).length;
   const winRate = holdings.length > 0 ? Math.round((winCount / holdings.length) * 100) : 0;
@@ -87,9 +71,9 @@ export default function PaperTradingDashboard() {
         </div>
         <div>
           <h3 className="text-zinc-100 font-bold mb-1">連線異常</h3>
-          <p className="text-zinc-400 text-sm max-w-xs mx-auto">{error}</p>
+          <p className="text-zinc-400 text-sm max-w-xs mx-auto">{error instanceof Error ? error.message : String(error)}</p>
         </div>
-        <button type="button" onClick={() => { setLoading(true); fetchPositions(); }}
+        <button type="button" onClick={() => refetch()}
           className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-lg text-sm transition-colors flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
@@ -131,7 +115,7 @@ export default function PaperTradingDashboard() {
           模擬交易看板 (Paper Trading)
         </h2>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => fetchPositions()} aria-label="重新整理"
+          <button type="button" onClick={() => refetch()} aria-label="重新整理"
             className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">
             <RefreshCw size={14} />
           </button>

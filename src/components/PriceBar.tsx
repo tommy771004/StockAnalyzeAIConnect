@@ -46,7 +46,7 @@ export const PriceBar: React.FC<PriceBarProps> = React.memo(({
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
               <span className={safeCn("font-black tracking-tighter text-white uppercase leading-none", compact ? "text-xl" : "text-2xl sm:text-3xl")} style={{ fontFamily: 'var(--font-heading)' }}>{symbol}</span>
-              {twse && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase tracking-widest opacity-60">TWSE</span>}
+              {twse ? <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase tracking-widest opacity-60">TWSE</span> : null}
             </div>
             <span className="text-[10px] font-medium text-zinc-500 truncate mt-1 uppercase tracking-wider">{twse?.Name || 'Market Asset'}</span>
           </div>
@@ -75,8 +75,8 @@ export const PriceBar: React.FC<PriceBarProps> = React.memo(({
         {/* Global Market Stats (Desktop only or shown selectively) */}
         {!isLandscape && (
           <div className="hidden lg:flex items-center font-mono gap-5 text-[11px] bg-black/40 p-2 px-4 rounded-2xl border border-white/5">
-            {high != null && <div className="flex flex-col"><span className="opacity-30 font-black">HIGH</span><span className="text-rose-400 font-bold tabular-nums">{safeN(high)}</span></div>}
-            {low != null && <div className="flex flex-col"><span className="opacity-30 font-black">LOW</span><span className="text-emerald-400 font-bold tabular-nums">{safeN(low)}</span></div>}
+            {high != null ? <div className="flex flex-col"><span className="opacity-30 font-black">HIGH</span><span className="text-rose-400 font-bold tabular-nums">{safeN(high)}</span></div> : null}
+            {low != null ? <div className="flex flex-col"><span className="opacity-30 font-black">LOW</span><span className="text-emerald-400 font-bold tabular-nums">{safeN(low)}</span></div> : null}
             {vol != null && !isNaN(Number(vol)) && (
               <div className="flex flex-col">
                 <span className="opacity-30 font-black">VOL</span>
@@ -110,14 +110,14 @@ export const PriceBar: React.FC<PriceBarProps> = React.memo(({
             <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-0.5">AVG. 平均</span>
             <span className="text-[12px] font-black text-zinc-400 tabular-nums">{safeN(((high??0)+(low??0))/2)}</span>
           </div>
-          {recommendation && (
+          {recommendation ? (
             <div className="flex flex-col shrink-0 pr-4">
               <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-0.5">AI SIGNAL 訊號</span>
               <span className={safeCn("text-[12px] font-black tracking-tighter uppercase", recommendation.includes('買進') ? "text-emerald-400" : recommendation.includes('賣出') ? "text-rose-400" : "text-zinc-400")}>
                 {recommendation}
               </span>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 

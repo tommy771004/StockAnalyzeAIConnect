@@ -698,6 +698,13 @@ async function fetchAndCacheTWSE(): Promise<TWSEEntry[]> {
   return _twseCache;
 }
 
+// ── Background Pre-warming ──
+// Fetch cache immediately on startup and refresh every 6 hours
+if (!process.env.VERCEL) {
+  fetchAndCacheTWSE().catch(() => {});
+  setInterval(() => fetchAndCacheTWSE().catch(() => {}), TWSE_CACHE_TTL);
+}
+
 function hasChinese(str: string): boolean {
   return /[\u4e00-\u9fff]/.test(str);
 }
@@ -715,11 +722,15 @@ function twseFuzzySearch(list: TWSEEntry[], query: string, limit = 8): TWSEEntry
 }
 
 app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
-  const query = decodeURIComponent(req.params.query as string);
+  const query = decodeURIComponent(req.params.query as string).trim();
+  if (!query) return res.json({ quotes: [] });
+
   try {
     const twseList = await fetchAndCacheTWSE();
     const nameMap = new Map(twseList.map(e => [e.code, e]));
+    
     const isChinese = hasChinese(query);
+    const isNumeric = /^[0-9]{4,6}[A-Za-z]?$/.test(query); // matches typical TW codes like 2330 or 00679B
 
     let quotes: Array<{
       symbol: string; shortname?: string; longname?: string;
@@ -727,7 +738,7 @@ app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
     }> = [];
 
     if (isChinese) {
-      // Pure Chinese query → only search local TWSE/TPEx data
+      // Pure Chinese query → only search local TWSE/TPEx data (Instant)
       const localResults = twseFuzzySearch(twseList, query);
       quotes = localResults.map(e => ({
         symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
@@ -737,20 +748,52 @@ app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
         exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
         typeDisp: 'Equity',
       }));
-    } else {
-      // English / numeric query → Yahoo Finance + local TWSE enrich
-      try {
-        const data = await NativeYahooApi.search(query);
-        quotes = (data.quotes || []).map((q: Record<string, unknown>) => {
-          const sym = (q.symbol as string) || '';
-          const code = sym.replace(/\.(TW|TWO)$/, '');
-          const entry = nameMap.get(code);
-          return { ...q, chineseName: entry?.name };
+    } else if (isNumeric) {
+      // Numeric query → search local TWSE/TPEx first
+      const localResults = twseFuzzySearch(twseList, query, 8);
+      const hasExactLocalMatch = localResults.some(e => e.code === query);
+
+      quotes = localResults.map(e => ({
+        symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
+        shortname: e.name,
+        longname: e.name,
+        chineseName: e.name,
+        exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
+        typeDisp: 'Equity',
+      }));
+
+      // If we didn't find an exact TW match, run Yahoo search in parallel with a strict 400ms timeout
+      // to capture potential US numeric tickers, but don't block for long.
+      if (!hasExactLocalMatch) {
+        const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
+        const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 400));
+        
+        const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
+        const existing = new Set(quotes.map(q => q.symbol));
+        
+        (yahooData.quotes || []).forEach((q: any) => {
+          if (!existing.has(q.symbol)) {
+            const code = (q.symbol as string).replace(/\.(TW|TWO)$/, '');
+            const entry = nameMap.get(code);
+            quotes.push({ ...q, chineseName: entry?.name });
+            existing.add(q.symbol);
+          }
         });
-      } catch {
-        // Yahoo failed — fall through to local-only
       }
-      // Supplement with local TWSE results for numeric queries
+    } else {
+      // English query → Parallel Yahoo (with 800ms timeout) and local search
+      const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
+      const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 800));
+      
+      const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
+      quotes = (yahooData.quotes || []).map((q: Record<string, unknown>) => {
+        const sym = (q.symbol as string) || '';
+        const code = sym.replace(/\.(TW|TWO)$/, '');
+        const entry = nameMap.get(code);
+        return { ...q, chineseName: entry?.name };
+      });
+      
+      // Mix in local TWSE results if the query starts with a number
       if (/^\d/.test(query)) {
         const localResults = twseFuzzySearch(twseList, query, 5);
         const existing = new Set(quotes.map(q => q.symbol));

@@ -45,6 +45,7 @@ export function TopNav({
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cacheRef = useRef<Map<string, SearchResult[]>>(new Map());
 
   const toggleLanguage = () => {
     const nextLng = i18n.language.startsWith('zh') ? 'en' : 'zh';
@@ -53,11 +54,28 @@ export function TopNav({
 
   // Debounced search
   const doSearch = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); setShowDropdown(false); return; }
+    const trimmed = q.trim();
+    if (!trimmed) { setResults([]); setShowDropdown(false); return; }
+    
+    // Check local cache first
+    if (cacheRef.current.has(trimmed)) {
+      setResults(cacheRef.current.get(trimmed)!);
+      setShowDropdown(true);
+      setActiveIdx(-1);
+      return;
+    }
+
     setIsSearching(true);
     try {
-      const { quotes } = await searchStocks(q);
-      setResults((quotes || []).slice(0, 8));
+      const { quotes } = await searchStocks(trimmed);
+      const res = (quotes || []).slice(0, 8);
+      cacheRef.current.set(trimmed, res);
+      // Keep cache size reasonable
+      if (cacheRef.current.size > 50) {
+        const firstKey = cacheRef.current.keys().next().value;
+        if (firstKey) cacheRef.current.delete(firstKey);
+      }
+      setResults(res);
       setShowDropdown(true);
       setActiveIdx(-1);
     } catch {
@@ -70,7 +88,14 @@ export function TopNav({
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) { setResults([]); setShowDropdown(false); return; }
-    debounceRef.current = setTimeout(() => doSearch(query), 300);
+    
+    // If it's already in cache, no need to debounce
+    if (cacheRef.current.has(query.trim())) {
+      doSearch(query);
+      return;
+    }
+    
+    debounceRef.current = setTimeout(() => doSearch(query), 200);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, doSearch]);
 

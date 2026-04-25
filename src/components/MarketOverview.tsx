@@ -206,6 +206,8 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
   const [addInput, setAddInput] = useState('');
   const [addErr, setAddErr] = useState('');
 
+  const marketDataMap = React.useMemo(() => new Map(marketData.map(m => [m.symbol, m])), [marketData]);
+
   const [showOrder, setShowOrder] = useState(false);
   const [oSide, setOSide] = useState<'buy' | 'sell'>('buy');
   const [oQty, setOQty] = useState(Number(settings.defaultOrderQty || 100));
@@ -575,63 +577,63 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                 </div>
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 border border-white/5 font-mono text-[10px] tabular-nums tracking-widest opacity-60">
                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                   SYNC: {lastUpdate} {!navigator.onLine && <span className="text-amber-500 ml-1">[OFFLINE]</span>}
+                   SYNC: {lastUpdate} {!navigator.onLine ? <span className="text-amber-500 ml-1">[OFFLINE]</span> : null}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 z-10 relative">
                 {isMorning ? (
                   <>
-                    {marketData.some(m => m.symbol === '^GSPC' || m.symbol === '^IXIC') && (
+                    {marketDataMap.has('^GSPC') || marketDataMap.has('^IXIC') ? (
                       <div className="bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md hover:border-white/10 transition-colors">
                         <div className="text-[10px] font-black text-amber-400/50 uppercase tracking-widest mb-2">美股隔夜行情 OVERNIGHT</div>
                         <div className="space-y-1.5 line-clamp-2 md:line-clamp-none">
                           {(() => {
-                            const gspc = marketData.find(m => m.symbol === '^GSPC');
-                            const ixic = marketData.find(m => m.symbol === '^IXIC');
+                            const gspc = marketDataMap.get('^GSPC');
+                            const ixic = marketDataMap.get('^IXIC');
                             return (
                               <>
-                                {gspc && <div className="flex justify-between text-[11px] font-mono"><span className="opacity-60">S&P 500</span><span className="font-bold">{gspc.price.toLocaleString()} ({gspc.changePct > 0 ? '+' : ''}{gspc.changePct.toFixed(2)}%)</span></div>}
-                                {ixic && <div className="flex justify-between text-[11px] font-mono"><span className="opacity-60">NASDAQ</span><span className="font-bold">{ixic.price.toLocaleString()} ({ixic.changePct > 0 ? '+' : ''}{ixic.changePct.toFixed(2)}%)</span></div>}
+                                {gspc ? <div className="flex justify-between text-[11px] font-mono"><span className="opacity-60">S&P 500</span><span className="font-bold">{gspc.price.toLocaleString()} ({gspc.changePct > 0 ? '+' : ''}{gspc.changePct.toFixed(2)}%)</span></div> : null}
+                                {ixic ? <div className="flex justify-between text-[11px] font-mono"><span className="opacity-60">NASDAQ</span><span className="font-bold">{ixic.price.toLocaleString()} ({ixic.changePct > 0 ? '+' : ''}{ixic.changePct.toFixed(2)}%)</span></div> : null}
                               </>
                             );
                           })()}
                         </div>
                       </div>
-                    )}
-                    {aiSummary && (
+                    ) : null}
+                    {aiSummary ? (
                       <div className="bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md md:col-span-2 hover:border-white/10 transition-colors">
                         <div className="text-[10px] font-black text-amber-400/50 uppercase tracking-widest mb-2">AI 戰略預警 STRATEGIC ADVISORY</div>
                         <div className="text-xs font-medium leading-relaxed opacity-80 italic line-clamp-2">"{aiSummary.aiAdvice}"</div>
                       </div>
-                    )}
+                    ) : null}
                   </>
                 ) : (
                   <>
-                    {marketData.some(m => m.symbol === '2330.TW') && (
+                    {marketDataMap.has('2330.TW') ? (
                       <div className="bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md hover:border-white/10 transition-colors">
                         <div className="text-[10px] font-black text-indigo-400/50 uppercase tracking-widest mb-2">台股收盤摘要 DAILY CLOSE</div>
                         {(() => {
-                          const tsm = marketData.find(m => m.symbol === '2330.TW');
+                          const tsm = marketDataMap.get('2330.TW');
                           if (!tsm) return null;
                           return <div className="text-sm font-mono font-bold tracking-tight">2330.TW: {tsm.price.toLocaleString()} <span className={tsm.changePct >= 0 ? "text-rose-400" : "text-emerald-400"}>({tsm.changePct >= 0 ? '+' : ''}{tsm.changePct.toFixed(2)}%)</span></div>;
                         })()}
                       </div>
-                    )}
-                    {posInfo.totalVal > 0 && (
+                    ) : null}
+                    {posInfo.totalVal > 0 ? (
                       <div className="bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md hover:border-white/10 transition-colors">
                         <div className="text-data-xs font-black text-indigo-400/50 uppercase tracking-widest mb-2">投資組合效益 ASSET PERFORMANCE</div>
                         <div className={cn("text-sm font-mono font-black tracking-tighter", posInfo.plVal >= 0 ? "text-rose-400" : "text-emerald-400")}>
                           {posInfo.plVal >= 0 ? '+' : ''}{format.number(posInfo.plVal, 0)} TWD {format.percent(posInfo.plPct)}
                         </div>
                       </div>
-                    )}
-                    {aiSummary && (
+                    ) : null}
+                    {aiSummary ? (
                       <div className="bg-black/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md hover:border-white/10 transition-colors">
                         <div className="text-data-xs font-black text-indigo-400/50 uppercase tracking-widest mb-2">市場情緒摘要 SENTIMENT SUMMARY</div>
                         <div className="text-body-xs font-medium leading-relaxed opacity-80 line-clamp-2 italic">"{aiSummary.aiAdvice}"</div>
                       </div>
-                    )}
+                    ) : null}
                   </>
                 )}
               </div>

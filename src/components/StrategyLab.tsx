@@ -383,7 +383,7 @@ export default function StrategyLab() {
           ))}
         </div>
         <button type="button" onClick={handleApplyAll} disabled={appliedCount === suggestions.length} className="mt-4 w-full py-2 bg-indigo-500 rounded text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-600 transition">
-          套用全部 {appliedCount > 0 && `(${appliedCount}/${suggestions.length})`}
+          套用全部 {appliedCount > 0 ? `(${appliedCount}/${suggestions.length})` : null}
         </button>
       </div>
 
@@ -409,7 +409,7 @@ export default function StrategyLab() {
               ))}
             </div>
           </div>
-          {btError && <div className="flex items-center gap-2 text-xs text-rose-400 font-black uppercase tracking-widest"><AlertCircle size={14}/>{btError}</div>}
+          {btError ? <div className="flex items-center gap-2 text-xs text-rose-400 font-black uppercase tracking-widest"><AlertCircle size={14}/>{btError}</div> : null}
         </div>
 
         {btResult ? (

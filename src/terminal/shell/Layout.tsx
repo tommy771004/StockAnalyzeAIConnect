@@ -100,35 +100,41 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
   return (
     <div className="flex h-dvh w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
       {/* Top navigation */}
-      <TopNav
-        active={active}
-        onChange={onChange}
-        searchPlaceholder={searchPlaceholder}
-        onToggleAgent={toggleAgent}
-        onToggleSidebar={toggleSidebar}
-      />
+      <div style={{ viewTransitionName: 'persistent-topnav' }}>
+        <TopNav
+          active={active}
+          onChange={onChange}
+          searchPlaceholder={searchPlaceholder}
+          onToggleAgent={toggleAgent}
+          onToggleSidebar={toggleSidebar}
+        />
+      </div>
 
       {/* Scrolling ticker tape */}
-      <TickerTape
-        items={
-          tickerItems.length > 0
-            ? tickerItems
-            : [{ symbol: '', label: t('market.loading', 'LOADING...'), value: '---', changePct: 0 }]
-        }
-        onSelect={handleTickerSelect}
-        onSymbolsChange={handleSymbolsChange}
-        changedSymbols={changedSymbols}
-      />
+      <div style={{ viewTransitionName: 'persistent-ticker' }}>
+        <TickerTape
+          items={
+            tickerItems.length > 0
+              ? tickerItems
+              : [{ symbol: '', label: t('market.loading', 'LOADING...'), value: '---', changePct: 0 }]
+          }
+          onSelect={handleTickerSelect}
+          onSymbolsChange={handleSymbolsChange}
+          changedSymbols={changedSymbols}
+        />
+      </div>
 
       {/* Main content area */}
       <div className="flex min-h-0 flex-1 relative">
         {/* Sidebar — controls its own mobile drawer state */}
-        <Sidebar
-          active={active}
-          onChange={onChange}
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-        />
+        <div style={{ viewTransitionName: 'persistent-sidebar' }} className="flex-shrink-0 h-full">
+          <Sidebar
+            active={active}
+            onChange={onChange}
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+          />
+        </div>
 
         {/* Page content — add bottom padding on mobile to clear bottom nav */}
         <main className="min-h-0 flex-1 overflow-hidden p-3 pb-16 md:pb-3">
@@ -140,12 +146,14 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
       </div>
 
       {/* Footer — desktop only */}
-      <Footer lastUpdated={lastUpdated} />
+      <div style={{ viewTransitionName: 'persistent-footer' }}>
+        <Footer lastUpdated={lastUpdated} />
+      </div>
 
       {/* Mobile Bottom Navigation Bar */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-(--color-term-border) bg-(--color-term-bg)"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)', viewTransitionName: 'persistent-bottom-nav' }}
       >
         {BOTTOM_NAV_IDS.map((item) => {
           const isActive = active === item.id;

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, startTransition } from 'react';
+import { ViewTransition } from 'react';
 import type { TerminalView } from './terminal/types';
 import { Layout } from './terminal/shell/Layout';
 import { DashboardPage } from './terminal/pages/Dashboard';
@@ -60,12 +61,12 @@ export default function App() {
   }, [view]);
 
   useEffect(() => {
-    const onHash = () => setView(parseHashView());
+    const onHash = () => startTransition(() => setView(parseHashView()));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const handleChange = useCallback((next: TerminalView) => setView(next), []);
+  const handleChange = useCallback((next: TerminalView) => startTransition(() => setView(next)), []);
 
   if (loading) {
     return (
@@ -88,17 +89,21 @@ export default function App() {
     <>
       <SEO title={t(`nav.${view}`, view.toUpperCase())} path={`/#${view}`} />
       <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>
-      {view === 'dashboard' && <DashboardPage />}
-      {view === 'market' && <MarketPage />}
-      {view === 'crypto' && <CryptoPage />}
-      {view === 'portfolio' && <PortfolioPage />}
-      {view === 'research' && <ResearchPage />}
-      {view === 'backtest' && <BacktestTerminalPage />}
-      {view === 'news' && <NewsPage />}
-      {view === 'settings' && <SettingsPage />}
-      {view === 'alerts' && <AlertsPage />}
-      {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
-    </Layout>
+        <ViewTransition default="none" enter="fade-in" exit="fade-out">
+          <div className="h-full w-full">
+            {view === 'dashboard' && <DashboardPage />}
+            {view === 'market' && <MarketPage />}
+            {view === 'crypto' && <CryptoPage />}
+            {view === 'portfolio' && <PortfolioPage />}
+            {view === 'research' && <ResearchPage />}
+            {view === 'backtest' && <BacktestTerminalPage />}
+            {view === 'news' && <NewsPage />}
+            {view === 'settings' && <SettingsPage />}
+            {view === 'alerts' && <AlertsPage />}
+            {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
+          </div>
+        </ViewTransition>
+      </Layout>
     </>
   );
 }

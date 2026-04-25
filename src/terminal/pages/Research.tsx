@@ -110,7 +110,7 @@ export function ResearchPage() {
           </div>
 
           <PersonaSelector value={persona} onChange={setPersona} compact />
-          {loading && <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" />}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" /> : null}
         </header>
 
         <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
@@ -312,7 +312,7 @@ function SentimentRow({
 function RecentNewsPanel({ news }: { news: any[] }) {
   return (
     <Panel title="標的相關新聞" collapsible className="flex-1 min-h-[300px]" bodyClassName="overflow-auto">
-      {news.length === 0 && <div className="p-10 text-center text-(--color-term-muted)">尚無新聞資料</div>}
+      {news.length === 0 ? <div className="p-10 text-center text-(--color-term-muted)">尚無新聞資料</div> : null}
       <ul className="divide-y divide-(--color-term-border)/60">
         {news.slice(0, 10).map((n) => {
           const url = n.link || (n.storyPath ? `https://www.tradingview.com${n.storyPath}` : null);

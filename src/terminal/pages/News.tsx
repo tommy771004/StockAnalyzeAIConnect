@@ -72,7 +72,7 @@ function LiveFeed({
       bodyClassName="flex min-h-0 flex-col"
     >
       <div className="flex-1 overflow-auto">
-        {news.length === 0 && <div className="py-20 text-center text-(--color-term-muted)">目前沒有新聞</div>}
+        {news.length === 0 ? <div className="py-20 text-center text-(--color-term-muted)">目前沒有新聞</div> : null}
         <ul className="divide-y divide-(--color-term-border)/40">
           {news.map((item) => {
             const itemId = item.id || item.title;
@@ -93,7 +93,7 @@ function LiveFeed({
                         <span className="font-bold text-sky-400">{item.source}</span>
                         <span>{new Date(item.published * 1000).toLocaleTimeString()}</span>
                    </div>
-                   {isActive && <ExternalLink className="h-3 w-3 text-(--color-term-accent)" />}
+                   {isActive ? <ExternalLink className="h-3 w-3 text-(--color-term-accent)" /> : null}
                 </div>
                 <p className={cn('text-[13px] font-medium leading-relaxed', isActive ? 'text-(--color-term-accent)' : 'text-(--color-term-text)')}>
                   {item.title}

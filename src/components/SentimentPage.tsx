@@ -173,7 +173,7 @@ export default function SentimentPage({ model, symbol: initSym }: Props) {
           </h1>
           <p className="text-xs text-zinc-500 mt-0.5">
             AI 即時分析全球市場多空氣氛 + 個股多時框技術訊號
-            {lastUpdated && <span className="ml-2 text-zinc-600">更新於 {lastUpdated}</span>}
+            {lastUpdated ? <span className="ml-2 text-zinc-600">更新於 {lastUpdated}</span> : null}
           </p>
         </div>
         <button type="button" onClick={() => loadSentiment()} disabled={loading}

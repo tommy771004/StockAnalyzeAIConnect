@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { AlertRecord } from '../types/market';
 import { Panel } from '../ui/Panel';
@@ -7,76 +8,76 @@ import { Loader2, Bell, Plus, Trash2, TrendingUp, TrendingDown, AlertTriangle } 
 
 export function AlertsPage() {
   const { t } = useTranslation();
-  // Fix #6: typed state — AlertRecord[] instead of any[]
-  const [alerts, setAlerts] = useState<AlertRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [newAlert, setNewAlert] = useState({ symbol: '', condition: 'above', target: '' });
   const [addError, setAddError] = useState('');
-  // Inline delete confirmation (baseline-ui: AlertDialog for destructive actions)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState('');
 
-  // Fix #3: useCallback so useEffect can safely list it as a dependency
-  const fetchAlerts = useCallback(async () => {
-    try {
+  const { data: alerts = [], isLoading: loading } = useQuery<AlertRecord[]>({
+    queryKey: ['alerts'],
+    queryFn: async () => {
       const res = await fetch('/api/alerts');
+      if (!res.ok) throw new Error('Failed to fetch alerts');
       const data = await res.json();
-      setAlerts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Alerts fetch error:', err);
-    } finally {
-      setLoading(false);
+      return Array.isArray(data) ? data : [];
     }
-  }, []); // no external deps — stable reference across renders
+  });
 
-  // Fix #3: fetchAlerts is now stable (useCallback), safe to list as dep
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAlert.symbol || !newAlert.target) return;
-    setAddError('');
-    try {
-      // Fix #10: check HTTP status — fetch only rejects on network failure,
-      // not on 4xx/429/500. A rate-limited or validation error was silently ignored.
+  const addMutation = useMutation({
+    mutationFn: async (alert: { symbol: string, condition: string, target: number }) => {
       const res = await fetch('/api/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: newAlert.symbol.toUpperCase(),
-          condition: newAlert.condition,
-          target: Number(newAlert.target),
-        }),
+        body: JSON.stringify(alert),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setAddError(body?.error ?? t('alerts.addFailed'));
-        return;
+        throw new Error(body?.error ?? t('alerts.addFailed'));
       }
+      return res.json();
+    },
+    onSuccess: () => {
       setNewAlert({ symbol: '', condition: 'above', target: '' });
-      fetchAlerts();
-    } catch {
-      // Network-level failure (offline, DNS, etc.)
-      setAddError(t('alerts.addFailed'));
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+    },
+    onError: (err: Error) => {
+      setAddError(err.message);
     }
+  });
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAlert.symbol || !newAlert.target) return;
+    setAddError('');
+    addMutation.mutate({
+      symbol: newAlert.symbol.toUpperCase(),
+      condition: newAlert.condition,
+      target: Number(newAlert.target),
+    });
   };
 
-  const confirmDelete = async () => {
-    if (pendingDeleteId == null) return;
-    setDeleteError('');
-    try {
-      // Fix #10: check HTTP status on DELETE too
-      const res = await fetch(`/api/alerts/${pendingDeleteId}`, { method: 'DELETE' });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setDeleteError(body?.error ?? t('alerts.deleteFailed'));
-        return;
+        throw new Error(body?.error ?? t('alerts.deleteFailed'));
       }
+    },
+    onSuccess: () => {
       setPendingDeleteId(null);
-      fetchAlerts();
-    } catch {
-      setDeleteError(t('alerts.deleteFailed'));
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+    },
+    onError: (err: Error) => {
+      setDeleteError(err.message);
     }
+  });
+
+  const confirmDelete = () => {
+    if (pendingDeleteId == null) return;
+    setDeleteError('');
+    deleteMutation.mutate(pendingDeleteId);
   };
 
   // Loading skeleton (baseline-ui: structural skeletons for loading states)
@@ -167,10 +168,10 @@ export function AlertsPage() {
             )}
 
             <button
-              type="submit"
-              className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-sm text-sm transition-opacity mt-2"
+              disabled={addMutation.isPending}
+              className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-sm text-sm transition-opacity mt-2 disabled:opacity-50"
             >
-              {t('alerts.submit')}
+              {addMutation.isPending ? <Loader2 className="animate-spin h-4 w-4 mx-auto" /> : t('alerts.submit')}
             </button>
           </form>
         </Panel>
@@ -281,8 +282,10 @@ export function AlertsPage() {
                             <button
                               type="button"
                               onClick={confirmDelete}
-                              className="text-[11px] px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white font-bold transition-opacity"
+                              disabled={deleteMutation.isPending}
+                              className="text-[11px] px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white font-bold transition-opacity disabled:opacity-50"
                             >
+                              {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3 inline mr-1" /> : null}
                               {t('common.delete')}
                             </button>
                           </div>

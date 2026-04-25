@@ -70,7 +70,7 @@ const MetricBar: React.FC<MetricBarProps> = ({ label, value, max, barColor, unit
       <span className="text-sm font-semibold" style={{ color: 'var(--md-on-surface-variant)' }}>{label}</span>
       <span className="text-base font-bold font-mono" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{value}{unit}</span>
     </div>
-    {desc && <div className="text-xs mb-1" style={{ color: 'var(--md-outline)' }}>{desc}</div>}
+    {desc ? <div className="text-xs mb-1" style={{ color: 'var(--md-outline)' }}>{desc}</div> : null}
     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--md-surface-container-high)' }}>
       <div className="h-full rounded-full transition duration-500" style={{ width: `${Math.min(100, (value/max)*100)}%`, background: barColor }}/>
     </div>
@@ -377,7 +377,7 @@ export default function SystemLogs() {
                       className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-base sm:text-sm font-mono focus:outline-none focus:border-emerald-500/50"/>
                   </div>
                 </div>
-                {alertErr && <div className="text-xs" style={{ color: 'var(--color-up)' }}>{alertErr}</div>}
+                {alertErr ? <div className="text-xs" style={{ color: 'var(--color-up)' }}>{alertErr}</div> : null}
                 <div className="flex gap-2">
                   <button type="button" onClick={handleAddAlert}
                     className="px-5 py-2 rounded-xl text-sm font-bold transition bg-indigo-500 text-black hover:bg-indigo-400 active:scale-95">
