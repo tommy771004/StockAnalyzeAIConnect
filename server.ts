@@ -1210,9 +1210,16 @@ async function resolveQueryToYahooSymbol(query: string): Promise<string> {
   const q = query.trim().toUpperCase();
   if (!q) return q;
 
-  // Already looks like a clean symbol? Wait, Chinese won't match this.
-  // Actually, we can just hit Yahoo search directly if we don't find it in TWSE.
-  
+  // FAST PATH: If it's a standard Taiwan stock code (4-5 digits) or a common US symbol (1-5 letters)
+  // we can avoid the expensive TWSE fuzzy search and just try to parse it.
+  const isTaiwanCode = /^\d{4,5}$/.test(q);
+  const isUsSymbol = /^[A-Z]{1,5}$/.test(q);
+  const isAlreadyYahoo = /^[A-Z0-9.]+$/.test(q) && (q.includes('.') || isUsSymbol);
+
+  if (isTaiwanCode) return `${q}.TW`;
+  if (isAlreadyYahoo) return q;
+
+  // SLOW PATH: Fuzzy search for Chinese names or ambiguous strings
   const twseList = await fetchAndCacheTWSE();
   const nameMap = new Map(twseList.map(e => [e.code, e]));
 
@@ -1243,12 +1250,14 @@ async function resolveQueryToYahooSymbol(query: string): Promise<string> {
 app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const rawInput = req.params.symbol as string;
   try {
+    const start = Date.now();
     let yahooSymbol = await resolveQueryToYahooSymbol(rawInput);
+    const resolveTime = Date.now() - start;
     
     // Re-parse to get canonical for TradingView, since Yahoo Symbol is resolved
     const tvSymbol = toTradingViewSymbol(yahooSymbol);
 
-    console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
+    console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol} (Resolve: ${resolveTime}ms)`);
 
     const requestedTimeframe = (req.query.timeframe as string) || '1M';
     
@@ -1266,14 +1275,16 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     }
     const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
 
+    const startTime = Date.now();
     const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
-      NativeYahooApi.quote(yahooSymbol as string),
-      TV.getOverview(tvSymbol),
-      TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d'), // keeping TV indicators behavior safely
-      TV.getNewsHeadlines(tvSymbol),
-      NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }),
-      NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']),
+      NativeYahooApi.quote(yahooSymbol as string).then(res => { console.log(`[Research] Yahoo Quote: ${Date.now() - startTime}ms`); return res; }),
+      TV.getOverview(tvSymbol).then(res => { console.log(`[Research] TV Overview: ${Date.now() - startTime}ms`); return res; }),
+      TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d').then(res => { console.log(`[Research] TV Indicators: ${Date.now() - startTime}ms`); return res; }),
+      TV.getNewsHeadlines(tvSymbol).then(res => { console.log(`[Research] TV News: ${Date.now() - startTime}ms`); return res; }),
+      NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }).then(res => { console.log(`[Research] Yahoo Chart: ${Date.now() - startTime}ms`); return res; }),
+      NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']).then(res => { console.log(`[Research] Yahoo Summary: ${Date.now() - startTime}ms`); return res; }),
     ]);
+    console.log(`[Research] All sub-requests finished in ${Date.now() - startTime}ms`);
 
     const quoteVal: any = quote.status === 'fulfilled' ? quote.value : null;
     const yahooQuote: any = Array.isArray(quoteVal) ? quoteVal[0] : quoteVal;
