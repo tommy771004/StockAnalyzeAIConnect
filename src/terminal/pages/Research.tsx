@@ -20,7 +20,7 @@ export function ResearchPage() {
   const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [timeRange, setTimeRange] = useState('1M');
-  const { data, loading } = useResearchData(activeSymbol, timeRange);
+  const { data, loading, error } = useResearchData(activeSymbol, timeRange);
 
   // Fetch available free models on mount
   useEffect(() => {
@@ -78,6 +78,21 @@ export function ResearchPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-(--color-term-accent)" />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-(--color-term-muted)">
+        <span className="text-sm">{error}</span>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="text-xs border border-(--color-term-border) px-3 py-1 rounded hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-colors"
+        >
+          重新載入
+        </button>
       </div>
     );
   }
