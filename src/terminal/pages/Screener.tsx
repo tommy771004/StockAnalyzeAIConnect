@@ -222,17 +222,17 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
 
         {/* Template Chips */}
         <div className="flex flex-wrap gap-2 shrink-0">
-          {TEMPLATES.map(t => (
-            <button type="button" key={t.id} onClick={() => handleTemplate(t)}
+          {TEMPLATES.map(tmpl => (
+            <button type="button" key={tmpl.id} onClick={() => handleTemplate(tmpl)}
               className={cn(
                 "px-3 py-2 md:py-1.5 rounded-sm text-[11px] md:text-xs font-bold border transition active:scale-95 tracking-wider md:tracking-widest",
-                activeTemplate === t.id
+                activeTemplate === tmpl.id
                   ? "bg-(--color-term-accent)/20 border-(--color-term-accent) text-(--color-term-accent)"
                   : "bg-(--color-term-panel) border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) hover:border-white/20"
               )}
-              title={t(t.desc)}
+              title={t(tmpl.desc)}
             >
-              <span className={activeTemplate === t.id ? '' : t.color}>{t(t.label)}</span>
+              <span className={activeTemplate === tmpl.id ? '' : tmpl.color}>{t(tmpl.label)}</span>
             </button>
           ))}
         </div>
