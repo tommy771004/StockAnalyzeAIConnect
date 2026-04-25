@@ -235,7 +235,7 @@ export function TopMoversPanel({
   const [tab, setTab] = useState<'gainers' | 'losers'>('gainers');
   const rows = tab === 'gainers' ? gainers : losers;
   return (
-    <Panel title="TOP MOVERS" className="min-h-[220px]">
+    <Panel title="TOP MOVERS" collapsible className="min-h-[220px]">
       <div className="flex border-b border-(--color-term-border) text-[11px] tracking-widest">
         {(['gainers', 'losers'] as const).map((k) => (
           <button

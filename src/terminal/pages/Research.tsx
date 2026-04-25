@@ -183,7 +183,7 @@ import ChartWidget from '../../components/ChartWidget';
 function ChartPanel({ symbol, history }: { symbol: string, history: any[] }) {
   const [range, setRange] = useState('1M');
   return (
-    <Panel title="交互式圖表 (Price Action)" className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
+    <Panel title="交互式圖表 (Price Action)" collapsible className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
       <div className="relative flex-1 min-h-0">
         {history.length > 0 ? (
           <ChartWidget symbol={symbol} data={history} onTimeframeChange={setRange} />
@@ -209,7 +209,7 @@ function ValuationPanel({ tv }: { tv: any }) {
     ['持股比例 (Institutional)', tv?.institutional_holders_pct != null ? `${tv.institutional_holders_pct.toFixed(1)}%` : '---'],
   ];
   return (
-    <Panel title="估值與重要指標">
+    <Panel title="估值與重要指標" collapsible>
       <ul className="divide-y divide-(--color-term-border)/60">
         {rows.map(([k, v]) => (
           <li key={k} className="flex items-center justify-between px-4 py-2 text-[12px]">
@@ -233,7 +233,7 @@ function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators?: any }) {
   const total = buy + hold + sell;
 
   return (
-    <Panel title="分析師共識 & 技術指標">
+    <Panel title="分析師共識 & 技術指標" collapsible>
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4">
         <div className={cn("text-[26px] font-bold tracking-[0.2em]",
           !hasData ? 'text-zinc-500' :
@@ -311,7 +311,7 @@ function SentimentRow({
 
 function RecentNewsPanel({ news }: { news: any[] }) {
   return (
-    <Panel title="標的相關新聞" className="flex-1 min-h-[300px]" bodyClassName="overflow-auto">
+    <Panel title="標的相關新聞" collapsible className="flex-1 min-h-[300px]" bodyClassName="overflow-auto">
       {news.length === 0 && <div className="p-10 text-center text-(--color-term-muted)">尚無新聞資料</div>}
       <ul className="divide-y divide-(--color-term-border)/60">
         {news.slice(0, 10).map((n) => {
@@ -357,7 +357,7 @@ function AISummaryPanel({ summary, loading, persona }: { summary: string; loadin
   };
 
   return (
-    <Panel title="AI 摘要與分析" bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
+    <Panel title="AI 摘要與分析" collapsible bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
        <div className="flex flex-col gap-3">
           {loading ? (
              <div className="flex items-center gap-3 py-4">

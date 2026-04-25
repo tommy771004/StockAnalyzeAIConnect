@@ -452,7 +452,7 @@ export function AllocationPanel({ positions }: { positions: any[] }) {
   }, [positions]);
 
   return (
-    <Panel title="資產分配 (市場)" className="h-full" bodyClassName="flex flex-col p-4 gap-4">
+    <Panel title="資產分配 (市場)" collapsible className="h-full" bodyClassName="flex flex-col p-4 gap-4">
       <div className="flex items-center justify-center">
         <Donut sectors={allocation} />
       </div>

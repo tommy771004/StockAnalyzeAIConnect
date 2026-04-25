@@ -83,7 +83,7 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Profile */}
-        <Panel title={t('settings.profile')} icon={<User className="h-4 w-4" />}>
+        <Panel title={t('settings.profile')} icon={<User className="h-4 w-4" />} collapsible>
           <div className="p-4 space-y-4">
             <div>
               <label className="text-[10px] text-(--color-term-muted) uppercase tracking-widest block mb-1">
@@ -128,7 +128,7 @@ export function SettingsPage() {
         </Panel>
 
         {/* Subscription */}
-        <Panel title={t('settings.subscription')} icon={<CreditCard className="h-4 w-4" />}>
+        <Panel title={t('settings.subscription')} icon={<CreditCard className="h-4 w-4" />} collapsible>
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">{t('settings.currentPlan')}</span>
@@ -149,7 +149,7 @@ export function SettingsPage() {
         </Panel>
 
         {/* AI & Integration */}
-        <Panel title={t('settings.aiIntegration')} icon={<Key className="h-4 w-4" />} className="md:col-span-2">
+        <Panel title={t('settings.aiIntegration')} icon={<Key className="h-4 w-4" />} collapsible className="md:col-span-2">
           <div className="p-4 space-y-6">
             <div>
               <label className="text-[11px] text-(--color-term-muted) uppercase tracking-widest block mb-2">
