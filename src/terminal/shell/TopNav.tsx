@@ -15,7 +15,7 @@ const tabs: Tab[] = [
   { id: 'crypto',    label: 'crypto' },
   { id: 'portfolio', label: 'portfolio' },
   { id: 'research',  label: 'research' },
-  { id: 'screener',  label: 'screener' },
+  { id: 'backtest',  label: 'backtest' },
   { id: 'news',      label: 'news' },
 ];
 
