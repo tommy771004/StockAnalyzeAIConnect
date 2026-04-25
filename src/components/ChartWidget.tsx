@@ -478,14 +478,9 @@ tickMarkFormatter: (time: number) => {
       }
 
       // 3. Handle viewport
-      const barCount = uniqueData.length;
       if (!isInitializedRef.current) {
-        // First load: show last 60 bars
-        if (barCount > 60) {
-          chart.timeScale().setVisibleLogicalRange({ from: barCount - 60, to: barCount - 1 });
-        } else {
-          chart.timeScale().fitContent();
-        }
+        // First load: show all data (minimum zoom level)
+        chart.timeScale().fitContent();
         isInitializedRef.current = true;
       } else if (chartTypeChanged && logicalRangeRef.current) {
         // Restore saved viewport only when switching chart type
