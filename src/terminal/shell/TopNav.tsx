@@ -1,8 +1,10 @@
-import React from 'react';
-import { Bell, CircleUserRound, Search, BrainCircuit, Menu, Target, Languages } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Bell, CircleUserRound, Search, BrainCircuit, Menu, Target, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { TerminalView } from '../types';
+import { searchStocks } from '../../services/api';
+import type { SearchResult } from '../../types';
 
 interface Tab {
   id: TerminalView;
@@ -35,11 +37,98 @@ export function TopNav({
   onToggleSidebar,
 }: TopNavProps) {
   const { t, i18n } = useTranslation();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleLanguage = () => {
     const nextLng = i18n.language.startsWith('zh') ? 'en' : 'zh';
     i18n.changeLanguage(nextLng);
   };
+
+  // Debounced search
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); setShowDropdown(false); return; }
+    setIsSearching(true);
+    try {
+      const { quotes } = await searchStocks(q);
+      setResults((quotes || []).slice(0, 8));
+      setShowDropdown(true);
+      setActiveIdx(-1);
+    } catch {
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) { setResults([]); setShowDropdown(false); return; }
+    debounceRef.current = setTimeout(() => doSearch(query), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, doSearch]);
+
+  // Click outside to close
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function selectResult(result: SearchResult) {
+    const sym = result.symbol.toUpperCase();
+    window.location.hash = 'dashboard';
+    window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
+    setQuery('');
+    setResults([]);
+    setShowDropdown(false);
+    onChange('dashboard');
+  }
+
+  function submitSearch(rawInput: string) {
+    if (results.length > 0 && activeIdx >= 0) {
+      selectResult(results[activeIdx]);
+      return;
+    }
+    const sym = rawInput.trim().toUpperCase();
+    if (!sym) return;
+    window.location.hash = 'dashboard';
+    window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
+    setQuery('');
+    setResults([]);
+    setShowDropdown(false);
+    onChange('dashboard');
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, results.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      submitSearch(query);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+      setActiveIdx(-1);
+    }
+  }
+
+  function getDisplayName(r: SearchResult) {
+    return r.chineseName || r.shortname || r.longname || r.symbol;
+  }
 
   return (
     <header
@@ -63,7 +152,6 @@ export function TopNav({
         onClick={(e) => { e.preventDefault(); onChange('dashboard'); }}
       >
         Stock AI Connect
-        {/* Subtle glow underline on hover */}
         <span className="absolute -bottom-0.5 left-0 right-0 h-px bg-(--color-term-accent) opacity-0 group-hover:opacity-60 transition-opacity" />
       </a>
 
@@ -83,7 +171,6 @@ export function TopNav({
                   : 'text-(--color-term-text)/60 hover:text-(--color-term-text)',
               )}
             >
-              {/* Special icon for screener */}
               {tab.id === 'screener' && (
                 <Target className="inline h-3 w-3 mr-1 -mt-0.5" />
               )}
@@ -91,7 +178,6 @@ export function TopNav({
               {isActive && (
                 <>
                   <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" />
-                  {/* Glow effect on active tab */}
                   <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-4 bg-(--color-term-accent)/10 blur-sm pointer-events-none" />
                 </>
               )}
@@ -102,23 +188,98 @@ export function TopNav({
 
       {/* Right-side actions */}
       <div className="ml-auto flex items-center gap-2">
-        {/* Desktop search */}
-        <div className="relative hidden lg:block" style={{ WebkitAppRegion: 'no-drag' } as any}>
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--color-term-muted)" />
+        {/* Desktop search with autocomplete */}
+        <div
+          ref={searchRef}
+          className="relative hidden lg:block"
+          style={{ WebkitAppRegion: 'no-drag' } as any}
+        >
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--color-term-muted) z-10" />
           <input
-            className="h-8 w-48 xl:w-56 border border-(--color-term-border) bg-(--color-term-surface) pl-7 pr-2 text-[12px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none transition-colors"
+            id="topnav-search-input"
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
+            className="h-8 w-48 xl:w-64 border border-(--color-term-border) bg-(--color-term-surface) pl-7 pr-7 text-[12px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none transition-colors"
             placeholder={searchPlaceholder}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const sym = (e.target as HTMLInputElement).value.trim().toUpperCase();
-                if (sym) {
-                  window.location.hash = 'dashboard';
-                  window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
-                  (e.target as HTMLInputElement).value = '';
-                }
-              }
-            }}
+            autoComplete="off"
+            spellCheck={false}
           />
+          {/* Clear button */}
+          {query && !isSearching && (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); inputRef.current?.focus(); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {/* Search spinner */}
+          {isSearching && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 border border-(--color-term-accent) border-t-transparent rounded-full animate-spin" />
+          )}
+
+          {/* Autocomplete dropdown */}
+          {showDropdown && results.length > 0 && (
+            <div
+              className="absolute top-full right-0 mt-1 w-72 border border-(--color-term-border) bg-(--color-term-bg) shadow-2xl z-[9999] overflow-hidden"
+              style={{ backdropFilter: 'blur(12px)' }}
+            >
+              {results.map((r, idx) => (
+                <button
+                  key={r.symbol}
+                  type="button"
+                  id={`search-result-${idx}`}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
+                    idx === activeIdx
+                      ? 'bg-(--color-term-accent)/15 text-(--color-term-text)'
+                      : 'hover:bg-(--color-term-surface) text-(--color-term-text)/80',
+                  )}
+                  onMouseDown={e => { e.preventDefault(); selectResult(r); }}
+                >
+                  {/* Symbol badge */}
+                  <span
+                    className="font-mono text-[10px] font-bold tracking-wider px-1.5 py-0.5 border border-(--color-term-accent)/40 text-(--color-term-accent) shrink-0 text-center"
+                    style={{ minWidth: '4rem' }}
+                  >
+                    {r.symbol.replace(/\.(TW|TWO)$/, '')}
+                  </span>
+                  {/* Name + exchange */}
+                  <span className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[12px] font-medium truncate">
+                      {getDisplayName(r)}
+                    </span>
+                    {r.exchDisp && (
+                      <span className="text-[10px] text-(--color-term-muted) truncate">
+                        {r.exchDisp}
+                        {r.typeDisp && r.typeDisp !== 'Equity' ? ` · ${r.typeDisp}` : ''}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))}
+              {/* Footer keyboard hint */}
+              <div className="border-t border-(--color-term-border) px-3 py-1.5 flex items-center gap-1 text-(--color-term-muted) text-[10px]">
+                <kbd className="px-1 border border-(--color-term-border) rounded text-[9px]">↑↓</kbd>
+                <span>選擇</span>
+                <kbd className="px-1 border border-(--color-term-border) rounded text-[9px] ml-1">Enter</kbd>
+                <span>確認</span>
+                <kbd className="px-1 border border-(--color-term-border) rounded text-[9px] ml-1">Esc</kbd>
+                <span>關閉</span>
+              </div>
+            </div>
+          )}
+
+          {/* No results */}
+          {showDropdown && !isSearching && query && results.length === 0 && (
+            <div className="absolute top-full right-0 mt-1 w-64 border border-(--color-term-border) bg-(--color-term-bg) shadow-xl z-[9999] px-3 py-4 text-center text-(--color-term-muted) text-[12px]">
+              找不到「{query}」相關股票
+            </div>
+          )}
         </div>
 
         {/* Language toggle */}

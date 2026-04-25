@@ -10,11 +10,11 @@ import { SecFilingsPanel } from '../ui/SecFilingsPanel';
 import { CongressTradesPanel } from '../ui/CongressTradesPanel';
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
-  const [searchInput, setSearchInput]   = useState('');
-  const [aiSummary, setAiSummary]       = useState('');
-  const [aiLoading, setAiLoading]       = useState(false);
-  const [persona, setPersona]           = useState('hermes');
-  const [viewMode, setViewMode]         = useState<'standard' | 'pro'>('standard');
+  const [searchInput, setSearchInput] = useState('');
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [persona, setPersona] = useState('hermes');
+  const [viewMode, setViewMode] = useState<'standard' | 'pro'>('standard');
   const { data, loading } = useResearchData(activeSymbol);
 
   // Listen for global symbol-search events (from TopNav search bar and Screener page)
@@ -85,7 +85,7 @@ export function ResearchPage() {
               className="h-9 w-full rounded-sm border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-sm focus:border-(--color-term-accent) focus:outline-none"
             />
           </form>
-          
+
           <div className="flex bg-(--color-term-surface) p-1 rounded border border-(--color-term-border)">
             <button
               type="button"
@@ -237,9 +237,9 @@ function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators?: any }) {
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4">
         <div className={cn("text-[26px] font-bold tracking-[0.2em]",
           !hasData ? 'text-zinc-500' :
-          rec.includes('BUY') ? 'text-sky-400' :
-          rec.includes('SELL') ? 'text-rose-400' :
-          'text-amber-400')}>
+            rec.includes('BUY') ? 'text-sky-400' :
+              rec.includes('SELL') ? 'text-rose-400' :
+                'text-amber-400')}>
           {hasData ? rec.replace('STRONG_', '').replace('_', ' ') : 'N/A'}
         </div>
         <div className="text-right text-[11px]">
@@ -247,20 +247,20 @@ function ConsensusPanel({ tv, tvIndicators }: { tv: any; tvIndicators?: any }) {
             技術評分: <span className="text-(--color-term-text) tabular-nums">{hasData ? (score * 100).toFixed(0) : '---'}</span>
           </div>
           <div className="text-(--color-term-muted)">
-             趨勢方向: <span className={cn("tabular-nums",
-               !hasData ? 'text-zinc-500' :
-               score > 0 ? 'text-sky-400' :
-               score < 0 ? 'text-rose-400' :
-               'text-amber-400')}>
-               {!hasData ? '---' : score > 0 ? '看多' : score < 0 ? '看空' : '中立'}
-             </span>
+            趨勢方向: <span className={cn("tabular-nums",
+              !hasData ? 'text-zinc-500' :
+                score > 0 ? 'text-sky-400' :
+                  score < 0 ? 'text-rose-400' :
+                    'text-amber-400')}>
+              {!hasData ? '---' : score > 0 ? '看多' : score < 0 ? '看空' : '中立'}
+            </span>
           </div>
         </div>
       </div>
       <div className="px-4 pb-4">
         <div className="flex h-2 overflow-hidden bg-(--color-term-border) rounded-full">
           {!hasData ? (
-             <div className="w-full bg-zinc-800" />
+            <div className="w-full bg-zinc-800" />
           ) : (
             <>
               <div className="bg-sky-400" style={{ width: `${(buy / total) * 100}%` }} />
@@ -317,8 +317,8 @@ function RecentNewsPanel({ news }: { news: any[] }) {
         {news.slice(0, 10).map((n) => {
           const url = n.link || (n.storyPath ? `https://www.tradingview.com${n.storyPath}` : null);
           return (
-            <li 
-              key={n.id || n.title} 
+            <li
+              key={n.id || n.title}
               className={cn(
                 "px-4 py-3 transition-colors",
                 url ? "hover:bg-white/5 cursor-pointer group/item" : "opacity-80"
@@ -342,37 +342,37 @@ function RecentNewsPanel({ news }: { news: any[] }) {
 
 function AISummaryPanel({ summary, loading, persona }: { summary: string; loading: boolean; persona: string }) {
   const PERSONA_LABEL: Record<string, string> = {
-    hermes:          'Hermes AI (通用)',
-    buffett:         '華倫·巴菲特視角',
-    munger:          '查理·芒格視角',
-    graham:          '班傑明·葛拉漢視角',
-    lynch:           '彼得·林區視角',
-    soros:           '喬治·索羅斯視角',
-    dalio:           '瑞·達利歐視角',
-    simons:          '吉姆·西蒙斯視角',
-    cathie_wood:     '凱西·伍德視角',
-    congress_tracker:'國會交易分析',
-    geopolitics:     '地緣政治分析',
-    risk_manager:    '風險管理師視角',
+    hermes: 'Terminal AI (通用)',
+    buffett: '華倫·巴菲特視角',
+    munger: '查理·芒格視角',
+    graham: '班傑明·葛拉漢視角',
+    lynch: '彼得·林區視角',
+    soros: '喬治·索羅斯視角',
+    dalio: '瑞·達利歐視角',
+    simons: '吉姆·西蒙斯視角',
+    cathie_wood: '凱西·伍德視角',
+    congress_tracker: '國會交易分析',
+    geopolitics: '地緣政治分析',
+    risk_manager: '風險管理師視角',
   };
 
   return (
     <Panel title="AI 摘要與分析" collapsible bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
-       <div className="flex flex-col gap-3">
-          {loading ? (
-             <div className="flex items-center gap-3 py-4">
-                <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
-                <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">正在以 {PERSONA_LABEL[persona] ?? persona} 分析...</span>
-             </div>
-          ) : (
-             <p className="text-[13px] leading-relaxed text-zinc-200 italic whitespace-pre-wrap">
-                {summary}
-             </p>
-          )}
-          <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2">
-             {PERSONA_LABEL[persona] ?? persona} · Powered by OpenRouter
+      <div className="flex flex-col gap-3">
+        {loading ? (
+          <div className="flex items-center gap-3 py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
+            <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">正在以 {PERSONA_LABEL[persona] ?? persona} 分析...</span>
           </div>
-       </div>
+        ) : (
+          <p className="text-[13px] leading-relaxed text-zinc-200 italic whitespace-pre-wrap">
+            {summary}
+          </p>
+        )}
+        <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2">
+          {PERSONA_LABEL[persona] ?? persona} · Powered by OpenRouter
+        </div>
+      </div>
     </Panel>
   );
 }

@@ -641,9 +641,139 @@ app.get('/api/news/feed', authMiddleware, async (_req, res) => {
   } catch (e) { handleApiError(res, e); }
 });
 
+// ─── TWSE / TPEx Company Name Cache ─────────────────────────────────────────
+interface TWSEEntry {
+  code: string;
+  name: string;
+  market: 'TWSE' | 'TPEX';
+}
+
+let _twseCache: TWSEEntry[] = [];
+let _twseCacheTime = 0;
+const TWSE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+async function fetchAndCacheTWSE(): Promise<TWSEEntry[]> {
+  const now = Date.now();
+  if (_twseCache.length > 0 && now - _twseCacheTime < TWSE_CACHE_TTL) {
+    return _twseCache;
+  }
+  const results: TWSEEntry[] = [];
+  try {
+    const r = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL', {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const data = await r.json() as Array<{ Code: string; Name: string }>;
+      data.forEach(item => {
+        if (item.Code && item.Name) {
+          results.push({ code: item.Code, name: item.Name, market: 'TWSE' });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('[TWSE] Failed to fetch listed stocks:', (e as Error).message);
+  }
+  try {
+    const r = await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes', {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const data = await r.json() as Array<{ SecuritiesCompanyCode: string; CompanyName: string }>;
+      data.forEach(item => {
+        if (item.SecuritiesCompanyCode && item.CompanyName) {
+          results.push({ code: item.SecuritiesCompanyCode, name: item.CompanyName, market: 'TPEX' });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('[TWSE] Failed to fetch OTC stocks:', (e as Error).message);
+  }
+  if (results.length > 0) {
+    _twseCache = results;
+    _twseCacheTime = now;
+    console.log(`[TWSE] Cache loaded: ${results.length} stocks`);
+  }
+  return _twseCache;
+}
+
+function hasChinese(str: string): boolean {
+  return /[\u4e00-\u9fff]/.test(str);
+}
+
+function twseFuzzySearch(list: TWSEEntry[], query: string, limit = 8): TWSEEntry[] {
+  const q = query.toLowerCase();
+  return list
+    .filter(e =>
+      e.code.toLowerCase().startsWith(q) ||
+      e.code.toLowerCase().includes(q) ||
+      e.name.includes(query) ||
+      e.name.toLowerCase().includes(q)
+    )
+    .slice(0, limit);
+}
+
 app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
-  try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
-  catch (e) { handleApiError(res, e); }
+  const query = decodeURIComponent(req.params.query as string);
+  try {
+    const twseList = await fetchAndCacheTWSE();
+    const nameMap = new Map(twseList.map(e => [e.code, e]));
+    const isChinese = hasChinese(query);
+
+    let quotes: Array<{
+      symbol: string; shortname?: string; longname?: string;
+      chineseName?: string; exchDisp?: string; typeDisp?: string;
+    }> = [];
+
+    if (isChinese) {
+      // Pure Chinese query → only search local TWSE/TPEx data
+      const localResults = twseFuzzySearch(twseList, query);
+      quotes = localResults.map(e => ({
+        symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
+        shortname: e.name,
+        longname: e.name,
+        chineseName: e.name,
+        exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
+        typeDisp: 'Equity',
+      }));
+    } else {
+      // English / numeric query → Yahoo Finance + local TWSE enrich
+      try {
+        const data = await NativeYahooApi.search(query);
+        quotes = (data.quotes || []).map((q: Record<string, unknown>) => {
+          const sym = (q.symbol as string) || '';
+          const code = sym.replace(/\.(TW|TWO)$/, '');
+          const entry = nameMap.get(code);
+          return { ...q, chineseName: entry?.name };
+        });
+      } catch {
+        // Yahoo failed — fall through to local-only
+      }
+      // Supplement with local TWSE results for numeric queries
+      if (/^\d/.test(query)) {
+        const localResults = twseFuzzySearch(twseList, query, 5);
+        const existing = new Set(quotes.map(q => q.symbol));
+        for (const e of localResults) {
+          const sym = e.code + (e.market === 'TWSE' ? '.TW' : '.TWO');
+          if (!existing.has(sym)) {
+            quotes.unshift({
+              symbol: sym,
+              shortname: e.name,
+              longname: e.name,
+              chineseName: e.name,
+              exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
+              typeDisp: 'Equity',
+            });
+          }
+        }
+      }
+    }
+    // Return { quotes: [...] } so client-side `res.quotes` works correctly
+    res.json({ quotes });
+  } catch (e) {
+    handleApiError(res, e);
+  }
 });
 
 app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {

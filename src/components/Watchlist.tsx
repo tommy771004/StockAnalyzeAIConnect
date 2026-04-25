@@ -225,7 +225,7 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-black text-white group-hover:text-indigo-400 transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>{res.symbol}</span>
-                        <span className="text-[10px] font-medium text-zinc-500 truncate group-hover:text-zinc-400">{res.shortname || res.longname}</span>
+                        <span className="text-[10px] font-medium text-zinc-500 truncate group-hover:text-zinc-400">{res.chineseName || res.shortname || res.longname}</span>
                       </div>
                       <span className="text-[9px] font-black px-2 py-1 rounded bg-white/5 text-zinc-500 uppercase tracking-widest">{res.exchDisp}</span>
                     </button>

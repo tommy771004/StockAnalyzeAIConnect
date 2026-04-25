@@ -74,7 +74,7 @@
   },
   "build": {
     "appId": "com.hermes.trading",
-    "productName": "Hermes AI Trading",
+    "productName": "Quantitative trading platform",
     "directories": {
       "output": "release"
     },

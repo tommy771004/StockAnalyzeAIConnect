@@ -61,6 +61,8 @@ export interface SearchResult {
   shortname?: string;
   longname?: string;
   exchDisp?: string;
+  chineseName?: string; // 台股中文公司名稱（來自 TWSE/TPEx）
+  typeDisp?: string;
 }
 
 export interface WatchlistItem {
