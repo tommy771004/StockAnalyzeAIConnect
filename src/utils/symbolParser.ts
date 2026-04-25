@@ -16,14 +16,16 @@
  */
 
 export type Market =
-  | 'TW'      // 台股上市
-  | 'TWO'     // 台股上櫃
-  | 'US'      // 美股（NYSE / NASDAQ / AMEX 合併，查詢時交給下游解析）
+  | 'TW'           // 台股上市
+  | 'TWO'          // 台股上櫃
+  | 'US'           // 美股（NYSE / NASDAQ / AMEX 合併，查詢時交給下游解析）
   | 'HK'
   | 'JP'
   | 'CRYPTO'
   | 'FOREX'
   | 'INDEX'
+  | 'TW_FUTURES'   // 台灣期貨（TXF = 台指期貨）
+  | 'TW_OPTIONS'   // 台灣選擇權（TXO = 台指選擇權）
   | 'UNKNOWN';
 
 export interface CanonicalSymbol {
@@ -35,6 +37,14 @@ export interface CanonicalSymbol {
   market: Market;
   /** TradingView 交易所 hint（若輸入已包含） */
   tvExchange?: string;
+
+  // Derivatives fields
+  /** 到期日（YYYYMM 格式，如 202503） */
+  expiry?: string;
+  /** 履約價 */
+  strike?: number;
+  /** 選擇權類型（C = Call, P = Put） */
+  optionType?: 'C' | 'P';
 }
 
 // ── Yahoo 後綴 → Market ─────────────────────────────────────────────────────
@@ -55,6 +65,8 @@ const TV_EXCHANGE_BY_MARKET: Record<Market, string> = {
   CRYPTO: 'BINANCE',
   FOREX: 'FX_IDC',
   INDEX: 'TVC',
+  TW_FUTURES: 'TAIFEX',  // 台灣期交所
+  TW_OPTIONS: 'TAIFEX',  // 台灣期交所
   UNKNOWN: '',
 };
 
@@ -82,6 +94,10 @@ const YAHOO_CRYPTO_RE = /^([A-Z0-9]+)-([A-Z]{3,5})$/;
 // TradingView 風格 `EXCHANGE:CODE`
 const TV_RE = /^([A-Z_]+):([A-Z0-9.]+)$/;
 
+// 台灣期貨期權：TXF202503, TXO202503C19000
+const TXF_RE = /^TXF(\d{6})$/;  // TXF202503
+const TXO_RE = /^TXO(\d{6})([CP])(\d{5,6})$/;  // TXO202503C19000
+
 /**
  * 將任意輸入正規化為 CanonicalSymbol。
  * 接受：
@@ -91,6 +107,32 @@ const TV_RE = /^([A-Z_]+):([A-Z0-9.]+)$/;
  */
 export function parseSymbol(input: string): CanonicalSymbol {
   const raw = input.trim().toUpperCase();
+
+  // 0) TXO 選擇權 (TXO202503C19000)
+  const txo = raw.match(TXO_RE);
+  if (txo) {
+    const [, expiry, optType, strikeStr] = txo;
+    return {
+      raw: input,
+      code: raw,
+      market: 'TW_OPTIONS',
+      expiry,
+      optionType: optType as 'C' | 'P',
+      strike: parseInt(strikeStr, 10) / 100, // 除以 100 轉為價格
+    };
+  }
+
+  // 0b) TXF 期貨 (TXF202503)
+  const txf = raw.match(TXF_RE);
+  if (txf) {
+    const [, expiry] = txf;
+    return {
+      raw: input,
+      code: raw,
+      market: 'TW_FUTURES',
+      expiry,
+    };
+  }
 
   // 1) TradingView 格式
   const tv = raw.match(TV_RE);
@@ -166,6 +208,10 @@ export function toYahoo(s: CanonicalSymbol | string): string {
       const alias = INDEX_ALIASES[sym.code];
       return alias?.yahoo ?? `^${sym.code}`;
     }
+    case 'TW_FUTURES':
+    case 'TW_OPTIONS':
+      // Derivatives 不支援 Yahoo，直接返回原始代碼
+      return sym.code;
     case 'US':
     default:
       return sym.code;
@@ -190,6 +236,12 @@ export function toTradingView(
     const base = sym.code.replace(/USDT?$/, '');
     const quote = opts?.quote ?? 'USDT';
     return `${exchange || 'BINANCE'}:${base}${quote}`;
+  }
+
+  if (sym.market === 'TW_FUTURES' || sym.market === 'TW_OPTIONS') {
+    // 期貨期權直接用代碼，如 TAIFEX:TXF202503
+    if (!exchange) return sym.code;
+    return `${exchange}:${sym.code}`;
   }
 
   if (!exchange) return sym.code;
