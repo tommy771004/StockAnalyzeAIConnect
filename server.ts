@@ -36,8 +36,7 @@ import { runAdvancedBacktest } from './server/services/backtestEngine.js';
 import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
 import { generateWeeklyReport } from './server/services/reportService.js';
-
-
+import { copyTradingService } from './server/services/copyTradingService.js';
 
 
 
@@ -672,7 +671,9 @@ app.get('/api/autotrading/report', authMiddleware, async (req: AuthRequest, res)
   }
 });
 
-
+app.get('/api/autotrading/followers', authMiddleware, (_req, res) => {
+  res.json({ ok: true, followers: copyTradingService.getFollowers() });
+});
 
 
 

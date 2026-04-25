@@ -66,8 +66,13 @@ export async function runAdvancedBacktest(
       }
 
       if (shouldExit) {
-        const pnl = (currentPrice - entryPrice) * shares;
-        balance += shares * currentPrice;
+        const tradeValue = shares * currentPrice;
+        const commission = Math.max(20, tradeValue * 0.001425); // 0.1425% fee
+        const tax = tradeValue * 0.003; // 0.3% tax
+        
+        balance += (tradeValue - commission - tax);
+        const pnl = (currentPrice - entryPrice) * shares - commission - tax;
+        
         trades.push({
           symbol, entryPrice, exitPrice: currentPrice,
           entryDate, exitDate: currentDate,
@@ -96,11 +101,26 @@ export async function runAdvancedBacktest(
       const totalW = signals.reduce((acc, s) => acc + s.weight, 0);
       
       if (totalW > 0 && (buyScore / totalW) > 60) {
-        shares = Math.floor(balance * 0.9 / currentPrice);
-        balance -= shares * currentPrice;
-        entryPrice = currentPrice;
-        entryDate = currentDate;
-        highWaterMark = currentPrice;
+        const targetInvest = balance * 0.9;
+        // 先計算預估股數
+        let estShares = Math.floor(targetInvest / currentPrice);
+        // 考慮手續費
+        const estCommission = Math.max(20, estShares * currentPrice * 0.001425);
+        if (estShares * currentPrice + estCommission > balance) {
+           estShares = Math.floor((balance - 20) / (currentPrice * 1.001425));
+        }
+
+        if (estShares > 0) {
+          shares = estShares;
+          const tradeValue = shares * currentPrice;
+          const commission = Math.max(20, tradeValue * 0.001425);
+          
+          balance -= (tradeValue + commission);
+          // 買入成本需要攤平手續費
+          entryPrice = (tradeValue + commission) / shares;
+          entryDate = currentDate;
+          highWaterMark = currentPrice;
+        }
       }
     }
 

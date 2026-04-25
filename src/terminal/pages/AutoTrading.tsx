@@ -9,6 +9,9 @@ import { DecisionLog } from '../../components/AutoTrading/DecisionLog';
 import { AssetMonitor } from '../../components/AutoTrading/AssetMonitor';
 import { AccountSummary } from '../../components/AutoTrading/AccountSummary';
 import { RiskControlPanel } from '../../components/AutoTrading/RiskControlPanel';
+import { StrategyTab } from '../../components/AutoTrading/StrategyTab';
+import { BacktestPanel } from '../../components/AutoTrading/BacktestPanel';
+import { StrategySandbox } from '../../components/AutoTrading/StrategySandbox';
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
 
@@ -24,6 +27,7 @@ async function callApi(path: string, method = 'GET', body?: unknown) {
 
 export function AutoTradingPage() {
   const ws = useAutotradingWS();
+  const [mainTab, setMainTab] = React.useState('LIVE_VIEW');
 
   const handleStart = async (cfg: Partial<AgentConfig>) => {
     await callApi('/api/autotrading/start', 'POST', cfg);
@@ -50,12 +54,13 @@ export function AutoTradingPage() {
         <div className="flex items-center gap-4">
           <span className="text-[11px] font-bold text-(--color-term-accent) tracking-[0.25em]">QUANTUM_CORE_V1</span>
           <nav className="flex gap-3">
-            {['LIVE_VIEW', 'STRATEGY', 'BACKTEST', 'SIMULATION'].map((tab, i) => (
+            {['LIVE_VIEW', 'STRATEGY', 'BACKTEST', 'SIMULATION'].map((tab) => (
               <button
                 key={tab}
                 type="button"
+                onClick={() => setMainTab(tab)}
                 className={`text-[10px] uppercase tracking-widest pb-0.5 transition-colors ${
-                  i === 0
+                  mainTab === tab
                     ? 'text-(--color-term-accent) border-b border-(--color-term-accent)'
                     : 'text-(--color-term-muted) hover:text-(--color-term-text)'
                 }`}
@@ -86,20 +91,56 @@ export function AutoTradingPage() {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
-        {/* Left — Logs + Asset Monitor */}
+        {/* Left — Logs + Asset Monitor or Other Tabs */}
         <div className="flex flex-col gap-2 min-h-0">
-          {/* Decision Log */}
-          <div className="flex-1 border border-(--color-term-border) rounded-sm min-h-0 overflow-hidden">
-            <DecisionLog logs={ws.logs} />
-          </div>
-          {/* Asset Monitor */}
-          <div className="h-52 border border-(--color-term-border) rounded-sm overflow-hidden shrink-0">
-            <AssetMonitor
-              positions={ws.positions}
-              symbols={currentSymbols}
-              logs={ws.logs}
-            />
-          </div>
+          {mainTab === 'LIVE_VIEW' && (
+            <>
+              {/* Decision Log */}
+              <div className="flex-1 border border-(--color-term-border) rounded-sm min-h-0 overflow-hidden">
+                <DecisionLog logs={ws.logs} />
+              </div>
+              {/* Asset Monitor */}
+              <div className="h-52 border border-(--color-term-border) rounded-sm overflow-hidden shrink-0">
+                <AssetMonitor
+                  positions={ws.positions}
+                  symbols={currentSymbols}
+                  logs={ws.logs}
+                />
+              </div>
+            </>
+          )}
+
+          {mainTab === 'STRATEGY' && (
+            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
+              <StrategyTab 
+                strategies={ws.config?.strategies ?? []}
+                params={ws.config?.params ?? {}}
+                onStrategiesChange={(s) => handleUpdateConfig({ strategies: s })}
+                onParamsChange={(p) => handleUpdateConfig({ params: p })}
+                isRunning={ws.status === 'running'}
+              />
+            </div>
+          )}
+
+          {mainTab === 'BACKTEST' && (
+            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
+              <BacktestPanel 
+                symbol={currentSymbols[0]} 
+                config={ws.config || ({ mode: 'simulated', strategies: ['RSI_REVERSION'], params: {}, symbols: currentSymbols, symbolConfigs: {} } as unknown as AgentConfig)} 
+              />
+            </div>
+          )}
+
+          {mainTab === 'SIMULATION' && (
+            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
+              <StrategySandbox 
+                config={ws.config || ({ mode: 'simulated', strategies: [], params: {}, symbols: currentSymbols, symbolConfigs: {} } as unknown as AgentConfig)}
+                onUpdateShadow={(n, p) => handleUpdateConfig({ shadowConfigs: { ...ws.config?.shadowConfigs, [n]: p } })}
+                onPromote={p => handleUpdateConfig({ params: p })}
+                onDelete={n => { const next = { ...ws.config?.shadowConfigs }; delete next[n]; handleUpdateConfig({ shadowConfigs: next }); }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right sidebar */}

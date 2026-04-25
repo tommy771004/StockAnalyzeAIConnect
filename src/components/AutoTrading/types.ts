@@ -7,6 +7,19 @@ export type AgentStatus = 'running' | 'stopped' | 'cooldown' | 'error' | 'paused
 export type TradingMode = 'simulated' | 'real';
 export type LogLevel = 'INFO' | 'WARNING' | 'ERROR' | 'EXECUTION' | 'CRITICAL' | 'SYSTEM' | 'MONITOR' | 'SHADOW' | 'HEDGE' | 'RISK_CHK';
 
+export const LOG_LEVEL_COLORS: Record<LogLevel, string> = {
+  INFO: 'text-cyan-400',
+  WARNING: 'text-amber-400',
+  ERROR: 'text-rose-400',
+  EXECUTION: 'text-emerald-400',
+  CRITICAL: 'text-rose-500 bg-rose-500/10 px-1',
+  SYSTEM: 'text-violet-400',
+  MONITOR: 'text-indigo-400',
+  SHADOW: 'text-slate-400',
+  HEDGE: 'text-fuchsia-400',
+  RISK_CHK: 'text-orange-400'
+};
+
 export interface StrategyParams {
   RSI_REVERSION?: { period: number; overbought: number; oversold: number; weight: number };
   BOLLINGER_BREAKOUT?: { period: number; stdDev: number; weight: number };

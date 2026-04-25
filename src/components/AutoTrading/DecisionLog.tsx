@@ -79,6 +79,7 @@ export function DecisionLog({ logs, autoScroll = true }: Props) {
               </div>
             )}
           </React.Fragment>
+          ))
         )}
         <div ref={endRef} />
       </div>
