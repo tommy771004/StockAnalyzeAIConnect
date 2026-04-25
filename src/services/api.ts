@@ -299,6 +299,11 @@ export interface ScreenerFilters {
   belowSMA20?: boolean;
 }
 
+export const getSectors = (): Promise<any[]> => fetchJ<any[]>('/api/sectors');
+
+export const getSectorSymbols = (id: string): Promise<string[]> =>
+  fetchJ<string[]>(`/api/sectors/${encodeURIComponent(id)}/symbols`);
+
 export const runScreener = (symbols: string[], filters?: ScreenerFilters): Promise<{ results: ScreenerResult[] }> =>
   fetchJ<{ results: ScreenerResult[] }>('/api/screener', {
     method: 'POST',
@@ -313,6 +318,19 @@ export interface InsightsPayload {
   tvOverview: Record<string, unknown> | null;
   tvIndicators: Record<string, number | string | null> | null;
   tvNews: Array<{ id: string; title: string; published: number; source: string; storyPath: string }> | null;
+  wantGooChip: {
+    mainPlayersNet: number;
+    brokerDiff: number;
+    concentration5d: number;
+    concentration20d: number;
+    foreignNet: number;
+    trustNet: number;
+    dealerNet: number;
+    holder400Pct: number;
+    holder1000Pct: number;
+    foreignPct: number;
+    trustPct: number;
+  } | null;
   errors?: Array<{ source: string; message: string }>;
 }
 
@@ -373,6 +391,10 @@ export const deleteStrategy = (id: number): Promise<void> =>
 
 export const activateStrategy = (id: number): Promise<void> =>
   fetchJ<void>(`/api/strategies/${id}/activate`, { method: 'POST' });
+
+// ── Performance ─────────────────────────────────────────────────────────────
+export const getPerformance = (period: string = '1m'): Promise<any> =>
+  fetchJ<any>(`/api/autotrading/performance?period=${period}`);
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
 export const openExternal  = (url: string): void => {

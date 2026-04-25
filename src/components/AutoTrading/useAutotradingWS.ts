@@ -10,6 +10,16 @@ const WS_PATH = '/ws/autotrading';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_LOGS = 300;
 
+export interface OrderLifecycleEvent {
+  orderId: number;
+  status: string;
+  symbol: string;
+  side: string;
+  qty: number;
+  price: number;
+  timestamp: string;
+}
+
 interface AutotradingState {
   status: AgentStatus;
   config: AgentConfig | null;

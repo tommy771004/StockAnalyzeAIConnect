@@ -41,6 +41,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   agentMemories:  many(agentMemories),
   portfolioHistory: many(portfolioHistory),
   paymentOrders:  many(paymentOrders),
+  orders:         many(orders),
+  notificationSettings: many(notificationSettings),
 }));
 
 // ─── portfolio_history (NAV snapshots) ────────────────────────────────────────
@@ -212,8 +214,6 @@ export const agentMemoriesRelations = relations(agentMemories, ({ one }) => ({
   user: one(users, { fields: [agentMemories.userId], references: [users.id] }),
 }));
 
-// update usersRelations to include agentMemories
-
 // ─── payment_orders ───────────────────────────────────────────────────────────
 export const paymentOrders = pgTable('payment_orders', {
   id:              serial('id').primaryKey(),
@@ -227,7 +227,6 @@ export const paymentOrders = pgTable('payment_orders', {
 },
 (t) => [
   index('payment_orders_user_id_idx').on(t.userId),
-  // Note: unique constraint already creates an index, but explicit indexing can be done if needed.
 ]);
 
 export const paymentOrdersRelations = relations(paymentOrders, ({ one }) => ({
@@ -267,6 +266,47 @@ export const autotradingLogs = pgTable('autotrading_logs', {
   action:     text('action'),
 });
 
+// ─── orders ───────────────────────────────────────────────────────────────────
+export const orders = pgTable('orders', {
+  id:            serial('id').primaryKey(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  symbol:        text('symbol').notNull(),
+  side:          text('side').notNull(),          // 'BUY' | 'SELL'
+  qty:           numeric('qty').notNull(),
+  price:         numeric('price').notNull(),
+  orderType:     text('order_type').notNull(),    // 'MARKET' | 'LIMIT'
+  marketType:    text('market_type').notNull(),   // 'TW_STOCK' | 'US_STOCK'
+  status:        text('status').notNull(),        // 'PENDING' | 'PARTIAL' | 'FILLED' | 'CANCELLED' | 'REJECTED'
+  brokerOrderId: text('broker_order_id'),
+  lastError:     text('last_error'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+  index('orders_user_id_idx').on(t.userId),
+  index('orders_broker_id_idx').on(t.brokerOrderId),
+]);
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+}));
+
+// ─── notification_settings ────────────────────────────────────────────────────
+export const notificationSettings = pgTable('notification_settings', {
+  id:        serial('id').primaryKey(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  channel:   text('channel').notNull(),           // 'telegram' | 'discord' | 'webhook' | 'email'
+  target:    text('target').notNull(),            // webhook URL or ID
+  enabled:   boolean('enabled').notNull().default(true),
+  triggers:  jsonb('triggers').notNull(),         // Array of NotifyEvent: ['fill', 'risk_block', ...]
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('notification_settings_user_id_idx').on(t.userId),
+]);
+
+export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
+  user: one(users, { fields: [notificationSettings.userId], references: [users.id] }),
+}));
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -292,3 +332,9 @@ export type AutotradingConfig = typeof autotradingConfigs.$inferSelect;
 export type NewAutotradingConfig = typeof autotradingConfigs.$inferInsert;
 export type AutotradingLog = typeof autotradingLogs.$inferSelect;
 export type NewAutotradingLog = typeof autotradingLogs.$inferInsert;
+
+export type OrderRow = typeof orders.$inferSelect;
+export type NewOrderRow = typeof orders.$inferInsert;
+
+export type NotificationSetting = typeof notificationSettings.$inferSelect;
+export type NewNotificationSetting = typeof notificationSettings.$inferInsert;

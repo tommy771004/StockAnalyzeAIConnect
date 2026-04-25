@@ -7,6 +7,8 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import * as TV from './server/services/TradingViewService.js';
 import * as TWSE from './server/services/TWSeService.js';
+import * as Sectors from './server/services/SectorService.js';
+import * as WantGoo from './server/services/WantGooService.js';
 import { parseSymbol, toYahoo } from './src/utils/symbolParser.js';
 import { authMiddleware, setTokenCookie, clearTokenCookie, type AuthRequest } from './server/middleware/auth.js';
 import * as usersRepo from './server/repositories/usersRepo.js';
@@ -768,11 +770,12 @@ app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, re
   console.log(`[AI] Generating summary for ${sym} (TV Symbol: ${tvSym})...`);
 
   try {
-    const [quoteRes, newsRes, tvOverview, tvIndicators] = await Promise.allSettled([
+    const [quoteRes, newsRes, tvOverview, tvIndicators, wantGooRes] = await Promise.allSettled([
       NativeYahooApi.quote(toYahoo(sym)),
       NativeYahooApi.search(toYahoo(sym)),
       TV.getOverview(tvSym),
-      TV.getIndicators(tvSym)
+      TV.getIndicators(tvSym),
+      WantGoo.getChipData(sym)
     ]);
 
     const quote = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
@@ -782,23 +785,31 @@ app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, re
     // Flatten nested TV responses
     const tvO = tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null;
     const tvI = tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null;
+    const chip = wantGooRes.status === 'fulfilled' ? (wantGooRes.value as any) : null;
 
     const newsText = news.length > 0 
       ? news.slice(0, 3).map((n: any) => `- ${n.title || n.headline || '無標題'}`).join('\n')
       : '無近期相關新聞';
     const techText = tvI ? JSON.stringify(tvI).slice(0, 500) : '無技術指標數據';
+    
+    let chipText = '無籌碼面數據';
+    if (chip) {
+      chipText = `主力買賣超: ${chip.mainPlayersNet}張, 外資: ${chip.foreignNet}張, 投信: ${chip.trustNet}張, 5日集中度: ${chip.concentration5d}%, 1000張大戶持股比: ${chip.holder1000Pct}%`;
+    }
 
     const prompt = `你是一位專業的金融分析師。請針對 ${sym} 提供深入的 AI 摘要分析。
 市場數據：現價 ${quote?.regularMarketPrice || tvO?.close || 'N/A'}，漲跌幅 ${quote?.regularMarketChangePercent || 'N/A'}%。
 公司概況：${tvO?.description || '無描述'}。
 技術指標摘要：${techText}。
+籌碼面資料：${chipText}。
 最近新聞：
 ${newsText}
 
 請提供：
 1. 營運狀況簡評
 2. 技術面分析（根據指標）
-3. 投資建議（看多/看空/中立）與理由。
+3. 籌碼面分析（分析主力與法人動向）
+4. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
     const resultText = await callAISimple(prompt, false, req.userId, 'free', req.query.model as string);
@@ -1277,13 +1288,14 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
 
     const startTime = Date.now();
-    const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
+    const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary, wantGooChip] = await Promise.allSettled([
       NativeYahooApi.quote(yahooSymbol as string).then(res => { console.log(`[Research] Yahoo Quote: ${Date.now() - startTime}ms`); return res; }),
       TV.getOverview(tvSymbol).then(res => { console.log(`[Research] TV Overview: ${Date.now() - startTime}ms`); return res; }),
       TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d').then(res => { console.log(`[Research] TV Indicators: ${Date.now() - startTime}ms`); return res; }),
       TV.getNewsHeadlines(tvSymbol).then(res => { console.log(`[Research] TV News: ${Date.now() - startTime}ms`); return res; }),
       NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }).then(res => { console.log(`[Research] Yahoo Chart: ${Date.now() - startTime}ms`); return res; }),
       NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']).then(res => { console.log(`[Research] Yahoo Summary: ${Date.now() - startTime}ms`); return res; }),
+      WantGoo.getChipData(yahooSymbol).then(res => { console.log(`[Research] WantGoo Chip: ${Date.now() - startTime}ms`); return res; }),
     ]);
     console.log(`[Research] All sub-requests finished in ${Date.now() - startTime}ms`);
 
@@ -1333,6 +1345,7 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
       tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
       tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
       history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
+      wantGooChip: wantGooChip.status === 'fulfilled' ? wantGooChip.value : null,
     });
   } catch (e) {
     handleApiError(res, e);
@@ -1367,6 +1380,33 @@ app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) =
   try {
     const data = await TV.getIdeas(req.params.symbol, (req.query.sort as any) || 'popular');
     res.json(data || []);
+  } catch (e) { handleApiError(res, e); }
+});
+
+// ── Sectors ──────────────────────────────────────────────────────────────────
+app.get('/api/sectors', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const list = await Sectors.getSectors();
+    res.json(list);
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.get('/api/sectors/:id/symbols', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const codes = await Sectors.getSectorSymbols(req.params.id);
+    const twseList = await fetchAndCacheTWSE();
+    const marketMap = new Map(twseList.map(s => [s.code, s.market]));
+    
+    const symbols = codes.map(code => {
+      const market = marketMap.get(code);
+      if (market === 'TWSE') return `${code}.TW`;
+      if (market === 'TPEX') return `${code}.TWO`;
+      // Default to .TW if unknown but 4 digits
+      if (/^\d{4}$/.test(code)) return `${code}.TW`;
+      return code;
+    });
+    
+    res.json(symbols);
   } catch (e) { handleApiError(res, e); }
 });
 

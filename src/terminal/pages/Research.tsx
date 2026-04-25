@@ -2,8 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
 import { useResearchData } from '../hooks/useResearchData';
-import { Loader2, Search, Cpu } from 'lucide-react';
-import { formatPct, toneClass } from '../ui/format';
+import { Loader2, Search, Cpu, Users, BarChart3, Info } from 'lucide-react';
+import { formatPct, toneClass, formatNum } from '../ui/format';
 import type { CandlePoint } from '../types';
 import { PersonaSelector } from '../ui/PersonaSelector';
 import { SecFilingsPanel } from '../ui/SecFilingsPanel';
@@ -106,6 +106,7 @@ export function ResearchPage() {
   const tv = data?.tvOverview || {};
   const tvIndicators = data?.tvIndicators || {};
   const news = data?.tvNews || [];
+  const chip = data?.wantGooChip;
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
@@ -169,6 +170,13 @@ export function ResearchPage() {
         </header>
 
         <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
+        
+        {chip && (
+          <div className="px-1">
+            <ChipAnalysisPanel data={{ ...chip, symbol: activeSymbol }} />
+          </div>
+        )}
+
         {viewMode === 'standard' ? (
           <ChartPanel symbol={activeSymbol} history={history} range={timeRange} setRange={setTimeRange} />
         ) : (
@@ -434,6 +442,52 @@ function AISummaryPanel({ summary, loading, persona, modelName }: { summary: str
           <span>{PERSONA_LABEL[persona] ?? persona}</span>
           <span>{modelName || 'OpenRouter'}</span>
         </div>
+      </div>
+    </Panel>
+  );
+}
+function ChipAnalysisPanel({ data }: { data: any }) {
+  const items = [
+    { label: '主力買賣超', value: data.mainPlayersNet, unit: '張', color: toneClass(data.mainPlayersNet) },
+    { label: '外資買賣超', value: data.foreignNet, unit: '張', color: toneClass(data.foreignNet) },
+    { label: '投信買賣超', value: data.trustNet, unit: '張', color: toneClass(data.trustNet) },
+    { label: '自營商買賣超', value: data.dealerNet, unit: '張', color: toneClass(data.dealerNet) },
+    { label: '5日集中度', value: data.concentration5d, unit: '%', color: toneClass(data.concentration5d) },
+    { label: '20日集中度', value: data.concentration20d, unit: '%', color: toneClass(data.concentration20d) },
+    { label: '400張大戶', value: data.holder400Pct, unit: '%', color: 'text-white' },
+    { label: '1000張大戶', value: data.holder1000Pct, unit: '%', color: 'text-(--color-term-accent)' },
+    { label: '外資持股比', value: data.foreignPct, unit: '%', color: 'text-white' },
+    { label: '投信持股比', value: data.trustPct, unit: '%', color: 'text-white' },
+  ];
+
+  return (
+    <Panel title="籌碼分析 (玩股網)" icon={<Users size={16} />} className="bg-(--color-term-panel)">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex flex-col gap-1">
+            <span className="text-[10px] text-(--color-term-muted) uppercase tracking-tighter">{item.label}</span>
+            <div className="flex items-baseline gap-1">
+              <span className={cn("text-sm font-black", item.color)}>
+                {typeof item.value === 'number' ? formatNum(item.value, 0) : '---'}
+              </span>
+              <span className="text-[9px] text-(--color-term-muted)">{item.unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 pt-4 border-t border-(--color-term-border) flex items-center justify-between text-[10px] text-(--color-term-muted)">
+        <div className="flex items-center gap-2">
+          <Info size={10} />
+          <span>家數差: <span className={toneClass(-data.brokerDiff)}>{data.brokerDiff}</span> (正值代表籌碼分散)</span>
+        </div>
+        <a 
+          href={`https://www.wantgoo.com/stock/${data.symbol}/major-investors/main-trend`} 
+          target="_blank" 
+          rel="noreferrer"
+          className="hover:text-(--color-term-accent) transition-colors flex items-center gap-1"
+        >
+          查看詳細籌碼 <BarChart3 size={10} />
+        </a>
       </div>
     </Panel>
   );

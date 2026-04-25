@@ -19,6 +19,7 @@ import type { ScreenerFilters } from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator';
+import { SectorSelector } from '../components/SectorSelector';
 import type { ScreenerResult } from '../../types';
 import type { TerminalView } from '../types';
 
@@ -42,15 +43,6 @@ export const DEFAULT_SYMBOLS = [
   'AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','AMD','AVGO','TSM',
   // 加密
   'BTC-USD','ETH-USD',
-];
-
-export const SECTORS = [
-  { id: 'tech_tw', name: 'screener.techTw', symbols: ['2330.TW', '2317.TW', '2454.TW', '2382.TW', '3231.TW', '2308.TW', '3711.TW', '2303.TW', '2379.TW', '3034.TW'] },
-  { id: 'tech_us', name: 'screener.techUs', symbols: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META', 'AMD', 'TSM', 'AVGO', 'AMZN', 'TSLA'] },
-  { id: 'finance_tw', name: 'screener.financeTw', symbols: ['2881.TW', '2882.TW', '2884.TW', '2891.TW', '2886.TW', '2883.TW', '2892.TW', '2885.TW', '2890.TW'] },
-  { id: 'biotech_tw', name: 'screener.biotechTw', symbols: ['4147.TWO', '6472.TWO', '4123.TWO', '4743.TWO', '1701.TW', '1795.TWO', '6446.TWO', '6547.TWO'] },
-  { id: 'etf_tw', name: 'screener.etfTw', symbols: ['0050.TW', '0056.TW', '00878.TW', '00929.TW', '00919.TW', '00713.TW', '00679B.TW', '00687B.TW'] },
-  { id: 'crypto', name: 'screener.cryptoMain', symbols: ['BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'AVAX-USD', 'DOGE-USD'] }
 ];
 
 type SortKey = 'symbol' | 'price' | 'changePct' | 'rsi' | 'volumeRatio' | 'signals';
@@ -79,6 +71,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [scannedCount, setScannedCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(50);
+  const [viewMode, setViewMode] = useState<'list' | 'chart'>('list');
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const runScan = useCallback(async (filters?: ScreenerFilters) => {
@@ -90,7 +83,12 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
         ? customSymbols.split(/[,\s\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
         : [];
       
-      const sectorSymbols = SECTORS.filter(s => selectedSectors.includes(s.id)).flatMap(s => s.symbols);
+      let sectorSymbols: string[] = [];
+      if (selectedSectors.length > 0) {
+        // Fetch symbols for each selected sector in parallel
+        const results = await Promise.all(selectedSectors.map(id => api.getSectorSymbols(id)));
+        sectorSymbols = Array.from(new Set(results.flat() as string[]));
+      }
       
       if (manualSymbols.length > 0 || sectorSymbols.length > 0) {
         syms = Array.from(new Set([...manualSymbols, ...sectorSymbols]));
@@ -118,11 +116,16 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   };
 
   const handleSelectSymbol = useCallback((sym: string) => {
-    // Set for ResearchPage to pick up
+    // 確保在導航前先存入 sessionStorage，這是 ResearchPage 的主要來源
     sessionStorage.setItem('research-symbol', sym);
-    window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
-    onNavigate('research');
-  }, [onNavigate]);
+    // 延遲發送事件，確保 ResearchPage 已掛載（或是讓 ResearchPage 的 mount effect 處理）
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
+    }, 100);
+    
+    // 使用 hash 導航以符合 user 範例並確保 App.tsx 偵測到
+    window.location.hash = 'research';
+  }, []);
 
   const hasMoreResults = results.length > visibleCount;
 
@@ -239,6 +242,30 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           ))}
         </div>
 
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 bg-(--color-term-panel) border border-(--color-term-border) p-1 rounded-sm shrink-0 w-fit">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={cn(
+              "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors",
+              viewMode === 'list' ? "bg-(--color-term-accent) text-black" : "text-(--color-term-muted) hover:text-white"
+            )}
+          >
+            {t('screener.viewList', '清單 (List)')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('chart')}
+            className={cn(
+              "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors",
+              viewMode === 'chart' ? "bg-(--color-term-accent) text-black" : "text-(--color-term-muted) hover:text-white"
+            )}
+          >
+            {t('screener.viewChart', '附圖 (Chart)')}
+          </button>
+        </div>
+
         {/* Custom Filters Panel */}
         <div className="shrink-0 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden">
           <button type="button" onClick={() => setShowFilters(!showFilters)}
@@ -317,25 +344,11 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                   </div>
                   <div className="sm:col-span-2 lg:col-span-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-2 block">{t('screener.sectors')}</label>
-                    <div className="flex flex-wrap gap-2">
-                      {SECTORS.map(s => (
-                        <label key={s.id} className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs cursor-pointer border transition-colors",
-                          selectedSectors.includes(s.id)
-                            ? "bg-(--color-term-accent)/20 border-(--color-term-accent) text-(--color-term-accent)"
-                            : "bg-(--color-term-bg) border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text)"
-                        )}>
-                          <input type="checkbox" className="hidden"
-                            checked={selectedSectors.includes(s.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedSectors([...selectedSectors, s.id]);
-                              else setSelectedSectors(selectedSectors.filter(id => id !== s.id));
-                            }}
-                          />
-                          {t(s.name)}
-                        </label>
-                      ))}
-                    </div>
+                    <SectorSelector 
+                      selectedIds={selectedSectors} 
+                      onChange={setSelectedSectors} 
+                      placeholder={t('screener.searchSectors', '搜尋產業類別...')}
+                    />
                   </div>
                   <div className="sm:col-span-2 lg:col-span-4 mt-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">{t('screener.customSymbolsPlaceholder')}</label>
@@ -400,95 +413,152 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           </div>
         )}
 
-        {/* Results Table */}
+        {/* Results Display */}
         {!loading && results.length > 0 && (
-          <div className="flex-1 min-h-0 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden flex flex-col">
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-(--color-term-panel) border-b border-(--color-term-border)">
-                  <tr>
-                    {[
-                      { key: 'symbol' as SortKey, label: t('screener.colSymbol', 'SYMBOL') },
-                      { key: 'price' as SortKey, label: t('screener.colPrice', 'PRICE') },
-                      { key: 'changePct' as SortKey, label: t('screener.colChange', 'CHG%') },
-                      { key: 'rsi' as SortKey, label: 'RSI(14)' },
-                      { key: 'volumeRatio' as SortKey, label: t('screener.colVol', 'VOL RATIO') },
-                      { key: 'signals' as SortKey, label: t('screener.colSignals', 'SIGNALS') },
-                    ].map(col => (
-                      <th
-                        key={col.key}
-                        onClick={() => handleSort(col.key)}
-                        className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-white/5 transition-colors select-none text-(--color-term-muted) whitespace-nowrap"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {col.label}
-                          {sortKey === col.key && (
-                            <ArrowUpDownIcon size={12} className="text-(--color-term-accent)" />
-                          )}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-(--color-term-border)/40">
-                  {sorted.slice(0, visibleCount).map((r, i) => (
-                    <tr
-                      key={r.symbol}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleSelectSymbol(r.symbol)}
-                      onKeyDown={e => e.key === 'Enter' && handleSelectSymbol(r.symbol)}
-                      className={cn(
-                        "cursor-pointer transition-colors hover:bg-white/5",
-                        i % 2 === 0 ? '' : 'bg-black/20'
-                      )}
-                    >
-                      <td className="px-4 py-3.5 min-w-[120px]">
-                        <div className="font-bold text-(--color-term-text) text-sm truncate">{r.symbol}</div>
-                        <div className="text-[10px] truncate max-w-[120px] text-(--color-term-muted)">{r.name}</div>
-                      </td>
-                      <td className="px-4 py-3.5 font-mono font-bold text-(--color-term-text) whitespace-nowrap">
-                        {format.number(r.price, 2)}
-                      </td>
-                      <td className={cn("px-4 py-3.5 font-mono font-bold whitespace-nowrap", r.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                        {r.changePct >= 0 ? '+' : ''}{format.percent(r.changePct)}
-                      </td>
-                      <td className={cn("px-4 py-3.5 font-mono font-bold whitespace-nowrap", rsiColor(r.rsi))}>
-                        {format.number(r.rsi, 1)}
-                      </td>
-                      <td className="px-4 py-3.5 font-mono whitespace-nowrap">
-                        <span className={cn("font-bold", r.volumeRatio >= 2 ? 'text-amber-400' : 'text-(--color-term-muted)')}>
-                          {format.number(r.volumeRatio, 1)}x
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 min-w-[160px]">
-                        <div className="flex flex-wrap gap-1.5">
-                          {r.signals.length === 0 && <span className="text-[10px] text-(--color-term-muted)">—</span>}
-                          {r.signals.map(sig => (
-                            <span
-                              key={sig}
-                              className={cn("px-2 py-0.5 rounded-sm text-[10px] font-bold border whitespace-nowrap", signalColor(sig))}
-                            >
-                              {translateSignal(sig)}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
+          viewMode === 'list' ? (
+            <div className="flex-1 min-h-0 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto flex-1">
+                <table className="w-full text-xs sm:text-sm">
+                  <thead className="sticky top-0 z-10 bg-(--color-term-panel) border-b border-(--color-term-border)">
+                    <tr>
+                      {[
+                        { key: 'symbol' as SortKey, label: t('screener.colSymbol', 'SYMBOL') },
+                        { key: 'price' as SortKey, label: t('screener.colPrice', 'PRICE') },
+                        { key: 'changePct' as SortKey, label: t('screener.colChange', 'CHG%') },
+                        { key: 'rsi' as SortKey, label: 'RSI(14)' },
+                        { key: 'volumeRatio' as SortKey, label: t('screener.colVol', 'VOL RATIO') },
+                        { key: 'signals' as SortKey, label: t('screener.colSignals', 'SIGNALS') },
+                      ].map(col => (
+                        <th
+                          key={col.key}
+                          onClick={() => handleSort(col.key)}
+                          className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:bg-white/5 transition-colors select-none text-(--color-term-muted) whitespace-nowrap"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {col.label}
+                            {sortKey === col.key && (
+                              <ArrowUpDownIcon size={12} className="text-(--color-term-accent)" />
+                            )}
+                          </span>
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {hasMoreResults && (
-              <div className="flex justify-center p-4 border-t border-(--color-term-border) bg-(--color-term-bg)">
-                <button type="button" onClick={() => setVisibleCount(v => v + 50)}
-                  className="px-6 py-2.5 text-xs font-bold rounded-sm transition-all border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
-                >
-                  {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
-                </button>
+                  </thead>
+                  <tbody className="divide-y divide-(--color-term-border)/40">
+                    {sorted.slice(0, visibleCount).map((r, i) => (
+                      <tr
+                        key={r.symbol}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleSelectSymbol(r.symbol)}
+                        onKeyDown={e => e.key === 'Enter' && handleSelectSymbol(r.symbol)}
+                        className={cn(
+                          "cursor-pointer transition-colors hover:bg-white/5",
+                          i % 2 === 0 ? '' : 'bg-black/20'
+                        )}
+                      >
+                        <td className="px-4 py-3.5 min-w-[120px]">
+                          <div className="font-bold text-(--color-term-text) text-sm truncate">{r.symbol}</div>
+                          <div className="text-[10px] truncate max-w-[120px] text-(--color-term-muted)">{r.name}</div>
+                        </td>
+                        <td className="px-4 py-3.5 font-mono font-bold text-(--color-term-text) whitespace-nowrap">
+                          {format.number(r.price, 2)}
+                        </td>
+                        <td className={cn("px-4 py-3.5 font-mono font-bold whitespace-nowrap", r.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                          {r.changePct >= 0 ? '+' : ''}{format.percent(r.changePct)}
+                        </td>
+                        <td className={cn("px-4 py-3.5 font-mono font-bold whitespace-nowrap", rsiColor(r.rsi))}>
+                          {format.number(r.rsi, 1)}
+                        </td>
+                        <td className="px-4 py-3.5 font-mono whitespace-nowrap">
+                          <span className={cn("font-bold", r.volumeRatio >= 2 ? 'text-amber-400' : 'text-(--color-term-muted)')}>
+                            {format.number(r.volumeRatio, 1)}x
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 min-w-[160px]">
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.signals.length === 0 && <span className="text-[10px] text-(--color-term-muted)">—</span>}
+                            {r.signals.map(sig => (
+                              <span
+                                key={sig}
+                                className={cn("px-2 py-0.5 rounded-sm text-[10px] font-bold border whitespace-nowrap", signalColor(sig))}
+                              >
+                                {translateSignal(sig)}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
+              {hasMoreResults && (
+                <div className="flex justify-center p-4 border-t border-(--color-term-border) bg-(--color-term-bg)">
+                  <button type="button" onClick={() => setVisibleCount(v => v + 50)}
+                    className="px-6 py-2.5 text-xs font-bold rounded-sm transition-all border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
+                  >
+                    {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sorted.slice(0, visibleCount).map((r) => (
+                  <div 
+                    key={r.symbol}
+                    onClick={() => handleSelectSymbol(r.symbol)}
+                    className="bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden cursor-pointer hover:border-(--color-term-accent)/50 transition-colors flex flex-col h-[280px]"
+                  >
+                    <div className="p-3 border-b border-(--color-term-border) flex items-center justify-between shrink-0">
+                      <div>
+                        <div className="font-bold text-sm text-(--color-term-text)">{r.symbol}</div>
+                        <div className="text-[10px] text-(--color-term-muted) truncate max-w-[120px]">{r.name}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-sm text-(--color-term-text)">{r.price.toFixed(2)}</div>
+                        <div className={cn("text-[10px] font-bold", r.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                          {r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 bg-black/40 p-2 overflow-hidden relative group">
+                      {/* Using a simple TradingView chart widget as a thumbnail */}
+                      <iframe
+                        src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_762ae&symbol=${r.symbol.includes('.') ? r.symbol.split('.')[0] : r.symbol}&interval=D&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=AAPL`}
+                        width="100%"
+                        height="100%"
+                        frameBorder="0"
+                        allowTransparency={true}
+                        scrolling="no"
+                        allowFullScreen={true}
+                        className="pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity"
+                      ></iframe>
+                      <div className="absolute inset-0 z-10"></div> {/* Click catcher */}
+                    </div>
+                    <div className="p-2 border-t border-(--color-term-border) flex flex-wrap gap-1 shrink-0 overflow-hidden h-[40px]">
+                      {r.signals.slice(0, 3).map(sig => (
+                        <span key={sig} className={cn("px-1.5 py-0.5 rounded-sm text-[9px] font-bold border", signalColor(sig))}>
+                          {translateSignal(sig)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {hasMoreResults && (
+                <div className="flex justify-center p-6">
+                  <button type="button" onClick={() => setVisibleCount(v => v + 50)}
+                    className="px-8 py-3 text-sm font-bold rounded-sm transition-all bg-(--color-term-panel) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
+                  >
+                    {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
+                  </button>
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>
