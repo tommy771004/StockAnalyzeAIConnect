@@ -33,22 +33,17 @@ interface Props {
 
 export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
   const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts'>('monitor');
-  
-  // State from parent config or defaults
+  const [defaultsConfig, setDefaultsConfig] = useState<Partial<AgentConfig> | null>(null);
+
+  // 第一次掛載時從伺服器拉預設值；避免在元件中寫死預算/策略
+  React.useEffect(() => {
+    api.getAutotradingDefaults().then((d: any) => setDefaultsConfig(d?.config ?? null)).catch(() => {/* ignore */});
+  }, []);
+
   const [mode] = useState<TradingMode>(config?.mode ?? 'simulated');
-  const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? ['RSI_REVERSION']);
-  const [params, setParams] = useState<StrategyParams>(config?.params ?? {
-    RSI_REVERSION: { period: 14, overbought: 70, oversold: 30, weight: 0.2 },
-    BOLLINGER_BREAKOUT: { period: 20, stdDev: 2, weight: 0.2 },
-    MACD_CROSS: { fast: 12, slow: 26, signal: 9, weight: 0.2 },
-    AI_LLM: { confidenceThreshold: 65, weight: 0.6 },
-    stopLossPct: 5.0,
-    takeProfitPct: 15.0,
-    trailingStopPct: 3.0,
-    maxAllocationPerTrade: 0.1,
-    enableMTF: true
-  });
-  const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? ['2330.TW', '2317.TW']);
+  const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? defaultsConfig?.strategies ?? []);
+  const [params, setParams] = useState<StrategyParams>(config?.params ?? defaultsConfig?.params ?? {});
+  const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? defaultsConfig?.symbols ?? []);
   const isRunning = status === 'running';
 
   // Sync state with backend config when it changes
@@ -57,8 +52,13 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
       if (config.strategies) setStrategies(config.strategies);
       if (config.params) setParams(config.params);
       if (config.symbols) setSymbols(config.symbols);
+    } else if (defaultsConfig) {
+      // Fallback：尚未拿到 user config 時，套用 server defaults
+      if (defaultsConfig.strategies) setStrategies(defaultsConfig.strategies as StrategyType[]);
+      if (defaultsConfig.params) setParams(defaultsConfig.params);
+      if (defaultsConfig.symbols) setSymbols(defaultsConfig.symbols);
     }
-  }, [config]);
+  }, [config, defaultsConfig]);
 
   const updateConfig = (patch: Partial<AgentConfig>) => {
     onStart({ mode, strategies, params, symbols, ...patch });

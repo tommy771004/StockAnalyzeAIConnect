@@ -30,6 +30,9 @@ export const StrategyParamsSchema = z.object({
   takeProfitPct: z.number().min(0.5).max(100),
   trailingStopPct: z.number().min(0.1).max(10),
   maxAllocationPerTrade: z.number().min(0.01).max(0.5),
+  maxPositionPct: z.number().min(0.01).max(1).optional(),
+  riskPerTradePct: z.number().min(0.05).max(20).optional(),
+  sizingMethod: z.enum(['fixed', 'risk_base']).optional(),
   enableMTF: z.boolean().optional()
 }).partial();
 
@@ -51,8 +54,12 @@ export const AgentConfigPatchSchema = z.object({
     maxDailyLossPct: z.number(),
     cooldownMinutes: z.number()
   }),
-  tickIntervalMs: z.number(),
-
-  budgetLimitTWD: z.number(),
-  maxDailyLossTWD: z.number()
+  tradingHours: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/),
+    end: z.string().regex(/^\d{2}:\d{2}$/),
+  }).optional(),
+  tickIntervalMs: z.number().min(5_000).max(3_600_000),
+  budgetLimitTWD: z.number().positive(),
+  maxDailyLossTWD: z.number().positive(),
+  strategies: z.array(z.string()).optional(),
 }).partial();

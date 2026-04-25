@@ -14,15 +14,16 @@ import type {
   OrderResult, Position, OrderStatus, MarketType,
 } from './BrokerAdapter.js';
 import * as TWSeService from '../TWSeService.js';
-
-const COMMISSION_RATE = 0.001425; // 手續費 0.1425%
-const TRANSACTION_TAX_STOCK = 0.003; // 股票交易稅 0.3%（賣出時）
+import { computeTwStockFees } from '../twFees.js';
 
 interface SimPositionInternal {
   symbol: string;
   qty: number;
   avgCost: number;
   marketType: MarketType;
+  /** 當沖偵測用：本日是否曾發生買入動作 */
+  openedToday?: boolean;
+  openDate?: string; // YYYY-MM-DD
 }
 
 export class SimulatedAdapter implements IBrokerAdapter {
@@ -77,8 +78,11 @@ export class SimulatedAdapter implements IBrokerAdapter {
     }
 
     const orderValue = order.qty * fillPrice;
-    const commission = Math.max(20, orderValue * COMMISSION_RATE); // 最低手續費 20 元
-    const tax = order.side === 'SELL' ? orderValue * TRANSACTION_TAX_STOCK : 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const existingPos = this._positions.get(order.symbol);
+    const isDayTrade = order.side === 'SELL' && existingPos?.openedToday === true && existingPos.openDate === today;
+    const isETF = /^00\d+\.TW/.test(order.symbol); // 台股 ETF 代號規則：00xx
+    const { commission, tax } = computeTwStockFees(orderValue, { side: order.side, isDayTrade, isETF });
     const totalCost = order.side === 'BUY' ? orderValue + commission : -(orderValue - commission - tax);
 
     // 餘額不足檢查
@@ -160,13 +164,16 @@ export class SimulatedAdapter implements IBrokerAdapter {
 
   private _updatePosition(symbol: string, side: 'BUY' | 'SELL', qty: number, price: number, marketType: MarketType) {
     const existing = this._positions.get(symbol);
+    const today = new Date().toISOString().slice(0, 10);
     if (side === 'BUY') {
       if (existing) {
         const totalQty = existing.qty + qty;
         existing.avgCost = (existing.qty * existing.avgCost + qty * price) / totalQty;
         existing.qty = totalQty;
+        existing.openedToday = true;
+        existing.openDate = today;
       } else {
-        this._positions.set(symbol, { symbol, qty, avgCost: price, marketType });
+        this._positions.set(symbol, { symbol, qty, avgCost: price, marketType, openedToday: true, openDate: today });
       }
     } else {
       if (existing) {

@@ -389,9 +389,18 @@ export const getNewsFeed = (): Promise<any[]> => fetchJ<any[]>('/api/news/feed')
 // ── AutoTrading ──────────────────────────────────────────────────────────────
 export const getAutotradingStatus = () => fetchJ<any>('/api/autotrading/status');
 export const resetCircuitBreaker = () => fetchJ<any>('/api/autotrading/status/reset', { method: 'POST' });
-export const startAutotrading = (config: any) => fetchJ<any>('/api/autotrading/start', { 
-  method: 'POST', 
-  headers: { 'Content-Type': 'application/json' }, 
-  body: JSON.stringify(config) 
+export const startAutotrading = (config: any) => fetchJ<any>('/api/autotrading/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(config)
 });
 export const stopAutotrading = () => fetchJ<any>('/api/autotrading/stop', { method: 'POST' });
+export const releaseKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch/release', { method: 'POST' });
+export const getAutotradingDefaults = () => fetchJ<any>('/api/autotrading/defaults');
+export const getMarketSession = (symbols: string[]) =>
+  fetchJ<any>(`/api/autotrading/session?symbols=${encodeURIComponent(symbols.join(','))}`);
+export const updateAutotradingConfig = (cfg: Record<string, unknown>) => fetchJ<any>('/api/autotrading/config', {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(cfg),
+});

@@ -10,6 +10,8 @@
  *  5. 最大槓桿倍數
  */
 
+import { DEFAULT_RISK_CONFIG as SHARED_DEFAULTS } from './autotradingDefaults.js';
+
 export interface OrderRequest {
   symbol: string;
   side: 'BUY' | 'SELL';
@@ -25,13 +27,7 @@ export interface RiskConfig {
   stopLossPct: number;          // 個股停損比例（0~1, 例如 0.05 = 5%）
 }
 
-export const DEFAULT_RISK_CONFIG: RiskConfig = {
-  budgetLimitTWD: 10_000_000,     // 1000 萬
-  maxDailyLossTWD: 200_000,       // 20 萬
-  maxSinglePositionTWD: 500_000,  // 50 萬
-  maxPositionPct: 0.3,            // 30%
-  stopLossPct: 0.05,              // 5% 停損
-};
+export const DEFAULT_RISK_CONFIG: RiskConfig = { ...SHARED_DEFAULTS };
 
 export interface RiskCheckResult {
   allowed: boolean;
