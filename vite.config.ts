@@ -17,18 +17,21 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      electron([
-        {
-          entry: 'electron/main.ts',
-        },
-        {
-          entry: 'electron/preload.ts',
-          onstart(options) {
-            options.reload();
+      // Only include Electron plugins if not building on Vercel
+      ...(process.env.VERCEL ? [] : [
+        electron([
+          {
+            entry: 'electron/main.ts',
           },
-        },
+          {
+            entry: 'electron/preload.ts',
+            onstart(options) {
+              options.reload();
+            },
+          },
+        ]),
+        renderer(),
       ]),
-      renderer(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg'],
