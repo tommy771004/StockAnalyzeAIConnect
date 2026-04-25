@@ -8,6 +8,7 @@ export type TerminalView =
   | 'news'
   | 'alerts'
   | 'screener'
+  | 'autotrading'
   | 'settings';
 
 export interface TickerSummary {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart3, Bell, CalendarDays, CircleHelp, FlaskConical, LogOut,
+  BarChart3, Bell, Bot, CalendarDays, CircleHelp, FlaskConical, LogOut,
   SlidersHorizontal, Star, Target, X,
 } from 'lucide-react';
 import type { TerminalView } from '../types';
@@ -15,13 +15,14 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: Array<{ id: TerminalView; icon: React.ReactNode; labelKey: string }> = [
-  { id: 'dashboard', icon: <Star className="h-4 w-4" />,            labelKey: 'nav.dashboard' },
-  { id: 'alerts',    icon: <Bell className="h-4 w-4" />,            labelKey: 'nav.alerts' },
-  { id: 'market',    icon: <CalendarDays className="h-4 w-4" />,    labelKey: 'nav.market' },
-  { id: 'portfolio', icon: <BarChart3 className="h-4 w-4" />,        labelKey: 'nav.portfolio' },
-  { id: 'backtest',  icon: <FlaskConical className="h-4 w-4" />,     labelKey: 'nav.backtest' },
-  { id: 'screener',  icon: <Target className="h-4 w-4" />,           labelKey: 'nav.screener' },
-  { id: 'settings',  icon: <SlidersHorizontal className="h-4 w-4" />, labelKey: 'nav.settings' },
+  { id: 'dashboard',   icon: <Star className="h-4 w-4" />,              labelKey: 'nav.dashboard' },
+  { id: 'alerts',      icon: <Bell className="h-4 w-4" />,              labelKey: 'nav.alerts' },
+  { id: 'market',      icon: <CalendarDays className="h-4 w-4" />,      labelKey: 'nav.market' },
+  { id: 'portfolio',   icon: <BarChart3 className="h-4 w-4" />,          labelKey: 'nav.portfolio' },
+  { id: 'backtest',    icon: <FlaskConical className="h-4 w-4" />,       labelKey: 'nav.backtest' },
+  { id: 'screener',    icon: <Target className="h-4 w-4" />,             labelKey: 'nav.screener' },
+  { id: 'autotrading', icon: <Bot className="h-4 w-4" />,               labelKey: 'nav.autotrading' },
+  { id: 'settings',    icon: <SlidersHorizontal className="h-4 w-4" />, labelKey: 'nav.settings' },
 ];
 
 export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {

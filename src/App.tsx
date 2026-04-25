@@ -12,6 +12,7 @@ import { SettingsPage } from './terminal/pages/Settings';
 import { AlertsPage } from './terminal/pages/Alerts';
 import { ScreenerPage } from './terminal/pages/Screener';
 import { BacktestTerminalPage } from './terminal/pages/Backtest';
+import { AutoTradingPage } from './terminal/pages/AutoTrading';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
 import { SEO } from './components/SEO';
@@ -27,6 +28,7 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'news',
   'alerts',
   'screener',
+  'autotrading',
   'settings'
 ];
 
@@ -47,7 +49,8 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   backtest: 'BACKTEST...',
   news: '搜尋 . . .',
   alerts: 'SEARCH ALERTS...',
-  screener: 'SCREENER ACTIVE...',
+  screener: 'SEARCH SCREENER...',
+  autotrading: 'SEARCH BOT LOGS...',
   settings: 'SEARCH SETTINGS...',
 };
 
@@ -101,6 +104,7 @@ export default function App() {
             {view === 'settings' && <SettingsPage />}
             {view === 'alerts' && <AlertsPage />}
             {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
+            {view === 'autotrading' && <AutoTradingPage />}
           </div>
         </ViewTransition>
       </Layout>

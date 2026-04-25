@@ -22,7 +22,13 @@ import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter }    from './server/api/agent.js';
 import { ecpayRouter }    from './server/api/ecpay.js';
 import { researchRouter } from './server/api/research.js';
-import { startAutonomousAgent } from './server/services/autonomousAgent.js';
+import {
+  startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
+  getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
+  setWsBroadcast,
+} from './server/services/autonomousAgent.js';
+import { riskManager } from './server/services/RiskManager.js';
+import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
 import { callAISimple } from './server/utils/llmPipeline.js';
@@ -481,6 +487,110 @@ function isMarketOpen(symbol: string): boolean {
     });
   }, 1000);
   ws.on('close', () => clearInterval(timer));
+});
+
+// ─── AutoTrading WebSocket ─────────────────────────────────────────────────
+const autotradingWsClients = new Set<any>();
+
+setWsBroadcast((data: unknown) => {
+  const msg = JSON.stringify(data);
+  autotradingWsClients.forEach(ws => {
+    if (ws.readyState === 1) ws.send(msg);
+  });
+});
+
+(app as any).ws('/ws/autotrading', (ws: any) => {
+  autotradingWsClients.add(ws);
+
+  // 連線後立即推送當前狀態
+  ws.send(JSON.stringify({ type: 'status', data: { status: getAgentStatus(), config: getAgentConfig(), riskStats: riskManager.getStats() } }));
+  const recentLogs = getAgentLogs(50);
+  if (recentLogs.length > 0) ws.send(JSON.stringify({ type: 'log_history', data: recentLogs }));
+
+  ws.on('close', () => autotradingWsClients.delete(ws));
+  ws.on('error', () => autotradingWsClients.delete(ws));
+});
+
+// ─── AutoTrading REST API ─────────────────────────────────────────────────────
+
+app.get('/api/autotrading/status', authMiddleware, (_req, res) => {
+  res.json({
+    status: getAgentStatus(),
+    config: getAgentConfig(),
+    riskStats: riskManager.getStats(),
+  });
+});
+
+app.post('/api/autotrading/start', authMiddleware, (req: AuthRequest, res) => {
+  const cfg = req.body ?? {};
+  const result = startAgent(cfg);
+  res.json(result);
+});
+
+app.post('/api/autotrading/stop', authMiddleware, (_req, res) => {
+  const result = stopAgent();
+  res.json(result);
+});
+
+app.post('/api/autotrading/kill-switch', authMiddleware, (_req, res) => {
+  const result = emergencyKillSwitch();
+  res.json(result);
+});
+
+app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
+  res.json(getAgentConfig());
+});
+
+app.put('/api/autotrading/config', authMiddleware, (req: AuthRequest, res) => {
+  updateAgentConfig(req.body);
+  res.json({ ok: true, config: getAgentConfig() });
+});
+
+app.get('/api/autotrading/logs', authMiddleware, (req: AuthRequest, res) => {
+  const limit = parseInt(String(req.query.limit ?? '100'));
+  res.json(getAgentLogs(limit));
+});
+
+app.get('/api/autotrading/positions', authMiddleware, async (_req, res) => {
+  try {
+    const positions = await simulatedAdapter.getPositions();
+    res.json(positions);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/balance', authMiddleware, async (_req, res) => {
+  try {
+    const balance = await simulatedAdapter.getBalance();
+    res.json(balance);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequest, res) => {
+  const { brokerId, apiKey, apiSecret, certPath, accountId, mode } = req.body;
+  if (brokerId !== 'simulated') {
+    // 真實券商需要本地服務，回傳設定說明
+    const brokerInfo: Record<string, { name: string; url: string; note: string }> = {
+      sinopac: { name: '永豐金證券 (Shioaji)', url: 'https://sinotrade.github.io/', note: '需啟動本地 Python bridge service' },
+      kgi:     { name: '群益證券 (SKCOM)',      url: 'https://easywin.capital.com.tw/trade/skcom', note: '需 Windows COM 元件' },
+      yuanta:  { name: '元大證券',              url: 'https://www.yuantafutures.com.tw/', note: '需 Windows COM 元件 + 書面申請' },
+      fubon:   { name: '富邦證券',              url: 'https://www.fubon.com/securities/', note: '需申請 API 使用權限' },
+    };
+    const info = brokerInfo[brokerId] ?? { name: brokerId, url: '', note: '' };
+    res.json({
+      ok: false,
+      brokerId,
+      message: `${info.name} 需要本地環境設定。${info.note}。
+請參考說明：${info.url}`,
+      requiresLocalSetup: true,
+    });
+    return;
+  }
+  const result = await simulatedAdapter.connect({ brokerId: 'simulated', mode: mode ?? 'simulated' });
+  res.json(result);
 });
 
 app.get('/api/health', (_req, res) => {
