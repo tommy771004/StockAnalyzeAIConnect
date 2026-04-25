@@ -72,7 +72,7 @@ const BASE = (process.env.TV_SCRAPER_URL)
       ? `https://${process.env.VERCEL_URL || 'localhost'}/api/python`
       : 'http://127.0.0.1:8787');
 
-const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? 8000);
+const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? 3000);
 
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */
 async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T | null> {

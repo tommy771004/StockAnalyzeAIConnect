@@ -74,13 +74,8 @@ export function ResearchPage() {
     }
   };
 
-  if (loading && !data) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-(--color-term-accent)" />
-      </div>
-    );
-  }
+  // Partial loading is handled by individual panels for a better UX.
+  // We only show a skeleton if absolutely necessary, but here we'll let the layout render.
 
   if (error && !data) {
     return (
