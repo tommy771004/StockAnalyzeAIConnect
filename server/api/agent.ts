@@ -57,10 +57,10 @@ agentRouter.post('/dynamic-strategy', async (req: AuthRequest, res) => {
     let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
     if (!openrouterKey && req.userId) {
       try {
-        const storedKey = await settingsRepo.getSetting(req.userId, 'openrouterKey');
-        if (storedKey && (storedKey as any).settingValue) openrouterKey = (storedKey as any).settingValue;
+        const storedKey = await settingsRepo.getSetting(req.userId, 'OPENROUTER_API_KEY');
+        if (typeof storedKey === 'string' && storedKey) openrouterKey = storedKey;
       } catch (e) {
-        console.warn('Failed to fetch openrouterKey from db', e);
+        console.warn('Failed to fetch OPENROUTER_API_KEY from db', e);
       }
     }
 
@@ -311,10 +311,10 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
     let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
     if (!openrouterKey && userId) {
       try {
-        const storedKey = await settingsRepo.getSetting(userId, 'openrouterKey');
-        if (storedKey && (storedKey as any).settingValue) openrouterKey = (storedKey as any).settingValue;
+        const storedKey = await settingsRepo.getSetting(userId, 'OPENROUTER_API_KEY');
+        if (typeof storedKey === 'string' && storedKey) openrouterKey = storedKey;
       } catch (e) {
-        console.warn('Failed to fetch openrouterKey from db', e);
+        console.warn('Failed to fetch OPENROUTER_API_KEY from db', e);
       }
     }
 
@@ -509,9 +509,9 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
     let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
     if (!openrouterKey && userId) {
       try {
-        const storedKey = await settingsRepo.getSetting(userId, 'openrouterKey');
-        if (storedKey && (storedKey as Record<string, unknown>)['settingValue']) {
-          openrouterKey = (storedKey as Record<string, unknown>)['settingValue'];
+        const storedKey = await settingsRepo.getSetting(userId, 'OPENROUTER_API_KEY');
+        if (typeof storedKey === 'string' && storedKey) {
+          openrouterKey = storedKey;
         }
       } catch { /* ignore */ }
     }
