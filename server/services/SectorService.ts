@@ -60,50 +60,46 @@ export async function getSectors(): Promise<Sector[]> {
 }
 
 /**
- * Fetch symbols for a specific sector from WantGoo.
- * Example: https://www.wantgoo.com/index/^028/stocks
- * We need to parse the stocks from the HTML or find a JSON API.
+ * Fetch symbols for a specific sector from WantGoo's JSON API.
+ * API: https://www.wantgoo.com/api/invest-stats/index-stocks?id=^011
  */
 export async function getSectorSymbols(sectorId: string): Promise<string[]> {
-  const url = `https://www.wantgoo.com/index/${encodeURIComponent(sectorId)}/stocks`;
+  const url = `https://www.wantgoo.com/api/invest-stats/index-stocks?id=${encodeURIComponent(sectorId)}`;
   try {
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        'Accept': 'application/json',
+        'Referer': 'https://www.wantgoo.com/',
       }
     });
     
     if (!res.ok) {
-      console.error(`[SectorService] WantGoo returned ${res.status} for ${sectorId}`);
+      console.error(`[SectorService] WantGoo API returned ${res.status} for ${sectorId}`);
       return [];
     }
 
-    const html = await res.text();
+    const data = await res.json();
     
-    // Refine: Only match symbols within stock links to avoid sidebars/popular stocks.
-    // Main table links usually look like <a href="/stock/XXXX">
-    const matches = html.match(/href="\/stock\/(\d{4,6})"/g);
-    if (!matches) {
-      console.warn(`[SectorService] No symbols found in main table for ${sectorId}`);
+    // WantGoo API usually returns an array of objects
+    // Format based on common WantGoo patterns: [{ stockNo: '1101', ... }, ...]
+    // or a direct array if simpler. We'll handle both.
+    const list = Array.isArray(data) ? data : (data.stocks || data.data || []);
+    
+    if (!Array.isArray(list)) {
+      console.warn(`[SectorService] Unexpected API response format for ${sectorId}:`, data);
       return [];
     }
     
-    // Extract codes and filter out duplicates
-    const codes: string[] = Array.from(new Set(
-      matches.map(m => {
-        const match = m.match(/\/stock\/(\d{4,6})/);
-        return match ? match[1] : null;
-      }).filter(Boolean) as string[]
-    ));
+    const codes: string[] = list.map((item: any) => {
+      // Handle different possible key names
+      return item.stockNo || item.code || item.symbol || (typeof item === 'string' ? item : null);
+    }).filter(Boolean);
 
-    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId}`);
+    console.log(`[SectorService] Found ${codes.length} symbols via JSON API for ${sectorId}`);
     return codes;
   } catch (e) {
-    console.error(`[SectorService] Failed to fetch symbols for ${sectorId}:`, e);
+    console.error(`[SectorService] Failed to fetch symbols for ${sectorId} via JSON API:`, e);
     return [];
   }
 }

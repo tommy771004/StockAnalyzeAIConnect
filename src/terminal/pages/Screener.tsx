@@ -68,7 +68,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(() => localStorage.getItem('screener_active_template'));
 
   const [customFilters, setCustomFilters] = useState<ScreenerFilters>(() => {
     try {
@@ -91,7 +91,12 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
     localStorage.setItem('screener_filters', JSON.stringify(customFilters));
     localStorage.setItem('screener_symbols', customSymbols);
     localStorage.setItem('screener_sectors', JSON.stringify(selectedSectors));
-  }, [results, customFilters, customSymbols, selectedSectors]);
+    if (activeTemplate) {
+      localStorage.setItem('screener_active_template', activeTemplate);
+    } else {
+      localStorage.removeItem('screener_active_template');
+    }
+  }, [results, customFilters, customSymbols, selectedSectors, activeTemplate]);
 
   const [sortKey, setSortKey] = useState<SortKey>('changePct');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
