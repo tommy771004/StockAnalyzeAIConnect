@@ -22,6 +22,15 @@ export function ResearchPage() {
   const [timeRange, setTimeRange] = useState('1M');
   const { data, loading, error } = useResearchData(activeSymbol, timeRange);
 
+  // Pick up symbol navigated from Dashboard "深入研究" button
+  useEffect(() => {
+    const pending = sessionStorage.getItem('research-symbol');
+    if (pending) {
+      setActiveSymbol(pending.toUpperCase());
+      sessionStorage.removeItem('research-symbol');
+    }
+  }, []);
+
   // Fetch available free models on mount
   useEffect(() => {
     getFreeModels().then(models => {

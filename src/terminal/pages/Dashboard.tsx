@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X } from 'lucide-react';
+import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X, Microscope } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
@@ -430,6 +430,17 @@ export function SelectedChartPanel({
             </span>
           )}
         </div>
+        <button
+          onClick={() => {
+            sessionStorage.setItem('research-symbol', row.symbol);
+            window.location.hash = 'research';
+          }}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold tracking-widest text-(--color-term-accent) border border-(--color-term-accent)/40 rounded-sm hover:bg-(--color-term-accent)/10 transition-colors"
+          title="深入研究"
+        >
+          <Microscope className="h-3 w-3" />
+          深入研究
+        </button>
       </header>
 
       {/* OHLC summary bar */}
