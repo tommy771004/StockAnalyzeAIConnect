@@ -5,6 +5,146 @@ export interface Sector {
   name: string;
 }
 
+/**
+ * Map WantGoo 行業指數 ID → 證交所/櫃買中心公佈的「產業類別」中文字串，
+ * 用於以 TWSE/TPEX OpenAPI 取代被 Cloudflare 阻擋的 WantGoo HTML 抓取。
+ *
+ * 上市資料：https://openapi.twse.com.tw/v1/opendata/t187ap03_L
+ * 上櫃資料：https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O
+ */
+const TWSE_INDUSTRY_BY_ID: Record<string, string> = {
+  '^011': '水泥工業',
+  '^012': '食品工業',
+  '^013': '塑膠工業',
+  '^014': '紡織纖維',
+  '^015': '電機機械',
+  '^016': '電器電纜',
+  '^017': '化學工業',
+  '^018': '生技醫療業',
+  '^019': '玻璃陶瓷',
+  '^020': '造紙工業',
+  '^021': '鋼鐵工業',
+  '^022': '橡膠工業',
+  '^023': '汽車工業',
+  '^024': '半導體業',
+  '^025': '電腦及週邊設備業',
+  '^026': '光電業',
+  '^027': '通信網路業',
+  '^028': '電子零組件業',
+  '^029': '電子通路業',
+  '^030': '資訊服務業',
+  '^031': '其他電子業',
+  '^032': '建材營造業',
+  '^033': '航運業',
+  '^034': '觀光餐旅',
+  '^035': '金融保險業',
+  '^036': '貿易百貨業',
+  '^037': '油電燃氣業',
+  '^038': '其他業',
+};
+
+const TPEX_INDUSTRY_BY_ID: Record<string, string> = {
+  '^048': '生技醫療',
+  '^052': '半導體業',
+  '^053': '電腦及週邊設備業',
+  '^054': '光電業',
+  '^055': '通信網路業',
+  '^056': '電子零組件業',
+  '^057': '電子通路業',
+  '^058': '資訊服務業',
+  '^059': '其他電子業',
+  '^063': '金融保險業',
+};
+
+interface IndustryStock {
+  code: string;
+  market: 'TWSE' | 'TPEX';
+}
+
+let _industryCache: IndustryStock[] | null = null;
+let _industryCacheTime = 0;
+const INDUSTRY_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
+let _industryByName = new Map<string, IndustryStock[]>();
+
+async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
+  const now = Date.now();
+  if (_industryCache && now - _industryCacheTime < INDUSTRY_CACHE_TTL) {
+    return _industryByName;
+  }
+
+  const byName = new Map<string, IndustryStock[]>();
+  const all: IndustryStock[] = [];
+
+  // 1. TWSE 上市公司行業別
+  try {
+    const r = await fetch('https://openapi.twse.com.tw/v1/opendata/t187ap03_L', {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const data = await r.json() as Array<Record<string, string>>;
+      for (const item of data) {
+        const code = item['公司代號'] || item.Code;
+        const industry = item['產業類別'] || item.Industry;
+        if (!code || !industry) continue;
+        const stock: IndustryStock = { code, market: 'TWSE' };
+        all.push(stock);
+        const list = byName.get(industry) ?? [];
+        list.push(stock);
+        byName.set(industry, list);
+      }
+    }
+  } catch (e) {
+    console.warn('[SectorService] TWSE industry directory failed:', (e as Error).message);
+  }
+
+  // 2. TPEX 上櫃公司行業別
+  try {
+    const r = await fetch('https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O', {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const data = await r.json() as Array<Record<string, string>>;
+      for (const item of data) {
+        const code = item['公司代號'] || item.SecuritiesCompanyCode;
+        const industry = item['產業別'] || item['產業類別'] || item.Industry;
+        if (!code || !industry) continue;
+        const stock: IndustryStock = { code, market: 'TPEX' };
+        all.push(stock);
+        const list = byName.get(industry) ?? [];
+        list.push(stock);
+        byName.set(industry, list);
+      }
+    }
+  } catch (e) {
+    console.warn('[SectorService] TPEX industry directory failed:', (e as Error).message);
+  }
+
+  if (all.length > 0) {
+    _industryCache = all;
+    _industryCacheTime = now;
+    _industryByName = byName;
+    console.log(`[SectorService] Industry directory cached: ${all.length} stocks across ${byName.size} categories`);
+  }
+
+  return _industryByName;
+}
+
+async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
+  const isTpex = sectorId in TPEX_INDUSTRY_BY_ID;
+  const isTwse = sectorId in TWSE_INDUSTRY_BY_ID;
+  if (!isTpex && !isTwse) return [];
+
+  const targetIndustry = isTpex ? TPEX_INDUSTRY_BY_ID[sectorId] : TWSE_INDUSTRY_BY_ID[sectorId];
+  const targetMarket: 'TWSE' | 'TPEX' = isTpex ? 'TPEX' : 'TWSE';
+
+  const byName = await fetchIndustryDirectory();
+  const matches = byName.get(targetIndustry) ?? [];
+  const filtered = matches.filter(m => m.market === targetMarket);
+  return filtered.map(m => m.code);
+}
+
 // Data source: WantGoo Industry Mapping
 const SECTORS: Sector[] = [
   { "name": "水泥 (上市)", "id": "^011" },
@@ -60,10 +200,20 @@ export async function getSectors(): Promise<Sector[]> {
 }
 
 /**
- * Fetch symbols for a specific sector from WantGoo's JSON API.
- * API: https://www.wantgoo.com/api/invest-stats/index-stocks?id=^011
+ * Fetch symbols for a specific sector. Resolution order:
+ *   1. TWSE / TPEX OpenAPI 行業別 (穩定、官方來源)
+ *   2. WantGoo JSON API (常被 Cloudflare 阻擋)
+ *   3. WantGoo HTML 抓取
  */
 export async function getSectorSymbols(sectorId: string): Promise<string[]> {
+  // 1) 先用官方 OpenAPI（最穩定，不會 403）
+  const officialCodes = await getSectorSymbolsViaOpenApi(sectorId).catch(() => [] as string[]);
+  if (officialCodes.length > 0) {
+    console.log(`[SectorService] Found ${officialCodes.length} symbols for ${sectorId} via TWSE/TPEX OpenAPI`);
+    return officialCodes;
+  }
+
+  // 2) Fallback: WantGoo JSON
   const url = `https://www.wantgoo.com/api/invest-stats/index-stocks?id=${encodeURIComponent(sectorId)}`;
   try {
     const res = await fetch(url, {
@@ -72,11 +222,13 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Referer': `https://www.wantgoo.com/index/${encodeURIComponent(sectorId)}/stocks`,
         'X-Requested-With': 'XMLHttpRequest',
-      }
+      },
+      // @ts-ignore node-fetch supports timeout via AbortSignal
+      signal: AbortSignal.timeout(5000),
     });
-    
+
     if (res.status === 404 || res.status === 403) {
-      console.warn(`[SectorService] JSON API failed with ${res.status} for ${sectorId}. Falling back to HTML scraping.`);
+      console.warn(`[SectorService] WantGoo JSON ${res.status} for ${sectorId}, trying HTML scrape.`);
       return await scrapeSectorHtml(sectorId);
     }
 
@@ -87,20 +239,20 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
 
     const data = await res.json();
     const list = Array.isArray(data) ? data : (data.stocks || data.data || data.list || []);
-    
+
     if (!Array.isArray(list) || list.length === 0) {
-      console.warn(`[SectorService] No stocks found in JSON response for ${sectorId}. Data keys:`, Object.keys(data));
+      console.warn(`[SectorService] No stocks found in JSON response for ${sectorId}.`);
       return await scrapeSectorHtml(sectorId);
     }
-    
+
     const codes: string[] = list.map((item: any) => {
       return item.stockNo || item.code || item.symbol || item.id || (typeof item === 'string' ? item : null);
     }).filter(Boolean);
 
-    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} via JSON API`);
+    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} via WantGoo JSON`);
     return codes;
   } catch (e) {
-    console.error(`[SectorService] JSON API error for ${sectorId}, trying HTML fallback:`, e);
+    console.warn(`[SectorService] WantGoo JSON error for ${sectorId}, trying HTML fallback:`, (e as Error).message);
     return await scrapeSectorHtml(sectorId);
   }
 }
