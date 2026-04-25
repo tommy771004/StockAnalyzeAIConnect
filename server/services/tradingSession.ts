@@ -3,13 +3,12 @@
  * 盤前盤後守門 — 判斷指定 symbol 在指定時間是否處於盤中交易時段。
  *
  * 規則：
- *  - 台股 (.TW / .TWO)：09:00–13:30 台北時間，週一到週五。
+ *  - 台股 (.TW / .TWO)：09:00–13:30 台北時間，週一到週五，扣除國定假日；
+ *    若當日為半日交易（除夕前等）會自動套用提早收盤時間。
  *  - 美股：09:30–16:00 美東時間（換算成台北時間 21:30–04:00 跨日）。
  *  - 其他（加密貨幣、未指定）：永遠視為開市。
- *
- * 注意：本檔案僅判斷「常規交易時段」，國定假日、提早收盤等特殊日曆需在
- * 後續整合台股交易日曆 API 後再加強。
  */
+import { isTwHoliday, getEarlyCloseTime } from './twCalendar.js';
 
 export type MarketKind = 'TW' | 'US' | 'OTHER';
 
@@ -63,13 +62,19 @@ export function isTradingSession(
 
   let win: SessionWindow;
   if (market === 'TW') {
-    win = { start: override?.start ?? TW_DEFAULT.start, end: override?.end ?? TW_DEFAULT.end };
+    if (isTwHoliday(now)) {
+      return { open: false, reason: '台股國定假日休市', market };
+    }
+    const earlyClose = getEarlyCloseTime(now);
+    const endTime = earlyClose ?? override?.end ?? TW_DEFAULT.end;
+    win = { start: override?.start ?? TW_DEFAULT.start, end: endTime };
     const startM = toMinutes(win.start);
     const endM = toMinutes(win.end);
     const open = minutes >= startM && minutes < endM;
+    const earlyTag = earlyClose ? ' [半日]' : '';
     return {
       open,
-      reason: open ? `台股盤中 (${win.start}-${win.end})` : `台股非交易時間 (${win.start}-${win.end})`,
+      reason: open ? `台股盤中 (${win.start}-${win.end})${earlyTag}` : `台股非交易時間 (${win.start}-${win.end})${earlyTag}`,
       market,
     };
   }

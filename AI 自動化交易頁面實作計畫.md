@@ -244,7 +244,56 @@ interface IBrokerAdapter {
 ### 仍待後續處理
 1. 真實 KGI / Yuantra 券商的本地 Windows 服務橋接（目前 UI 已停用）。
 2. 選擇權 Greeks（Black-Scholes）與期貨保證金的 Python microservice。
-3. 台股交易日曆 API 整合 — 國定假日與提早收盤的 fallback。
-4. 訂單生命週期狀態機（PENDING → PARTIAL → FILLED → CANCELLED）含重試。
-5. 通知通道（Email / Telegram / Discord webhook）。
-6. 績效儀表板（勝率、夏普、最大回撤）與回測 ↔ 實盤偏差分析。
+
+---
+
+## 🔧 2026-04 改善紀錄（第二輪：部署 / 日曆 / 績效 / 訂單 / 通知）
+
+### 部署架構 (§0)
+- 新增 `Dockerfile`、`render.yaml`、`railway.json`，提供 Render / Railway 一鍵部署。
+- `server.ts` 把 `process.env.VERCEL` 守門擴充為 `AUTOTRADING_DISABLED` 旗標，
+  方便藍綠部署 / 測試環境關閉常駐 agent。
+- 文件中載明 6 種 WebSocket 部署方案比較（Render / Railway / Fly / CF Workers / 自家 Win / VPS）。
+
+### 台股交易日曆 (§1)
+- 新檔 `server/services/twCalendar.ts`：內建 2026 / 2027 國定假日 + 半日交易。
+- `tradingSession.ts` 接入 calendar；半日交易自動套用 12:00 收盤。
+- `/api/autotrading/session` 額外回傳 `twHoliday / twEarlyClose` 與台北現在時間。
+
+### 績效儀表板 (§3-A)
+- 新檔 `server/services/performanceService.ts`：以日 PnL 序列計算 Sharpe，
+  從累計權益曲線算 MaxDrawdown，並做策略歸因。
+- `reportService` 移除硬編碼 Sharpe 1.8 與隨機 confidence；改用 agentMemories 真實值。
+- 新端點 `GET /api/autotrading/performance?period=1d|1w|1m|3m|ytd|all`。
+- 新元件 `PerformanceDashboard.tsx`：4 大指標卡 + 權益曲線 / 回撤 sparkline + 策略歸因表。
+- AutoTradingPage 加入 `PERFORMANCE` 主分頁。
+
+### 訂單生命週期 (§2-A)
+- DB schema 新增 `orders` 表：PENDING / PARTIAL / FILLED / CANCELLED / REJECTED 全狀態 +
+  retryCount + lastError + parentSignalId + brokerOrderId。
+- 新檔 `server/repositories/ordersRepo.ts`：CRUD + listOpenByUser + cancel。
+- 改寫 `OrderExecutor`：每張單寫 DB → 嘗試送單（指數退避最多 3 次重試）→
+  廣播 `order_lifecycle` WS 事件 → 失敗自動觸發 risk_block 通知。
+- 新 API：
+  - `GET /api/autotrading/orders?open=0|1`
+  - `POST /api/autotrading/orders/:id/cancel`
+- 新元件 `OrderBookPanel.tsx`：即時表格 + 取消按鈕，顯示在 LIVE_VIEW 下方。
+- `useAutotradingWS` 新增 `orderEvents` 狀態接收 WS 事件。
+
+### 通知通道 (§2-B)
+- DB schema 新增 `notification_settings`：channel / target / triggers JSONB / enabled。
+- 新模組 `server/services/notifier/`：
+  - `index.ts` 統一派發；任何通道失敗都不影響 agent loop。
+  - `TelegramNotifier`（Bot API）、`DiscordNotifier`（Webhook）、
+    `WebhookNotifier`（通用 POST JSON）、`EmailNotifier`（Resend HTTPS API stub）。
+- `autonomousAgent` 在 Kill Switch / Cooldown / Risk Block 時呼叫 `notifier.dispatch`。
+- 新 API：
+  - `GET/PUT/DELETE /api/autotrading/notifications`
+  - `POST /api/autotrading/notifications/test`
+- 新元件 `NotificationSettings.tsx`：在 AgentControlPanel 多加一個 `Notify` 分頁，
+  使用者可填 token / URL，按「測試」立即發送一則訊息驗證可用性。
+
+### 仍待第三輪
+1. 選擇權 / 期貨 Greeks + 保證金（Black-Scholes、TXF/TXO 解析、TAIFEX 報價）。
+2. 回測 ↔ 實盤偏差分析（backtest_sessions 表 + AlignmentView）。
+3. KGI / Yuantra Windows COM bridge。

@@ -267,6 +267,60 @@ export const autotradingLogs = pgTable('autotrading_logs', {
   action:     text('action'),
 });
 
+// ─── orders (lifecycle tracking) ──────────────────────────────────────────────
+// 真實追蹤 PENDING → PARTIAL → FILLED / CANCELLED / REJECTED 全部狀態流，
+// 並支援重試計數與關聯到觸發此單的決策 / trade。
+export const orders = pgTable('orders', {
+  id:              serial('id').primaryKey(),
+  userId:          uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  brokerOrderId:   text('broker_order_id'),
+  brokerId:        text('broker_id').notNull().default('simulated'),
+  symbol:          text('symbol').notNull(),
+  side:            text('side').notNull(),       // BUY / SELL
+  qty:             numeric('qty').notNull(),
+  price:           numeric('price'),
+  orderType:       text('order_type').notNull().default('MARKET'),
+  marketType:      text('market_type').notNull().default('TW_STOCK'),
+  status:          text('status').notNull().default('PENDING'),
+  filledQty:       numeric('filled_qty').notNull().default('0'),
+  avgFillPrice:    numeric('avg_fill_price'),
+  retryCount:      bigint('retry_count', { mode: 'number' }).notNull().default(0),
+  lastError:       text('last_error'),
+  parentSignalId:  text('parent_signal_id'),
+  notes:           text('notes'),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+  updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+},
+(t) => [
+  index('orders_user_status_idx').on(t.userId, t.status),
+  index('orders_user_created_idx').on(t.userId, t.createdAt),
+]);
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+}));
+
+// ─── notification_settings ────────────────────────────────────────────────────
+// 每個使用者可設定多個通知通道（telegram / discord / email / webhook）
+// triggers 為 JSONB 陣列：['kill_switch', 'risk_block', 'fill', 'daily_report']
+export const notificationSettings = pgTable('notification_settings', {
+  id:        serial('id').primaryKey(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  channel:   text('channel').notNull(),       // telegram / discord / email / webhook
+  target:    text('target').notNull(),        // bot token + chat id / webhook URL / email
+  enabled:   boolean('enabled').notNull().default(true),
+  triggers:  jsonb('triggers').notNull(),     // string[]
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+},
+(t) => [
+  index('notif_user_idx').on(t.userId),
+]);
+
+export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
+  user: one(users, { fields: [notificationSettings.userId], references: [users.id] }),
+}));
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -292,3 +346,7 @@ export type AutotradingConfig = typeof autotradingConfigs.$inferSelect;
 export type NewAutotradingConfig = typeof autotradingConfigs.$inferInsert;
 export type AutotradingLog = typeof autotradingLogs.$inferSelect;
 export type NewAutotradingLog = typeof autotradingLogs.$inferInsert;
+export type OrderRow = typeof orders.$inferSelect;
+export type NewOrderRow = typeof orders.$inferInsert;
+export type NotificationSetting = typeof notificationSettings.$inferSelect;
+export type NewNotificationSetting = typeof notificationSettings.$inferInsert;

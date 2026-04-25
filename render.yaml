@@ -1,0 +1,31 @@
+# render.yaml — 一鍵部署到 Render Web Service
+# 部署步驟：
+#  1. 在 Render Dashboard 連結 Git repo
+#  2. 選擇 "Use existing render.yaml"
+#  3. 設定 Environment 中 secret：DATABASE_URL、OPENROUTER_API_KEY、JWT_SECRET 等
+#  4. 第一次部署會自動建置 Docker 並 host /ws/autotrading
+
+services:
+  - type: web
+    name: stockanalyze-autotrading
+    runtime: docker
+    region: singapore        # 亞洲節點，距離台股機房較近
+    plan: starter            # Free tier 會 sleep，交易型 agent 一定要 paid
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: AUTOTRADING_DISABLED
+        value: "0"
+      - key: DATABASE_URL
+        sync: false          # 由 dashboard 填寫
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SINOPAC_BRIDGE_URL
+        sync: false
