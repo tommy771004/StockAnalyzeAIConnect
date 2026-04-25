@@ -29,6 +29,7 @@ import {
 } from './server/services/autonomousAgent.js';
 import { DEFAULT_AGENT_CONFIG, DEFAULT_RISK_CONFIG, DEFAULT_TRADING_HOURS } from './server/services/autotradingDefaults.js';
 import { isTradingSession } from './server/services/tradingSession.js';
+import { isTwHoliday, getEarlyCloseTime } from './server/services/twCalendar.js';
 import { riskManager } from './server/services/RiskManager.js';
 import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
@@ -63,10 +64,15 @@ let dbAvailable = false;
 try {
   await import('./src/db/index.js');
   dbAvailable = true;
-  // Only start these in non-vercel environments
-  if (!process.env.VERCEL) {
-    // 修正：異步啟動自動交易引擎並恢復配置 (P1)
+  // 環境守門：
+  //  - Vercel Serverless 不能跑常駐 agent（無法維持 setTimeout 與 WebSocket）
+  //  - AUTOTRADING_DISABLED=1 可手動關閉（例如測試、藍綠部署）
+  const onVercel = !!process.env.VERCEL;
+  const explicitlyDisabled = process.env.AUTOTRADING_DISABLED === '1';
+  if (!onVercel && !explicitlyDisabled) {
     startAutonomousAgent().catch(e => console.error('[AutoAgent] 啟動失敗:', e));
+  } else {
+    console.log(`[AutoAgent] 跳過啟動（${onVercel ? 'Vercel' : 'AUTOTRADING_DISABLED'}）— AutoTrading 需另行部署於 Render/Railway/VPS。`);
   }
 } catch (e) {
   console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
@@ -572,8 +578,15 @@ app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
 app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {
   const symbols = String(req.query.symbols ?? '2330.TW').split(',').map(s => s.trim()).filter(Boolean);
   const cfg = getAgentConfig();
-  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours) }));
-  res.json({ ok: true, sessions: result });
+  const now = new Date();
+  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours, now) }));
+  res.json({
+    ok: true,
+    sessions: result,
+    twHoliday: isTwHoliday(now),
+    twEarlyClose: getEarlyCloseTime(now),
+    nowTaipei: new Date(now.getTime() + 8 * 3600 * 1000).toISOString(),
+  });
 });
 
 app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
@@ -691,6 +704,118 @@ app.post('/api/autotrading/optimize', authMiddleware, async (req: AuthRequest, r
 
     const proposal = await runOptimizationScan(symbol, quotes);
     res.json({ ok: true, proposal });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+// ── Orders 生命週期 ──────────────────────────────────────────────────────────
+app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const onlyOpen = String(req.query.open ?? '0') === '1';
+    const { ordersRepo } = await import('./server/repositories/ordersRepo.js');
+    const rows = onlyOpen ? await ordersRepo.listOpenByUser(req.userId) : await ordersRepo.listByUser(req.userId, 100);
+    res.json({ ok: true, orders: rows });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const id = parseInt(String(req.params.id), 10);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+    const { ordersRepo } = await import('./server/repositories/ordersRepo.js');
+    const row = await ordersRepo.cancel(id, '使用者手動取消');
+    res.json({ ok: !!row, order: row });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+// ── Notification settings ────────────────────────────────────────────────────
+app.get('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { db } = await import('./src/db/index.js');
+    const { notificationSettings } = await import('./src/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    const rows = await db.select().from(notificationSettings).where(eq(notificationSettings.userId, req.userId));
+    // 安全處理：不外洩完整 token，只回前 6 字符遮罩
+    const masked = rows.map(r => ({ ...r, target: maskToken(r.target) }));
+    res.json({ ok: true, settings: masked });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.put('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { channel, target, triggers, enabled = true, id } = req.body ?? {};
+    if (!channel || !target || !Array.isArray(triggers)) {
+      return res.status(400).json({ error: 'channel/target/triggers 為必填' });
+    }
+    const { db } = await import('./src/db/index.js');
+    const { notificationSettings } = await import('./src/db/schema.js');
+    const { eq, and } = await import('drizzle-orm');
+    if (id) {
+      const [row] = await db.update(notificationSettings).set({
+        channel, target, triggers, enabled, updatedAt: new Date(),
+      }).where(and(eq(notificationSettings.id, id), eq(notificationSettings.userId, req.userId))).returning();
+      return res.json({ ok: true, setting: row });
+    }
+    const [row] = await db.insert(notificationSettings).values({
+      userId: req.userId, channel, target, triggers, enabled,
+    }).returning();
+    res.json({ ok: true, setting: row });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.delete('/api/autotrading/notifications/:id', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const id = parseInt(String(req.params.id), 10);
+    if (Number.isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+    const { db } = await import('./src/db/index.js');
+    const { notificationSettings } = await import('./src/db/schema.js');
+    const { eq, and } = await import('drizzle-orm');
+    await db.delete(notificationSettings).where(and(eq(notificationSettings.id, id), eq(notificationSettings.userId, req.userId)));
+    res.json({ ok: true });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/notifications/test', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { channel, target } = req.body ?? {};
+    if (!channel || !target) return res.status(400).json({ error: 'channel/target 為必填' });
+    const { notifier } = await import('./server/services/notifier/index.js');
+    const result = await notifier.test(channel, target);
+    res.json(result);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+function maskToken(s: string): string {
+  if (s.length <= 8) return s.slice(0, 2) + '***';
+  return s.slice(0, 6) + '***' + s.slice(-4);
+}
+
+app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const period = String(req.query.period ?? 'all') as 'all' | '1d' | '1w' | '1m' | '3m' | 'ytd';
+    const startingEquity = Number(req.query.startingEquity ?? getAgentConfig().budgetLimitTWD ?? 10_000_000);
+    const { getPerformance } = await import('./server/services/performanceService.js');
+    const result = await getPerformance(req.userId, period, startingEquity);
+    res.json({ ok: true, period, ...result });
   } catch (e) {
     handleApiError(res, e);
   }

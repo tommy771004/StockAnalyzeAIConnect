@@ -16,6 +16,7 @@ import type { AgentConfig, AgentStatus, AgentLog } from '../../src/components/Au
 import { riskManager } from './RiskManager.js';
 import { anyMarketOpen, isTradingSession } from './tradingSession.js';
 import { DEFAULT_AGENT_CONFIG } from './autotradingDefaults.js';
+import { notifier } from './notifier/index.js';
 
 import { autotradingConfigRepo } from '../repositories/autotradingConfigRepo.js';
 
@@ -36,7 +37,10 @@ let isTickRunning = false;
 
 const executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
 
-export function setWsBroadcast(fn: (msg: any) => void) { wsBroadcast = fn; }
+export function setWsBroadcast(fn: (msg: any) => void) {
+  wsBroadcast = fn;
+  executor.setWsBroadcast(fn);
+}
 
 function emitLog(log: Omit<AgentLog, 'id' | 'timestamp'>) {
   const newLog: AgentLog = { 
@@ -265,6 +269,9 @@ async function agentTick() {
           );
           if (!riskCheck.allowed) {
             emitLog({ level: 'RISK_CHK', source: 'RISK', symbol, message: `🛑 風控攔截：${riskCheck.reason}` });
+            if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'risk_block', {
+              symbol, side: signal.action, qty: finalQty, reason: riskCheck.reason ?? '',
+            }).catch(() => {});
             continue;
           }
           if (riskCheck.level === 'WARNING' && riskCheck.reason) {
@@ -334,6 +341,7 @@ async function agentTick() {
 function activateCooldown(reason: string) {
   agentStatus = 'cooldown';
   emitLog({ level: 'CRITICAL', source: 'BREAKER', symbol: 'ALL', message: `🚨 斷路器觸發：${reason}。實盤交易已暫停。` });
+  if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'kill_switch', { reason }).catch(() => {});
   syncStateToDb();
   if (tickTimeout) clearTimeout(tickTimeout);
   tickTimeout = setTimeout(() => {
@@ -419,6 +427,7 @@ export function emergencyKillSwitch() {
   stopAgent();
   riskManager.activateKillSwitch();
   emitLog({ level: 'CRITICAL', source: 'SYSTEM', symbol: 'ALL', message: '🚨 緊急停止已觸發！所有自動交易已停止。' });
+  if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'kill_switch', { reason: '使用者手動觸發 Kill Switch' }).catch(() => {});
   return { ok: true };
 }
 

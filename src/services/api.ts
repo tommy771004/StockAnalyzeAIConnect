@@ -404,3 +404,5 @@ export const updateAutotradingConfig = (cfg: Record<string, unknown>) => fetchJ<
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(cfg),
 });
+export const getPerformance = (period: '1d' | '1w' | '1m' | '3m' | 'ytd' | 'all' = 'all') =>
+  fetchJ<any>(`/api/autotrading/performance?period=${period}`);

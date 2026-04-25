@@ -20,6 +20,7 @@ import { CommanderTerminal } from './CommanderTerminal';
 import { StrategySandbox } from './StrategySandbox';
 import { AlphaReport } from './AlphaReport';
 import { CopyTradingPanel } from './CopyTradingPanel';
+import { NotificationSettings } from './NotificationSettings';
 
 interface Props {
   status: AgentStatus;
@@ -32,7 +33,7 @@ interface Props {
 }
 
 export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
-  const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts'>('monitor');
+  const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts' | 'notifications'>('monitor');
   const [defaultsConfig, setDefaultsConfig] = useState<Partial<AgentConfig> | null>(null);
 
   // 第一次掛載時從伺服器拉預設值；避免在元件中寫死預算/策略
@@ -99,6 +100,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
           { id: 'backtest', icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Backtest' },
           { id: 'commander', icon: <MessageSquareCode className="h-3.5 w-3.5" />, label: 'Chat' },
           { id: 'broker', icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Broker' },
+          { id: 'notifications', icon: <AlertTriangle className="h-3.5 w-3.5" />, label: 'Notify' },
         ].map(t => (
           <button
             key={t.id}
@@ -153,6 +155,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
         {activeTab === 'backtest' && <BacktestPanel symbol={symbols[0]} config={{ mode, strategies, params, symbols, symbolConfigs: {} }} />}
         {activeTab === 'commander' && <CommanderTerminal />}
         {activeTab === 'broker' && <BrokerSettings onConnect={async (c) => { const res = await fetch('/api/autotrading/broker/connect', { method: 'POST', body: JSON.stringify(c) }); return res.json(); }} disabled={isRunning} />}
+        {activeTab === 'notifications' && <NotificationSettings />}
       </div>
     </div>
   );

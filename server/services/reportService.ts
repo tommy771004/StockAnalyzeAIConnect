@@ -1,10 +1,16 @@
 /**
  * server/services/reportService.ts
- * 最終進化版：智慧交易報告服務 — 具備成長時間軸與 AI 價值歸因
+ * 智慧交易報告 — 真實的 Sharpe / MaxDrawdown / Attribution。
+ *
+ * 改造重點（2026-04）：
+ *  - confidenceTimeline 改為從 agentMemories 真實取值，無資料時退回 0
+ *  - attribution 改為依 trades.notes / aiGenerated 真實統計而非寫死
+ *  - scoreCard.consistency 改為以 Sharpe 與 MaxDD 為基礎的計算
  */
 import { callLLM } from '../utils/llmPipeline.js';
 import { agentMemoryRepo } from '../repositories/agentMemoryRepo.js';
 import { getTradesByUser } from '../repositories/tradesRepo.js';
+import { computePerformance } from './performanceService.js';
 
 interface ReportData {
   totalTrades: number;
@@ -13,41 +19,66 @@ interface ReportData {
   aiValueAdded: number; // AI 過濾後比純指標多賺的錢
   confidenceTimeline: number[]; // 過去 7 天平均信心
   achievements: string[];
-  attribution: { rsi: number; bollinger: number; ai_llm: number; };
+  attribution: Record<string, { pnl: number; trades: number; winRate: number }>;
   scoreCard: { consistency: number; riskControl: number; profitability: number; };
+  sharpe: number;
+  maxDrawdown: number;
   aiCommentary: string;
+}
+
+function buildConfidenceTimeline(memories: Awaited<ReturnType<typeof agentMemoryRepo.getRelevantMemories>>): number[] {
+  // 過去 7 天，每天平均 confidence；若無紀錄 → 0
+  const days = 7;
+  const buckets: number[][] = Array.from({ length: days }, () => []);
+  const now = Date.now();
+  for (const m of memories) {
+    const created = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+    const ageDays = Math.floor((now - created) / (24 * 3600 * 1000));
+    if (ageDays < 0 || ageDays >= days) continue;
+    const conf = (m.content as { confidence?: number })?.confidence;
+    if (typeof conf === 'number') buckets[days - 1 - ageDays].push(conf);
+  }
+  return buckets.map(b => b.length === 0 ? 0 : Math.round(b.reduce((a, c) => a + c, 0) / b.length));
 }
 
 export async function generateWeeklyReport(userId: string): Promise<ReportData> {
   const memories = await agentMemoryRepo.getRelevantMemories(userId, 'ALL', 40);
   const trades = await getTradesByUser(userId);
-  
-  // 計算真實數據
-  const totalTrades = trades.length;
-  const winTrades = trades.filter(t => t.pnl && Number(t.pnl) > 0).length;
-  const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
-  const totalPnL = trades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
-  
-  // 簡易估算 AI 貢獻 (如果為負表示目前為止AI無貢獻，但仍顯示0)
-  const aiGeneratedTrades = trades.filter(t => t.aiGenerated);
-  const aiPnL = aiGeneratedTrades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
-  const aiValueAdded = Math.max(0, aiPnL);
-  
+
+  // 真實績效計算
+  const perf = computePerformance(trades);
+
+  // AI 價值貢獻（only positive — 若虧錢視為 0 以鼓勵）
+  const aiPnL = trades.filter(t => t.aiGenerated).reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
+  const aiValueAdded = Math.max(0, Math.round(aiPnL));
+
+  const totalTrades = perf.metrics.totalTrades;
+  const winRate = perf.metrics.winRate;
+
   // 動態成就
-  const achievements = [];
+  const achievements: string[] = [];
   if (totalTrades > 0) achievements.push('FIRST_BLOOD');
   if (winRate > 60 && totalTrades >= 5) achievements.push('ALPHA_CATCHER');
   if (aiPnL > 1000) achievements.push('AI_MASTER');
+  if (perf.metrics.sharpe >= 1.5) achievements.push('SHARPE_HUNTER');
+  if (perf.metrics.maxDrawdown > -0.05 && totalTrades >= 10) achievements.push('IRON_DEFENSE');
 
-  const stats = {
+  // ScoreCard：以真實指標為基礎
+  const consistency = Math.max(0, Math.min(100, Math.round(50 + perf.metrics.sharpe * 25)));
+  const riskControl = Math.max(0, Math.min(100, Math.round(100 + perf.metrics.maxDrawdown * 200))); // -10% DD → 80
+  const profitability = Math.round(winRate);
+
+  const stats: Omit<ReportData, 'aiCommentary'> = {
     totalTrades,
     winRate,
-    totalPnL,
+    totalPnL: perf.metrics.totalPnL,
     aiValueAdded,
-    confidenceTimeline: [65, 68, 72, 70, 75, Math.floor(60 + Math.random() * 20), Math.floor(70 + Math.random() * 20)], // 簡化展示
+    confidenceTimeline: buildConfidenceTimeline(memories),
     achievements: achievements.length > 0 ? achievements : ['FRESHMAN'],
-    attribution: { rsi: 20, bollinger: 10, ai_llm: 70 },
-    scoreCard: { consistency: 95, riskControl: 98, profitability: winRate }
+    attribution: perf.attribution,
+    scoreCard: { consistency, riskControl, profitability },
+    sharpe: perf.metrics.sharpe,
+    maxDrawdown: perf.metrics.maxDrawdown,
   };
 
   const prompt = `
