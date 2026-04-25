@@ -69,13 +69,14 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://www.wantgoo.com/',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Referer': `https://www.wantgoo.com/index/${encodeURIComponent(sectorId)}/stocks`,
+        'X-Requested-With': 'XMLHttpRequest',
       }
     });
     
     if (!res.ok) {
-      console.error(`[SectorService] WantGoo API returned ${res.status} for ${sectorId}`);
+      console.error(`[SectorService] WantGoo API returned ${res.status} ${res.statusText} for ${sectorId}`);
       return [];
     }
 
@@ -83,20 +84,19 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
     
     // WantGoo API usually returns an array of objects
     // Format based on common WantGoo patterns: [{ stockNo: '1101', ... }, ...]
-    // or a direct array if simpler. We'll handle both.
-    const list = Array.isArray(data) ? data : (data.stocks || data.data || []);
+    const list = Array.isArray(data) ? data : (data.stocks || data.data || data.list || []);
     
-    if (!Array.isArray(list)) {
-      console.warn(`[SectorService] Unexpected API response format for ${sectorId}:`, data);
+    if (!Array.isArray(list) || list.length === 0) {
+      console.warn(`[SectorService] No stocks found in response for ${sectorId}. Data keys:`, Object.keys(data));
       return [];
     }
     
     const codes: string[] = list.map((item: any) => {
-      // Handle different possible key names
-      return item.stockNo || item.code || item.symbol || (typeof item === 'string' ? item : null);
+      // Handle different possible key names (stockNo is common in WantGoo API)
+      return item.stockNo || item.code || item.symbol || item.id || (typeof item === 'string' ? item : null);
     }).filter(Boolean);
 
-    console.log(`[SectorService] Found ${codes.length} symbols via JSON API for ${sectorId}`);
+    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} (e.g., ${codes.slice(0, 3).join(', ')})`);
     return codes;
   } catch (e) {
     console.error(`[SectorService] Failed to fetch symbols for ${sectorId} via JSON API:`, e);
