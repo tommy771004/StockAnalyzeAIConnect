@@ -107,7 +107,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [customSymbols, customFilters, selectedSectors]);
+  }, [customSymbols, customFilters, selectedSectors, t]);
 
   const pullState = usePullToRefresh(containerRef, { onRefresh: () => runScan() });
 
@@ -118,6 +118,8 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   };
 
   const handleSelectSymbol = useCallback((sym: string) => {
+    // Set for ResearchPage to pick up
+    sessionStorage.setItem('research-symbol', sym);
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     onNavigate('research');
   }, [onNavigate]);
@@ -262,7 +264,10 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     <input
                       type="number" min={0} max={100} placeholder="30"
                       value={customFilters.rsiBelow ?? ''}
-                      onChange={e => setCustomFilters(f => ({ ...f, rsiBelow: e.target.value ? Number(e.target.value) : undefined }))}
+                      onChange={e => {
+                        setActiveTemplate(null);
+                        setCustomFilters(f => ({ ...f, rsiBelow: e.target.value ? Number(e.target.value) : undefined }));
+                      }}
                       className="w-full h-11 px-3 bg-(--color-term-bg) border border-(--color-term-border) text-sm font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
                     />
                   </div>
@@ -271,7 +276,10 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     <input
                       type="number" min={0} max={100} placeholder="70"
                       value={customFilters.rsiAbove ?? ''}
-                      onChange={e => setCustomFilters(f => ({ ...f, rsiAbove: e.target.value ? Number(e.target.value) : undefined }))}
+                      onChange={e => {
+                        setActiveTemplate(null);
+                        setCustomFilters(f => ({ ...f, rsiAbove: e.target.value ? Number(e.target.value) : undefined }));
+                      }}
                       className="w-full h-11 px-3 bg-(--color-term-bg) border border-(--color-term-border) text-sm font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
                     />
                   </div>
@@ -280,20 +288,29 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     <input
                       type="number" min={1} step={0.5} placeholder="2"
                       value={customFilters.volumeSpikeMin ?? ''}
-                      onChange={e => setCustomFilters(f => ({ ...f, volumeSpikeMin: e.target.value ? Number(e.target.value) : undefined }))}
+                      onChange={e => {
+                        setActiveTemplate(null);
+                        setCustomFilters(f => ({ ...f, volumeSpikeMin: e.target.value ? Number(e.target.value) : undefined }));
+                      }}
                       className="w-full h-11 px-3 bg-(--color-term-bg) border border-(--color-term-border) text-sm font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
                     />
                   </div>
                   <div className="flex flex-col gap-3 justify-center pt-5">
                     <label className="flex items-center gap-2 text-xs cursor-pointer text-(--color-term-text)">
                       <input type="checkbox" checked={!!customFilters.macdBullish}
-                        onChange={e => setCustomFilters(f => ({ ...f, macdBullish: e.target.checked || undefined, macdBearish: undefined }))}
+                        onChange={e => {
+                          setActiveTemplate(null);
+                          setCustomFilters(f => ({ ...f, macdBullish: e.target.checked || undefined, macdBearish: undefined }));
+                        }}
                         className="w-4 h-4 accent-(--color-term-accent)" />
                       {t('screener.macdBullish')}
                     </label>
                     <label className="flex items-center gap-2 text-xs cursor-pointer text-(--color-term-text)">
                       <input type="checkbox" checked={!!customFilters.aboveSMA20}
-                        onChange={e => setCustomFilters(f => ({ ...f, aboveSMA20: e.target.checked || undefined, belowSMA20: undefined }))}
+                        onChange={e => {
+                          setActiveTemplate(null);
+                          setCustomFilters(f => ({ ...f, aboveSMA20: e.target.checked || undefined, belowSMA20: undefined }));
+                        }}
                         className="w-4 h-4 accent-(--color-term-accent)" />
                       {t('screener.priceAboveSma20')}
                     </label>
