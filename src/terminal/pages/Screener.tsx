@@ -85,15 +85,28 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
       
       let sectorSymbols: string[] = [];
       if (selectedSectors.length > 0) {
-        // Fetch symbols for each selected sector in parallel
         const results = await Promise.all(selectedSectors.map(id => api.getSectorSymbols(id)));
         sectorSymbols = Array.from(new Set(results.flat() as string[]));
       }
       
+      // LOGIC FIX: 
+      // 1. If we have manual symbols, use them.
+      // 2. If we have sector symbols, include them.
+      // 3. ONLY if both are truly empty (and no sector was even attempted), fall back to defaults.
       if (manualSymbols.length > 0 || sectorSymbols.length > 0) {
         syms = Array.from(new Set([...manualSymbols, ...sectorSymbols]));
-      } else {
+      } else if (selectedSectors.length === 0 && customSymbols.trim() === '') {
+        // Only fall back to defaults if user has NO selections and NO custom input
         syms = DEFAULT_SYMBOLS;
+      } else {
+        // User selected a sector or typed something that returned no results
+        syms = [];
+      }
+
+      if (syms.length === 0 && (selectedSectors.length > 0 || customSymbols.trim() !== '')) {
+        setResults([]);
+        setScannedCount(0);
+        return;
       }
 
       setScannedCount(syms.length);

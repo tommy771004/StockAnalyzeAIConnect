@@ -69,20 +69,38 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       }
     });
+    
+    if (!res.ok) {
+      console.error(`[SectorService] WantGoo returned ${res.status} for ${sectorId}`);
+      return [];
+    }
+
     const html = await res.text();
     
-    // WantGoo's stock table rows usually contain data-symbol or similar
-    // Looking at the provided example link: https://www.wantgoo.com/index/%5E028/stocks
-    // The symbols are in a table. We can use a regex to extract 4-5 digit codes.
-    // Better: WantGoo often has a JSON-like structure in the HTML scripts or simple <a> tags with /stock/XXXX
+    // Refine: Only match symbols within stock links to avoid sidebars/popular stocks.
+    // Main table links usually look like <a href="/stock/XXXX">
+    const matches = html.match(/href="\/stock\/(\d{4,6})"/g);
+    if (!matches) {
+      console.warn(`[SectorService] No symbols found in main table for ${sectorId}`);
+      return [];
+    }
     
-    const matches = html.match(/\/stock\/(\d{4,6})/g);
-    if (!matches) return [];
-    
-    const codes: string[] = Array.from(new Set(matches.map(m => m.replace('/stock/', ''))));
+    // Extract codes and filter out duplicates
+    const codes: string[] = Array.from(new Set(
+      matches.map(m => {
+        const match = m.match(/\/stock\/(\d{4,6})/);
+        return match ? match[1] : null;
+      }).filter(Boolean) as string[]
+    ));
+
+    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId}`);
     return codes;
   } catch (e) {
     console.error(`[SectorService] Failed to fetch symbols for ${sectorId}:`, e);
