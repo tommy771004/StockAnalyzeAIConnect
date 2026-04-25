@@ -20,8 +20,8 @@ export function Footer({ lastUpdated }: FooterProps) {
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between border-t border-(--color-term-border) bg-(--color-term-bg) px-5 text-[11px] tracking-wider text-(--color-term-muted)">
       <div className="flex items-center gap-4">
-        <span className="text-(--color-term-accent) font-semibold">FIN-TERMINAL</span>
-        <span>© {new Date().getFullYear()} FIN-TERMINAL</span>
+        <span className="text-(--color-term-accent) font-semibold">Stock AI Connect</span>
+        <span>© {new Date().getFullYear()} Stock AI Connect</span>
         <span className="hidden sm:inline">|</span>
         <span className="hidden sm:inline">
           {t('footer.status')}：

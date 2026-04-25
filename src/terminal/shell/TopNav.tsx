@@ -11,12 +11,12 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: 'dashboard', label: 'dashboard' },
-  { id: 'market',    label: 'market' },
-  { id: 'crypto',    label: 'crypto' },
+  { id: 'market', label: 'market' },
+  { id: 'crypto', label: 'crypto' },
   { id: 'portfolio', label: 'portfolio' },
-  { id: 'research',  label: 'research' },
-  { id: 'backtest',  label: 'backtest' },
-  { id: 'news',      label: 'news' },
+  { id: 'research', label: 'research' },
+  { id: 'backtest', label: 'backtest' },
+  { id: 'news', label: 'news' },
 ];
 
 interface TopNavProps {
@@ -42,7 +42,7 @@ export function TopNav({
   };
 
   return (
-    <header 
+    <header
       className="flex h-14 items-center gap-3 border-b border-(--color-term-border) bg-(--color-term-bg) px-3 md:px-5 shrink-0 relative electron-drag"
       style={{ WebkitAppRegion: 'drag' } as any}
     >
@@ -62,7 +62,7 @@ export function TopNav({
         href="#"
         onClick={(e) => { e.preventDefault(); onChange('dashboard'); }}
       >
-        FIN-TERMINAL
+        Stock AI Connect
         {/* Subtle glow underline on hover */}
         <span className="absolute -bottom-0.5 left-0 right-0 h-px bg-(--color-term-accent) opacity-0 group-hover:opacity-60 transition-opacity" />
       </a>

@@ -55,7 +55,7 @@ export function LoginPage() {
             <Terminal className="h-6 w-6" />
           </div>
           <h1 className="text-xl font-bold tracking-[0.2em] text-(--color-term-text)">
-            FIN-TERMINAL
+            Stock AI Connect
           </h1>
           <p className="mt-2 text-[11px] tracking-widest text-(--color-term-muted)">
             {t('auth.loginSubtitle')}
