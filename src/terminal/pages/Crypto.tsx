@@ -43,7 +43,7 @@ export function CryptoPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3">
       <div className="col-span-12 min-h-[300px]">
-        <Panel title="REAL-TIME CRYPTO MARKETS (USD)">
+        <Panel title="REAL-TIME CRYPTO MARKETS (USD)" collapsible>
           <table className="w-full text-[12px]">
             <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) sticky top-0 z-10">
               <tr className="border-b border-(--color-term-border)">

@@ -20,7 +20,7 @@ export function MarketPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
       <div className="col-span-12">
-        <Panel title={t('market.sectorTitle')}>
+        <Panel title={t('market.sectorTitle')} collapsible>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1">
             {sectors.map((s) => (
               <div
@@ -51,7 +51,7 @@ export function MarketPage() {
       </div>
 
       <div className="col-span-12 min-h-[260px]">
-        <Panel title={t('market.indicesTitle')}>
+        <Panel title={t('market.indicesTitle')} collapsible>
           <table className="w-full text-[12px]">
             <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) z-10 sticky top-0">
               <tr className="border-b border-(--color-term-border)">

@@ -104,7 +104,7 @@ export function AlertsPage() {
 
       {/* Add Alert Form */}
       <div className="col-span-12 lg:col-span-4">
-        <Panel title={t('alerts.add')} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+        <Panel title={t('alerts.add')} icon={<Plus className="h-4 w-4" aria-hidden="true" />} collapsible>
           <form onSubmit={handleAdd} className="p-4 space-y-4" noValidate>
             <div>
               <label
