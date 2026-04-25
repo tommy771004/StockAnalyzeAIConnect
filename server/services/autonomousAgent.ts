@@ -16,7 +16,6 @@ import type { AgentConfig, AgentStatus, AgentLog } from '../../src/components/Au
 import { riskManager } from './RiskManager.js';
 import { anyMarketOpen, isTradingSession } from './tradingSession.js';
 import { DEFAULT_AGENT_CONFIG } from './autotradingDefaults.js';
-import { notifier } from './notifier/index.js';
 
 import { autotradingConfigRepo } from '../repositories/autotradingConfigRepo.js';
 
@@ -37,10 +36,7 @@ let isTickRunning = false;
 
 const executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
 
-export function setWsBroadcast(fn: (msg: any) => void) {
-  wsBroadcast = fn;
-  executor.setWsBroadcast(fn);
-}
+export function setWsBroadcast(fn: (msg: any) => void) { wsBroadcast = fn; }
 
 function emitLog(log: Omit<AgentLog, 'id' | 'timestamp'>) {
   const newLog: AgentLog = { 
@@ -165,8 +161,44 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       userId: config.userId || 'default' 
     });
 
-    const dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    let dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
     const currentPrice = quote?.price || 0;
+    
+    // 信心度過低時，觸發「深度研究任務」(Parallel-Web)
+    if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65) {
+      emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `信心度 (${dec.confidence}) 過低，觸發 parallel-web 深度研究反向觀點...` });
+      try {
+        const { scrapeUrls } = await import('../utils/scienceService.js');
+        // 假設我們有預設的幾個新聞網址來針對這檔股票，或者用 LLM 生出網址
+        // 這裡作為展示，直接輸入相關的查詢或知名外部網址
+        const researchUrls = [
+          `https://news.google.com/search?q=${symbol}+stock&hl=zh-TW`,
+          `https://finance.yahoo.com/quote/${symbol}/news`
+        ];
+        const webData = await scrapeUrls(researchUrls);
+        let deepContext = '';
+        if (webData && webData.data) {
+           deepContext = Object.values(webData.data).join('\\n').substring(0, 1000);
+        }
+        
+        if (deepContext) {
+           const { text: newText } = await callLLM({
+             systemPrompt: ORCHESTRATOR_PROMPT,
+             prompt: orchestratorPrompt + `\\n\\n[Deep Research Context]:\\n${deepContext}\\n\\n請重新評估並產出 JSON 決策。`,
+             forceModel: models[0],
+             jsonMode: true,
+             userId: config.userId || 'default'
+           });
+           const newDec = JSON.parse(newText.match(/\{[\s\S]*\}/)?.[0] || '{}');
+           if (newDec.confidence) {
+              emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `深度研究完成。新信心度: ${newDec.confidence}, 新動作: ${newDec.action}` });
+              dec = newDec;
+           }
+        }
+      } catch (e) {
+        console.warn('[Agent] Deep research failed:', e);
+      }
+    }
     
     // 發送決策熱圖數據到前端
     const heatScore = (dec.confidence || 0) * (dec.action === 'SELL' ? -1 : 1);
@@ -269,9 +301,6 @@ async function agentTick() {
           );
           if (!riskCheck.allowed) {
             emitLog({ level: 'RISK_CHK', source: 'RISK', symbol, message: `🛑 風控攔截：${riskCheck.reason}` });
-            if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'risk_block', {
-              symbol, side: signal.action, qty: finalQty, reason: riskCheck.reason ?? '',
-            }).catch(() => {});
             continue;
           }
           if (riskCheck.level === 'WARNING' && riskCheck.reason) {
@@ -341,7 +370,6 @@ async function agentTick() {
 function activateCooldown(reason: string) {
   agentStatus = 'cooldown';
   emitLog({ level: 'CRITICAL', source: 'BREAKER', symbol: 'ALL', message: `🚨 斷路器觸發：${reason}。實盤交易已暫停。` });
-  if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'kill_switch', { reason }).catch(() => {});
   syncStateToDb();
   if (tickTimeout) clearTimeout(tickTimeout);
   tickTimeout = setTimeout(() => {
@@ -427,7 +455,6 @@ export function emergencyKillSwitch() {
   stopAgent();
   riskManager.activateKillSwitch();
   emitLog({ level: 'CRITICAL', source: 'SYSTEM', symbol: 'ALL', message: '🚨 緊急停止已觸發！所有自動交易已停止。' });
-  if (agentConfig.userId) notifier.dispatch(agentConfig.userId, 'kill_switch', { reason: '使用者手動觸發 Kill Switch' }).catch(() => {});
   return { ok: true };
 }
 

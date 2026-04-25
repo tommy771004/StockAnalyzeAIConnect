@@ -18,7 +18,7 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setError(t('auth.requiredFields'));
+      setError(t('auth.requiredFields', 'Required fields missing'));
       return;
     }
     setLoading(true);
@@ -30,7 +30,7 @@ export function LoginPage() {
         await login(email, password);
       }
     } catch (err: any) {
-      setError(err.message || t('auth.authFailed'));
+      setError(err.message || t('auth.authFailed', 'Authentication failed'));
     } finally {
       setLoading(false);
     }
@@ -55,10 +55,10 @@ export function LoginPage() {
             <Terminal className="h-6 w-6" />
           </div>
           <h1 className="text-xl font-bold tracking-[0.2em] text-(--color-term-text)">
-            Stock AI Connect
+            {t('auth.appTitle', 'Stock AI Connect')}
           </h1>
           <p className="mt-2 text-[11px] tracking-widest text-(--color-term-muted)">
-            {t('auth.loginSubtitle')}
+            {t('auth.loginSubtitle', 'AUTONOMOUS_TRADING_SYNDICATE_v3')}
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export function LoginPage() {
                 className="overflow-hidden flex flex-col gap-1"
               >
                 <label className="text-[10px] tracking-widest text-(--color-term-muted)">
-                  {t('auth.operatorId')}
+                  {t('auth.operatorId', 'OPERATOR_ID')}
                 </label>
                 <div className="relative">
                   <Cpu className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-subtle)" />
@@ -94,7 +94,7 @@ export function LoginPage() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder={t('auth.namePlaceholder')}
+                    placeholder={t('auth.namePlaceholder', 'Enter handle...')}
                     className="h-10 w-full border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-[13px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-subtle) focus:border-(--color-term-accent) focus:outline-none transition-colors"
                   />
                 </div>
@@ -104,7 +104,7 @@ export function LoginPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-[10px] tracking-widest text-(--color-term-muted)">
-              {t('auth.accessCoord')}
+              {t('auth.accessCoord', 'ACCESS_COORD (EMAIL)')}
             </label>
             <div className="relative">
               <Network className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-subtle)" />
@@ -112,7 +112,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('auth.emailPlaceholder')}
+                placeholder={t('auth.emailPlaceholder', 'sys.operator@fin.local')}
                 className="h-10 w-full border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-[13px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-subtle) focus:border-(--color-term-accent) focus:outline-none transition-colors"
               />
             </div>
@@ -120,7 +120,7 @@ export function LoginPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-[10px] tracking-widest text-(--color-term-muted)">
-              {t('auth.securityKey')}
+              {t('auth.securityKey', 'SECURITY_KEY')}
             </label>
             <div className="relative">
               <Database className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-subtle)" />
@@ -143,7 +143,7 @@ export function LoginPage() {
             )}
           >
             <span className={cn('relative z-10', loading && 'invisible')}>
-              {isRegister ? t('auth.establishUplink') : t('auth.initiateHandshake')}
+              {isRegister ? t('auth.establishUplink', 'ESTABLISH_UPLINK') : t('auth.initiateHandshake', 'INITIATE_HANDSHAKE')}
             </span>
             {loading && (
               <div className="absolute inset-0 z-0 flex items-center justify-center">
@@ -158,7 +158,7 @@ export function LoginPage() {
               onClick={() => { setIsRegister(!isRegister); setError(''); }}
               className="text-[10px] tracking-widest text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
             >
-              [ {isRegister ? t('auth.switchToLogin') : t('auth.requestAccess')} ]
+              [ {isRegister ? t('auth.switchToLogin', 'SWITCH_TO_LOGIN') : t('auth.requestAccess', 'REQUEST_NEW_ACCESS')} ]
             </button>
           </div>
         </form>

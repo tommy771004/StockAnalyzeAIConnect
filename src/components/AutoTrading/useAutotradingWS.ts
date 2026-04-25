@@ -10,13 +10,6 @@ const WS_PATH = '/ws/autotrading';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_LOGS = 300;
 
-export interface OrderLifecycleEvent {
-  orderId: number;
-  status: 'PENDING' | 'PARTIAL' | 'FILLED' | 'CANCELLED' | 'REJECTED';
-  payload: unknown;
-  timestamp: string;
-}
-
 interface AutotradingState {
   status: AgentStatus;
   config: AgentConfig | null;
@@ -27,7 +20,6 @@ interface AutotradingState {
   decisionHeats: Record<string, DecisionHeat>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
-  orderEvents: OrderLifecycleEvent[];
   connected: boolean;
 }
 
@@ -42,7 +34,6 @@ export function useAutotradingWS() {
     decisionHeats: {},
     globalSentiment: 50,
     equityHistory: [],
-    orderEvents: [],
     connected: false,
   });
 
@@ -103,14 +94,9 @@ export function useAutotradingWS() {
             case 'global_sentiment':
               return { ...prev, globalSentiment: msg.data.score };
             case 'equity_update':
-              return {
-                ...prev,
-                equityHistory: [...prev.equityHistory, msg.data].slice(-100)
-              };
-            case 'order_lifecycle':
-              return {
-                ...prev,
-                orderEvents: [...prev.orderEvents, msg.data].slice(-50),
+              return { 
+                ...prev, 
+                equityHistory: [...prev.equityHistory, msg.data].slice(-100) 
               };
             default:
               return prev;

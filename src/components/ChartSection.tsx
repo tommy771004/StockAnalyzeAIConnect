@@ -17,10 +17,11 @@ interface ChartSectionProps {
   model: string;
   focusMode: boolean;
   data: HistoricalData[];
+  timeframe?: string;
   onTimeframeChange?: (timeframe: string) => void;
 }
 
-export const ChartSection: React.FC<ChartSectionProps> = React.memo(({ data, focusMode, symbol, onTimeframeChange }) => {
+export const ChartSection: React.FC<ChartSectionProps> = React.memo(({ data, focusMode, symbol, timeframe, onTimeframeChange }) => {
   const { settings } = useSettings();
   const compact = settings.compactMode;
 
@@ -35,7 +36,7 @@ export const ChartSection: React.FC<ChartSectionProps> = React.memo(({ data, foc
       )}
     >
       <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-emerald-400 text-xs"><Loader2 className="animate-spin"/></div>}>
-        <ChartWidget symbol={symbol} data={data} focusMode={focusMode} onTimeframeChange={onTimeframeChange} />
+        <ChartWidget symbol={symbol} data={data} focusMode={focusMode} timeframe={timeframe} onTimeframeChange={onTimeframeChange} />
       </Suspense>
     </motion.div>
   );

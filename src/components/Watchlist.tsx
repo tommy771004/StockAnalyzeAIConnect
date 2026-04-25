@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useAnimation } from 'motion/react';
 import { vibrate } from '../utils/helpers';
 import { useSettings } from '../contexts/SettingsContext';
 import { WatchlistItem, SearchResult } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface WatchlistProps {
   watchlist: WatchlistItem[];
@@ -136,6 +137,7 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
 export const Watchlist: React.FC<WatchlistProps> = React.memo(({
   watchlist, norm, symbol, onSymbolChange, wlAdding, setWlAdding, wlSearch, setWlSearch, addToWatchlist, searchResults = [], isSearching = false, onSwipeAction
 }) => {
+  const { t } = useTranslation();
   const { settings, format } = useSettings();
   const compact = settings.compactMode;
   const [filter, setFilter] = React.useState<'all' | 'bullish' | 'bearish'>('all');
@@ -191,7 +193,7 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
                 value={wlSearch}
                 onChange={e => setWlSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addToWatchlist(wlSearch.toUpperCase())}
-                placeholder="搜尋代碼或名稱 SYMBOL..."
+                placeholder={t('watchlist.search_placeholder', '搜尋代碼或名稱 SYMBOL...')}
                 autoFocus
                 className="flex-1 bg-black/60 border border-white/5 rounded-2xl px-4 py-3 text-xs font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition shadow-inner"
               />

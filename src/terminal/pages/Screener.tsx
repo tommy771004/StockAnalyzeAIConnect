@@ -25,14 +25,14 @@ import type { TerminalView } from '../types';
 // ── Pre-built scan templates ──────────────────────────────────────────────────
 // Exported to prevent Terser/esbuild minifier TDZ collisions
 export const TEMPLATES: { id: string; label: string; desc: string; filters: ScreenerFilters; color: string }[] = [
-  { id: 'oversold',     label: 'RSI 超賣反彈',   desc: 'RSI < 30，超賣區反彈機會',          filters: { rsiBelow: 30 },                              color: 'text-rose-400' },
-  { id: 'overbought',   label: 'RSI 超買警示',   desc: 'RSI > 70，超買區注意回檔',          filters: { rsiAbove: 70 },                              color: 'text-emerald-400' },
-  { id: 'golden_cross',  label: '均線金叉',       desc: 'SMA5 上穿 SMA20，趨勢轉多',        filters: { goldenCrossOnly: true },                      color: 'text-amber-400' },
-  { id: 'death_cross',   label: '均線死叉',       desc: 'SMA5 下穿 SMA20，趨勢轉空',        filters: { deathCrossOnly: true },                       color: 'text-rose-400' },
-  { id: 'macd_bull',     label: 'MACD 多頭動能',  desc: 'MACD 柱狀由負轉正',               filters: { macdBullish: true },                          color: 'text-emerald-400' },
-  { id: 'vol_spike',     label: '異常爆量',       desc: '成交量 > 20 日均量 2 倍',           filters: { volumeSpikeMin: 2 },                          color: 'text-amber-400' },
-  { id: 'bullish_trend', label: '多頭排列',       desc: '價格 > SMA20，趨勢向上',           filters: { aboveSMA20: true, macdBullish: true },         color: 'text-emerald-400' },
-  { id: 'bearish_trend', label: '空頭排列',       desc: '價格 < SMA20 且 MACD 空頭',        filters: { belowSMA20: true, macdBearish: true },         color: 'text-rose-400' },
+  { id: 'oversold',     label: 'screener.oversold', desc: 'screener.oversoldDesc',          filters: { rsiBelow: 30 },                              color: 'text-rose-400' },
+  { id: 'overbought',   label: 'screener.overbought', desc: 'screener.overboughtDesc',          filters: { rsiAbove: 70 },                              color: 'text-emerald-400' },
+  { id: 'golden_cross',  label: 'screener.goldenCross', desc: 'screener.goldenCrossDesc',        filters: { goldenCrossOnly: true },                      color: 'text-amber-400' },
+  { id: 'death_cross',   label: 'screener.deathCross', desc: 'screener.deathCrossDesc',        filters: { deathCrossOnly: true },                       color: 'text-rose-400' },
+  { id: 'macd_bull',     label: 'screener.macdBull', desc: 'screener.macdBullDesc',               filters: { macdBullish: true },                          color: 'text-emerald-400' },
+  { id: 'vol_spike',     label: 'screener.volSpike', desc: 'screener.volSpikeDesc',           filters: { volumeSpikeMin: 2 },                          color: 'text-amber-400' },
+  { id: 'bullish_trend', label: 'screener.bullishTrend', desc: 'screener.bullishTrendDesc',           filters: { aboveSMA20: true, macdBullish: true },         color: 'text-emerald-400' },
+  { id: 'bearish_trend', label: 'screener.bearishTrend', desc: 'screener.bearishTrendDesc',        filters: { belowSMA20: true, macdBearish: true },         color: 'text-rose-400' },
 ];
 
 export const DEFAULT_SYMBOLS = [
@@ -44,6 +44,15 @@ export const DEFAULT_SYMBOLS = [
   'BTC-USD','ETH-USD',
 ];
 
+export const SECTORS = [
+  { id: 'tech_tw', name: 'screener.techTw', symbols: ['2330.TW', '2317.TW', '2454.TW', '2382.TW', '3231.TW', '2308.TW', '3711.TW', '2303.TW', '2379.TW', '3034.TW'] },
+  { id: 'tech_us', name: 'screener.techUs', symbols: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META', 'AMD', 'TSM', 'AVGO', 'AMZN', 'TSLA'] },
+  { id: 'finance_tw', name: 'screener.financeTw', symbols: ['2881.TW', '2882.TW', '2884.TW', '2891.TW', '2886.TW', '2883.TW', '2892.TW', '2885.TW', '2890.TW'] },
+  { id: 'biotech_tw', name: 'screener.biotechTw', symbols: ['4147.TWO', '6472.TWO', '4123.TWO', '4743.TWO', '1701.TW', '1795.TWO', '6446.TWO', '6547.TWO'] },
+  { id: 'etf_tw', name: 'screener.etfTw', symbols: ['0050.TW', '0056.TW', '00878.TW', '00929.TW', '00919.TW', '00713.TW', '00679B.TW', '00687B.TW'] },
+  { id: 'crypto', name: 'screener.cryptoMain', symbols: ['BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'AVAX-USD', 'DOGE-USD'] }
+];
+
 type SortKey = 'symbol' | 'price' | 'changePct' | 'rsi' | 'volumeRatio' | 'signals';
 type SortDir = 'asc' | 'desc';
 
@@ -51,7 +60,10 @@ interface ScreenerPageProps {
   onNavigate: (view: TerminalView) => void;
 }
 
+import { useTranslation } from 'react-i18next';
+
 export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
+  const { t, i18n } = useTranslation();
   const { settings, format } = useSettings();
   const compact = settings.compactMode;
 
@@ -62,6 +74,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
   const [customFilters, setCustomFilters] = useState<ScreenerFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [customSymbols, setCustomSymbols] = useState('');
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>('changePct');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [scannedCount, setScannedCount] = useState(0);
@@ -72,19 +85,29 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
     setLoading(true);
     setError('');
     try {
-      const syms = customSymbols.trim()
+      let syms: string[] = [];
+      const manualSymbols = customSymbols.trim()
         ? customSymbols.split(/[,\s\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
-        : DEFAULT_SYMBOLS;
+        : [];
+      
+      const sectorSymbols = SECTORS.filter(s => selectedSectors.includes(s.id)).flatMap(s => s.symbols);
+      
+      if (manualSymbols.length > 0 || sectorSymbols.length > 0) {
+        syms = Array.from(new Set([...manualSymbols, ...sectorSymbols]));
+      } else {
+        syms = DEFAULT_SYMBOLS;
+      }
+
       setScannedCount(syms.length);
       const data = await api.runScreener(syms, filters ?? customFilters);
       setResults(Array.isArray(data.results) ? data.results : []);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '掃描失敗';
+      const msg = e instanceof Error ? e.message : t('screener.scanFailed');
       setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [customSymbols, customFilters]);
+  }, [customSymbols, customFilters, selectedSectors]);
 
   const pullState = usePullToRefresh(containerRef, { onRefresh: () => runScan() });
 
@@ -170,16 +193,16 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           <div>
             <h1 className={cn("font-black tracking-tight flex items-center gap-2", compact ? "text-xl" : "text-2xl text-(--color-term-text)")}>
               <TargetIcon size={compact ? 20 : 24} className="text-(--color-term-accent)" />
-              智慧選股器 (Smart Screener)
+              {t('screener.title')}
             </h1>
-            <p className="text-xs mt-1 text-(--color-term-muted)">XQ-Style Technical Screener — 多條件批量掃描</p>
+            <p className="text-xs mt-1 text-(--color-term-muted)">{t('screener.screenerDesc', 'XQ-Style Technical Screener — 多條件批量掃描')}</p>
           </div>
           <button type="button" onClick={() => runScan()}
             disabled={loading}
             className="flex items-center justify-center gap-2 px-6 h-11 md:h-10 rounded-sm text-sm font-bold transition active:scale-95 disabled:opacity-50 uppercase tracking-widest bg-(--color-term-accent) text-black hover:opacity-90 w-full md:w-auto"
           >
             {loading ? <Loader2Icon size={16} className="animate-spin" /> : <RefreshCwIcon size={16} />}
-            {loading ? '掃描中 SCANNING...' : '開始掃描 RUN SCAN'}
+            {loading ? t('screener.scanningUpper') : t('screener.runScanUpper')}
           </button>
         </div>
 
@@ -207,7 +230,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           >
             <div className="flex items-center gap-2">
               <FilterIcon size={14} />
-              自訂篩選條件 (CUSTOM FILTERS)
+              {t('screener.customFilters')}
             </div>
             <ChevronDownIcon size={14} className={cn("transition-transform duration-300", showFilters && "rotate-180")} />
           </button>
@@ -221,7 +244,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">RSI 低於 (Oversold)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">{t('screener.rsiLow')}</label>
                     <input
                       type="number" min={0} max={100} placeholder="30"
                       value={customFilters.rsiBelow ?? ''}
@@ -230,7 +253,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">RSI 高於 (Overbought)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">{t('screener.rsiHigh')}</label>
                     <input
                       type="number" min={0} max={100} placeholder="70"
                       value={customFilters.rsiAbove ?? ''}
@@ -239,7 +262,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">量能倍數 ≥ (Volume Spike)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">{t('screener.volSpikeTitle')}</label>
                     <input
                       type="number" min={1} step={0.5} placeholder="2"
                       value={customFilters.volumeSpikeMin ?? ''}
@@ -262,7 +285,29 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     </label>
                   </div>
                   <div className="sm:col-span-2 lg:col-span-4">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">自訂代碼 (留空使用預設清單)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-2 block">{t('screener.sectors')}</label>
+                    <div className="flex flex-wrap gap-2">
+                      {SECTORS.map(s => (
+                        <label key={s.id} className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs cursor-pointer border transition-colors",
+                          selectedSectors.includes(s.id)
+                            ? "bg-(--color-term-accent)/20 border-(--color-term-accent) text-(--color-term-accent)"
+                            : "bg-(--color-term-bg) border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text)"
+                        )}>
+                          <input type="checkbox" className="hidden"
+                            checked={selectedSectors.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedSectors([...selectedSectors, s.id]);
+                              else setSelectedSectors(selectedSectors.filter(id => id !== s.id));
+                            }}
+                          />
+                          {t(s.name)}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4 mt-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-(--color-term-muted) mb-1.5 block">{t('screener.customSymbolsPlaceholder')}</label>
                     <input
                       type="text"
                       value={customSymbols}
@@ -275,12 +320,12 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     <button type="button" onClick={() => { setActiveTemplate(null); runScan(); }}
                       className="px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-accent) text-black hover:opacity-90 w-full sm:w-auto"
                     >
-                      執行自訂掃描
+                      {t('screener.runCustomScan')}
                     </button>
-                    <button type="button" onClick={() => { setCustomFilters({}); setActiveTemplate(null); }}
+                    <button type="button" onClick={() => { setCustomFilters({}); setActiveTemplate(null); setSelectedSectors([]); setCustomSymbols(''); }}
                       className="px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-bg) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5 w-full sm:w-auto"
                     >
-                      清除條件
+                      {t('screener.clearFiltersBtn')}
                     </button>
                   </div>
                 </div>
@@ -299,7 +344,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
         {/* Results Summary */}
         {results.length > 0 && (
           <div className="text-xs shrink-0 text-(--color-term-muted)">
-            掃描 <span className="font-mono">{scannedCount}</span> 檔標的 → 符合條件 <span className="font-bold text-(--color-term-accent)">{results.length}</span> 檔
+            {t('screener.scannedInfoSimple', { scanned: scannedCount, matched: results.length })}
           </div>
         )}
 
@@ -318,8 +363,8 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           <div className="flex-1 flex items-center justify-center min-h-[200px]">
             <div className="text-center">
               <TargetIcon className="w-12 h-12 mx-auto mb-4 text-(--color-term-border)" />
-              <p className="text-sm font-bold text-(--color-term-muted)">請選擇左上方篩選模板或展開自訂條件，開始掃描</p>
-              <p className="text-xs mt-2 text-(--color-term-muted)/60">預設掃描台股 + 美股 + 加密貨幣共 {DEFAULT_SYMBOLS.length} 檔</p>
+              <p className="text-sm font-bold text-(--color-term-muted)">{t('screener.emptyDesc1')}</p>
+              <p className="text-xs mt-2 text-(--color-term-muted)/60">{t('screener.emptyDesc2', { count: DEFAULT_SYMBOLS.length })}</p>
             </div>
           </div>
         )}
@@ -332,12 +377,12 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                 <thead className="sticky top-0 z-10 bg-(--color-term-panel) border-b border-(--color-term-border)">
                   <tr>
                     {[
-                      { key: 'symbol' as SortKey, label: '代碼 (SYMBOL)' },
-                      { key: 'price' as SortKey, label: '現價 (PRICE)' },
-                      { key: 'changePct' as SortKey, label: '漲跌 (CHG%)' },
+                      { key: 'symbol' as SortKey, label: t('screener.colSymbol', 'SYMBOL') },
+                      { key: 'price' as SortKey, label: t('screener.colPrice', 'PRICE') },
+                      { key: 'changePct' as SortKey, label: t('screener.colChange', 'CHG%') },
                       { key: 'rsi' as SortKey, label: 'RSI(14)' },
-                      { key: 'volumeRatio' as SortKey, label: '量比 (VOL)' },
-                      { key: 'signals' as SortKey, label: '技術訊號 (SIGNALS)' },
+                      { key: 'volumeRatio' as SortKey, label: t('screener.colVol', 'VOL RATIO') },
+                      { key: 'signals' as SortKey, label: t('screener.colSignals', 'SIGNALS') },
                     ].map(col => (
                       <th
                         key={col.key}
@@ -408,7 +453,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                 <button type="button" onClick={() => setVisibleCount(v => v + 50)}
                   className="px-6 py-2.5 text-xs font-bold rounded-sm transition-all border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
                 >
-                  載入更多 LOAD MORE ({visibleCount}/{sorted.length})
+                  {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
                 </button>
               </div>
             )}

@@ -67,6 +67,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
     loadData,
     norm,
     indic,
+    timeframe,
     setTimeframe
   } = useStockAnalysis({
     symbol,
@@ -326,6 +327,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
               model={model} 
               focusMode={isFocusActive || Boolean(isLandscape)} 
               data={hist} 
+              timeframe={timeframe}
               onTimeframeChange={onTimeframeChange}
             />
           </div>

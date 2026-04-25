@@ -12,8 +12,6 @@ import { RiskControlPanel } from '../../components/AutoTrading/RiskControlPanel'
 import { StrategyTab } from '../../components/AutoTrading/StrategyTab';
 import { BacktestPanel } from '../../components/AutoTrading/BacktestPanel';
 import { StrategySandbox } from '../../components/AutoTrading/StrategySandbox';
-import { OrderBookPanel } from '../../components/AutoTrading/OrderBookPanel';
-import { PerformanceDashboard } from '../../components/AutoTrading/PerformanceDashboard';
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
 
@@ -66,7 +64,7 @@ export function AutoTradingPage() {
         <div className="flex items-center gap-4">
           <span className="text-[11px] font-bold text-(--color-term-accent) tracking-[0.25em]">QUANTUM_CORE_V1</span>
           <nav className="flex gap-3">
-            {['LIVE_VIEW', 'STRATEGY', 'BACKTEST', 'SIMULATION', 'PERFORMANCE'].map((tab) => (
+            {['LIVE_VIEW', 'STRATEGY', 'BACKTEST', 'SIMULATION'].map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -119,17 +117,7 @@ export function AutoTradingPage() {
                   logs={ws.logs}
                 />
               </div>
-              {/* Order Lifecycle */}
-              <div className="shrink-0">
-                <OrderBookPanel events={ws.orderEvents} />
-              </div>
             </>
-          )}
-
-          {mainTab === 'PERFORMANCE' && (
-            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
-              <PerformanceDashboard />
-            </div>
           )}
 
           {mainTab === 'STRATEGY' && (
