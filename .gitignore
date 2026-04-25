@@ -6,3 +6,8 @@ dist/
 .DS_Store
 .vercel
 .cache/
+skills-lock.json
+.agents/skills/*
+.claude/skills/*
+.windsurf/skills/*
+src/tests/*

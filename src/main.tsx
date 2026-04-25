@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -12,14 +13,16 @@ if (!rootEl) throw new Error('Missing #root element');
 
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
-    <AuthProvider>
-      <SettingsProvider>
-        <SubscriptionProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </SubscriptionProvider>
-      </SettingsProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <SettingsProvider>
+          <SubscriptionProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </SubscriptionProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </HelmetProvider>
   </React.StrictMode>,
 );

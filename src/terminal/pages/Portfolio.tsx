@@ -73,11 +73,11 @@ export function PortfolioPage() {
   const plPct = totalInvestedTWD > 0 ? (totalPLTWD / totalInvestedTWD) * 100 : 0;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 grid-rows-[auto_1fr_auto] gap-3">
-      <div className="col-span-12 md:col-span-12 lg:col-span-5 row-span-1">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto md:overflow-hidden pb-8 md:pb-0">
+      <div className="col-span-12 lg:col-span-5 md:min-h-0 shrink-0 md:shrink">
         <EquityPanel history={history} currentEquity={totalEquityTWD} />
       </div>
-      <div className="col-span-12 md:col-span-12 lg:col-span-7 row-span-1">
+      <div className="col-span-12 lg:col-span-7 md:min-h-0 shrink-0 md:shrink">
         <div className="h-full flex flex-col justify-center p-6 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm">
           <div className="text-sm text-(--color-term-muted) mb-1">總權益 (Total Equity - TWD)</div>
           <div className="text-4xl font-bold text-(--color-term-text) tabular-nums">
@@ -93,7 +93,7 @@ export function PortfolioPage() {
           </div>
         </div>
       </div>
-      <div className="col-span-12 md:col-span-8 row-span-1 min-h-0">
+      <div className="col-span-12 lg:col-span-8 md:min-h-0 shrink-0 md:shrink">
         <HoldingsPanel 
           positions={enrichedPositions} 
           onDelete={deletePosition} 
@@ -115,7 +115,7 @@ export function PortfolioPage() {
                 <label className="block text-xs text-(--color-term-muted) mb-1">股票代號 (如: 2330.TW 或 AAPL)</label>
                 <input 
                   autoFocus
-                  className="w-full bg-(--color-term-bg) border border-(--color-term-border) px-3 py-2 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
+                  className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                   value={newPos.symbol}
                   onChange={e => setNewPos(p => ({ ...p, symbol: e.target.value }))}
                   placeholder="SYMBOL"
@@ -126,7 +126,7 @@ export function PortfolioPage() {
                   <label className="block text-xs text-(--color-term-muted) mb-1">持有股數</label>
                   <input 
                     type="number"
-                    className="w-full bg-(--color-term-bg) border border-(--color-term-border) px-3 py-2 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
+                    className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                     value={newPos.shares}
                     onChange={e => setNewPos(p => ({ ...p, shares: e.target.value }))}
                     placeholder="QTY"
@@ -136,7 +136,7 @@ export function PortfolioPage() {
                   <label className="block text-xs text-(--color-term-muted) mb-1">平均成本</label>
                   <input 
                     type="number"
-                    className="w-full bg-(--color-term-bg) border border-(--color-term-border) px-3 py-2 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
+                    className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                     value={newPos.avgCost}
                     onChange={e => setNewPos(p => ({ ...p, avgCost: e.target.value }))}
                     placeholder="COST"
@@ -147,13 +147,13 @@ export function PortfolioPage() {
             <div className="flex justify-end gap-3 mt-6">
               <button 
                 onClick={() => setIsAdding(false)}
-                className="px-4 py-2 text-sm text-(--color-term-muted) hover:text-(--color-term-text)"
+                className="px-4 h-11 min-w-[88px] text-sm text-(--color-term-muted) hover:text-(--color-term-text)"
               >
                 取消
               </button>
               <button 
                 onClick={handleAdd}
-                className="bg-(--color-term-accent) text-black px-6 py-2 text-sm font-bold rounded-sm hover:opacity-90"
+                className="bg-(--color-term-accent) text-black px-6 h-11 text-sm font-bold rounded-sm hover:opacity-90"
               >
                 確認新增
               </button>
@@ -162,17 +162,17 @@ export function PortfolioPage() {
         </div>
       )}
 
-      <div className="col-span-12 md:col-span-4 row-span-1 min-h-0">
+      <div className="col-span-12 lg:col-span-4 md:min-h-0 shrink-0 md:shrink">
         <AllocationPanel positions={positions} />
       </div>
-      <div className="col-span-12 row-span-1">
+      <div className="col-span-12 md:min-h-0 shrink-0 md:shrink">
         <TradeLogPanel trades={trades} />
       </div>
     </div>
   );
 }
 
-function EquityPanel({ history, currentEquity }: { history: any[], currentEquity: number }) {
+export function EquityPanel({ history, currentEquity }: { history: any[], currentEquity: number }) {
   const [range, setRange] = useState('1M');
   
   const chartPoints = useMemo(() => {
@@ -221,7 +221,7 @@ function EquityPanel({ history, currentEquity }: { history: any[], currentEquity
               key={r}
               onClick={() => setRange(r)}
               className={cn(
-                'h-6 min-w-9 px-1.5 text-[10px] tracking-widest',
+                'h-8 min-w-9 px-2 text-[10px] tracking-widest',
                 range === r ? 'text-(--color-term-accent) border border-(--color-term-accent)' : 'text-(--color-term-muted)'
               )}
             >
@@ -249,7 +249,7 @@ function EquityPanel({ history, currentEquity }: { history: any[], currentEquity
   );
 }
 
-function HoldingsPanel({ 
+export function HoldingsPanel({ 
   positions, 
   onDelete, 
   onUpdate,
@@ -291,17 +291,17 @@ function HoldingsPanel({
                 onClick={onRefresh}
                 disabled={loading}
                 title="立即刷新現價"
-                className="text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors p-1"
+                className="text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors p-2"
              >
-                <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
              </button>
              <span className="text-(--color-term-muted) text-[11px]">共 {positions.length} 檔標的</span>
           </div>
           <button 
             onClick={onAdd}
-            className="flex items-center gap-1 bg-(--color-term-accent)/10 text-(--color-term-accent) border border-(--color-term-accent)/30 px-2 py-1 text-[10px] font-bold hover:bg-(--color-term-accent)/20 transition-all"
+            className="flex items-center gap-1 bg-(--color-term-accent)/10 text-(--color-term-accent) border border-(--color-term-accent)/30 px-3 py-2 text-[11px] font-bold hover:bg-(--color-term-accent)/20 transition-all"
           >
-            <Plus size={12} /> 新增持倉
+            <Plus size={14} /> 新增持倉
           </button>
         </div>
       }
@@ -350,7 +350,7 @@ function HoldingsPanel({
                 <td className="px-4 py-3.5 text-right tabular-nums">
                   {isEditing ? (
                     <input 
-                      className="w-16 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
+                      className="w-16 h-8 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
                       type="number"
                       value={editBuf.shares}
                       onChange={e => setEditBuf((b:any) => ({ ...b, shares: e.target.value }))}
@@ -360,7 +360,7 @@ function HoldingsPanel({
                 <td className="px-4 py-3.5 text-right tabular-nums">
                   {isEditing ? (
                     <input 
-                      className="w-20 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
+                      className="w-20 h-8 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
                       type="number"
                       value={editBuf.avgCost}
                       onChange={e => setEditBuf((b:any) => ({ ...b, avgCost: e.target.value }))}
@@ -399,26 +399,26 @@ function HoldingsPanel({
                   <div className="flex items-center justify-center gap-2">
                     {isEditing ? (
                       <>
-                        <button onClick={saveEdit} className="text-emerald-400 hover:text-emerald-300">
-                          <Check size={14} />
+                        <button onClick={saveEdit} className="text-emerald-400 hover:text-emerald-300 p-2">
+                          <Check size={16} />
                         </button>
-                        <button onClick={() => setEditingSym(null)} className="text-(--color-term-muted) hover:text-(--color-term-text)">
-                          <X size={14} />
+                        <button onClick={() => setEditingSym(null)} className="text-(--color-term-muted) hover:text-(--color-term-text) p-2">
+                          <X size={16} />
                         </button>
                       </>
                     ) : (
                       <>
                         <button 
                           onClick={() => startEdit(h)}
-                          className="text-(--color-term-muted) hover:text-(--color-term-accent) opacity-0 group-hover:opacity-100 transition-all"
+                          className="text-(--color-term-muted) hover:text-(--color-term-accent) opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all p-2"
                         >
-                          <Edit2 size={13} />
+                          <Edit2 size={15} />
                         </button>
                         <button 
                           onClick={() => { if(confirm(`確定刪除 ${h.symbol} 持倉？`)) onDelete(h.symbol); }}
-                          className="text-(--color-term-muted) hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
+                          className="text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all p-2"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={15} />
                         </button>
                       </>
                     )}
@@ -432,7 +432,7 @@ function HoldingsPanel({
     </Panel>
   );
 }
-function AllocationPanel({ positions }: { positions: any[] }) {
+export function AllocationPanel({ positions }: { positions: any[] }) {
   const allocation = useMemo(() => {
     if (positions.length === 0) return [{ label: 'CASH', pct: 100, color: '#374151' }];
     
@@ -471,7 +471,7 @@ function AllocationPanel({ positions }: { positions: any[] }) {
   );
 }
 
-function Donut({ sectors }: { sectors: any[] }) {
+export function Donut({ sectors }: { sectors: any[] }) {
   const size = 160;
   const r = 58;
   const stroke = 18;
@@ -511,7 +511,7 @@ function Donut({ sectors }: { sectors: any[] }) {
   );
 }
 
-function TradeLogPanel({ trades }: { trades: any[] }) {
+export function TradeLogPanel({ trades }: { trades: any[] }) {
   return (
     <Panel
       title="交易歷史紀錄"

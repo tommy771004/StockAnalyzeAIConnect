@@ -12,6 +12,8 @@ import { AlertsPage } from './terminal/pages/Alerts';
 import { BacktestTerminalPage } from './terminal/pages/Backtest';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
+import { SEO } from './components/SEO';
+import { useTranslation } from 'react-i18next';
 
 const VALID_VIEWS: readonly TerminalView[] = [
   'dashboard',
@@ -22,6 +24,7 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'backtest',
   'news',
   'alerts',
+  'screener',
   'settings'
 ];
 
@@ -42,11 +45,13 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   backtest: 'SEARCH SYMBOLS...',
   news: '搜尋 . . .',
   alerts: 'SEARCH ALERTS...',
+  screener: 'SCREENER ACTIVE...',
   settings: 'SEARCH SETTINGS...',
 };
 
 export default function App() {
   const { user, loading } = useAuth();
+  const { t } = useTranslation();
   const [view, setView] = useState<TerminalView>(() => parseHashView());
 
   useEffect(() => {
@@ -70,11 +75,18 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginPage />;
+    return (
+      <>
+        <SEO title={t('nav.login', 'Login')} path="/#login" />
+        <LoginPage />
+      </>
+    );
   }
 
   return (
-    <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>
+    <>
+      <SEO title={t(`nav.${view}`, view.toUpperCase())} path={`/#${view}`} />
+      <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>
       {view === 'dashboard' && <DashboardPage />}
       {view === 'market' && <MarketPage />}
       {view === 'crypto' && <CryptoPage />}
@@ -84,6 +96,8 @@ export default function App() {
       {view === 'news' && <NewsPage />}
       {view === 'settings' && <SettingsPage />}
       {view === 'alerts' && <AlertsPage />}
+      {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
     </Layout>
+    </>
   );
 }

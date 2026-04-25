@@ -28,9 +28,9 @@ export function DashboardPage() {
   } = data;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 gap-3">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto md:overflow-hidden pb-8 md:pb-0">
       {/* Left column */}
-      <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-3">
+      <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <WatchlistPanel
           rows={watchlist}
           selected={selected}
@@ -50,7 +50,7 @@ export function DashboardPage() {
       </div>
 
       {/* Center column */}
-      <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-6">
+      <div className="col-span-12 flex flex-col gap-3 lg:col-span-6 md:min-h-0 shrink-0 md:shrink">
         <MarketPulsePanel watchlist={watchlist} onSelect={setSelected} />
         <SelectedChartPanel
           row={selectedRow}
@@ -63,7 +63,7 @@ export function DashboardPage() {
       </div>
 
       {/* Right column */}
-      <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-3">
+      <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <MarketNewsPanel news={news} onSelect={setSelected} />
         <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
       </div>
@@ -72,7 +72,7 @@ export function DashboardPage() {
 }
 
 // ─── WatchlistPanel ────────────────────────────────────────────────────────────
-function WatchlistPanel({
+export function WatchlistPanel({
   rows,
   selected,
   onSelect,
@@ -163,10 +163,10 @@ function WatchlistPanel({
       <table className="w-full text-[12px]">
         <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
           <tr className="border-b border-(--color-term-border)">
-            <th className="px-3 py-2 text-left font-medium">SYM</th>
-            <th className="px-3 py-2 text-right font-medium">LAST</th>
-            <th className="px-3 py-2 text-right font-medium">CHG%</th>
-            <th className="px-3 py-2 text-right font-medium w-8"></th>
+            <th className="px-3 py-3 text-left font-medium">SYM</th>
+            <th className="px-3 py-3 text-right font-medium">LAST</th>
+            <th className="px-3 py-3 text-right font-medium">CHG%</th>
+            <th className="px-3 py-3 text-right font-medium w-8"></th>
           </tr>
         </thead>
         <tbody>
@@ -183,7 +183,7 @@ function WatchlistPanel({
                     : 'hover:bg-white/5',
                 )}
               >
-                <td className="px-3 py-2 font-semibold tracking-wider">
+                <td className="px-3 py-3 font-semibold tracking-wider">
                   <span
                     className={cn(
                       'inline-flex items-center gap-2',
@@ -193,13 +193,13 @@ function WatchlistPanel({
                     {row.symbol}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td className="px-3 py-3 text-right tabular-nums">
                   {row.last > 0 ? row.last.toFixed(2) : '—'}
                 </td>
-                <td className={cn('px-3 py-2 text-right tabular-nums', toneClass(row.changePct))}>
+                <td className={cn('px-3 py-3 text-right tabular-nums', toneClass(row.changePct))}>
                   {formatPct(row.changePct)}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-3 text-right">
                    <button
                     type="button"
                     onClick={(e) => {
@@ -221,7 +221,7 @@ function WatchlistPanel({
 }
 
 // ─── TopMoversPanel ────────────────────────────────────────────────────────────
-function TopMoversPanel({
+export function TopMoversPanel({
   gainers,
   losers,
   loading,
@@ -243,7 +243,7 @@ function TopMoversPanel({
             type="button"
             onClick={() => setTab(k)}
             className={cn(
-              'flex-1 py-2 uppercase transition-colors',
+              'flex-1 py-3 uppercase transition-colors',
               tab === k
                 ? 'text-(--color-term-accent) border-b-2 border-(--color-term-accent)'
                 : 'text-(--color-term-muted) hover:text-(--color-term-text)',
@@ -261,7 +261,7 @@ function TopMoversPanel({
             <li 
               key={m.symbol} 
               onClick={() => onSelect(m.symbol)}
-              className="flex items-center justify-between px-3 py-2 text-[12px] hover:bg-white/5 cursor-pointer transition-colors group/mover"
+              className="flex items-center justify-between px-3 py-3 text-[12px] hover:bg-white/5 cursor-pointer transition-colors group/mover"
             >
               <span className="flex items-center gap-2">
                 <span
@@ -284,7 +284,7 @@ function TopMoversPanel({
 }
 
 // ─── MarketPulsePanel ──────────────────────────────────────────────────────────
-function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+export function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   return (
     <Panel
       title="MARKET PULSE (WATCHLIST)"
@@ -303,7 +303,7 @@ function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], 
 }
 
 // ─── Dynamic Heatmap ────────────────────────────────────────────────────────
-function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+export function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   if (!watchlist || watchlist.length === 0) {
     return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">Pulse unavailable</div>;
   }
@@ -332,7 +332,7 @@ function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect:
   );
 }
 
-function HeatCell({
+export function HeatCell({
   cell,
   className,
   onSelect,
@@ -376,7 +376,7 @@ function HeatCell({
 }
 
 // ─── SelectedChartPanel ────────────────────────────────────────────────────────
-function SelectedChartPanel({
+export function SelectedChartPanel({
   row,
   candles,
   range,
@@ -471,7 +471,7 @@ function SelectedChartPanel({
 
 
 // ─── MarketNewsPanel ───────────────────────────────────────────────────────────
-function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
+export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
   const [filter, setFilter] = useState<NewsCategory['id'] | 'ALL'>('ALL');
   
   const filteredNews = useMemo(() => {
@@ -511,7 +511,7 @@ function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: 
             return (
               <li 
                 key={n.id} 
-                className="px-3 py-3 hover:bg-white/5 cursor-pointer transition-colors group/news"
+                className="px-3 py-4 hover:bg-white/5 cursor-pointer transition-colors group/news"
                 onClick={() => n.link && window.open(n.link, '_blank', 'noopener')}
               >
                 <div className="mb-1.5 flex items-center justify-between text-[10px] tracking-widest">
@@ -552,7 +552,7 @@ function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: 
 // ─── QuickTradePanel ──────────────────────────────────────────────────────────
 type TradeStatus = 'idle' | 'submitting' | 'success' | 'error';
 
-function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
+export function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
   const [qty, setQty]           = useState(100);
   const [orderPrice, setOrderPrice] = useState(price);
   const [side, setSide]         = useState<'buy' | 'sell'>('buy');
@@ -647,7 +647,7 @@ function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
             onClick={() => { setSide('buy'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'border border-sky-300/50 bg-sky-300/20 py-2 text-[12px] font-semibold tracking-widest text-sky-200 transition-colors',
+              'border border-sky-300/50 bg-sky-300/20 py-3 text-[12px] font-semibold tracking-widest text-sky-200 transition-colors',
               status === 'submitting' && side === 'buy'
                 ? 'opacity-50 cursor-not-allowed'
                 : 'hover:bg-sky-300/30',
@@ -660,7 +660,7 @@ function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
             onClick={() => { setSide('sell'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'border border-rose-300/50 bg-rose-300/20 py-2 text-[12px] font-semibold tracking-widest text-rose-200 transition-colors',
+              'border border-rose-300/50 bg-rose-300/20 py-3 text-[12px] font-semibold tracking-widest text-rose-200 transition-colors',
               status === 'submitting' && side === 'sell'
                 ? 'opacity-50 cursor-not-allowed'
                 : 'hover:bg-rose-300/30',
@@ -675,20 +675,20 @@ function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
 }
 
 // ─── Shared primitives ─────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       {label && (
         <span className="text-[10px] tracking-widest text-(--color-term-muted)">{label}</span>
       )}
-      <div className="flex h-9 items-center justify-center border border-(--color-term-border) bg-(--color-term-surface) px-3 text-[13px] font-semibold tracking-widest text-(--color-term-text)">
+      <div className="flex h-11 items-center justify-center border border-(--color-term-border) bg-(--color-term-surface) px-3 text-[13px] font-semibold tracking-widest text-(--color-term-text)">
         {children}
       </div>
     </div>
   );
 }
 
-function LabeledInput({
+export function LabeledInput({
   label,
   value,
   onChange,
@@ -701,7 +701,7 @@ function LabeledInput({
     <label className="flex flex-col gap-1">
       <span className="text-[10px] tracking-widest text-(--color-term-muted)">{label}</span>
       <input
-        className="h-9 border border-(--color-term-border) bg-(--color-term-surface) px-3 text-center text-[13px] tabular-nums text-(--color-term-text) focus:border-(--color-term-accent) focus:outline-none"
+        className="h-11 border border-(--color-term-border) bg-(--color-term-surface) px-3 text-center text-[13px] tabular-nums text-(--color-term-text) focus:border-(--color-term-accent) focus:outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

@@ -7,6 +7,7 @@ export type TerminalView =
   | 'backtest'
   | 'news'
   | 'alerts'
+  | 'screener'
   | 'settings';
 
 export interface TickerSummary {
@@ -39,6 +40,7 @@ export interface DashboardNews {
   time: string;
   title: string;
   tickers: string[];
+  link?: string;
 }
 
 export interface Mover {

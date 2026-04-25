@@ -3,8 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node --env-file=.env --import=./node_modules/tsx/dist/esm/index.mjs server.ts",
+    "dev:electron": "vite",
+    "build:electron": "vite build && electron-builder",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -36,6 +39,7 @@
     "motion": "^12.38.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-helmet-async": "^3.0.0",
     "react-i18next": "^17.0.4",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
@@ -58,10 +62,34 @@
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.10",
     "electron": "^41.2.2",
+    "electron-builder": "^26.8.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.1.5"
+  },
+  "build": {
+    "appId": "com.hermes.trading",
+    "productName": "Hermes AI Trading",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.finance"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }

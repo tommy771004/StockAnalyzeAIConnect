@@ -22,6 +22,43 @@ interface Props {
 
 type ChartType = 'candle' | 'line' | 'area';
 
+function resolveWsUrl(): string | null {
+  const configuredWs = (import.meta.env.VITE_WS_URL as string | undefined)?.trim();
+  if (configuredWs) return configuredWs;
+
+  const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (apiBaseUrl) {
+    try {
+      const apiUrl = new URL(apiBaseUrl, window.location.origin);
+      apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      const normalizedPath = apiUrl.pathname.replace(/\/+$/, '').replace(/\/api$/, '');
+      apiUrl.pathname = `${normalizedPath}/ws`.replace(/\/{2,}/g, '/');
+      return apiUrl.toString();
+    } catch {
+      // Ignore invalid env URL and continue fallback checks.
+    }
+  }
+
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (isLocalHost) {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${window.location.host}/ws`;
+  }
+
+  return null;
+}
+
+function resolveApiBaseUrl(): string | undefined {
+  const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (!configuredApi) return undefined;
+  try {
+    const url = new URL(configuredApi, window.location.origin);
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    return undefined;
+  }
+}
+
 const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, onTimeframeChange }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -89,11 +126,15 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   useEffect(() => {
     if (!liveMode) return;
 
-    const wsUrl = (import.meta.env.VITE_WS_URL as string | undefined) ?? `ws://${location.host}/ws`;
+    const wsUrl = resolveWsUrl();
+    const apiBaseUrl = resolveApiBaseUrl();
+    if (!wsUrl) {
+      console.info('[ChartWidget] No WS endpoint configured; worker will use HTTP polling fallback.');
+    }
     const worker = new Worker(new URL('../workers/socket.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
-    worker.postMessage({ type: 'CONNECT', wsUrl });
+    worker.postMessage({ type: 'CONNECT', wsUrl: wsUrl ?? undefined, apiBaseUrl });
     worker.postMessage({ type: 'SUBSCRIBE', symbol });
 
     worker.addEventListener('message', (event: MessageEvent) => {

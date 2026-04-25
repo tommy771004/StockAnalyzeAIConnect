@@ -40,6 +40,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   strategies:     many(strategies),
   agentMemories:  many(agentMemories),
   portfolioHistory: many(portfolioHistory),
+  paymentOrders:  many(paymentOrders),
 }));
 
 // ─── portfolio_history (NAV snapshots) ────────────────────────────────────────
@@ -213,6 +214,26 @@ export const agentMemoriesRelations = relations(agentMemories, ({ one }) => ({
 
 // update usersRelations to include agentMemories
 
+// ─── payment_orders ───────────────────────────────────────────────────────────
+export const paymentOrders = pgTable('payment_orders', {
+  id:              serial('id').primaryKey(),
+  merchantTradeNo: text('merchant_trade_no').notNull().unique(),
+  userId:          uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  planId:          text('plan_id').notNull(),
+  status:          text('status').notNull().default('pending'), // 'pending' | 'success' | 'failed'
+  amount:          numeric('amount').notNull(),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+  updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+},
+(t) => [
+  index('payment_orders_user_id_idx').on(t.userId),
+  // Note: unique constraint already creates an index, but explicit indexing can be done if needed.
+]);
+
+export const paymentOrdersRelations = relations(paymentOrders, ({ one }) => ({
+  user: one(users, { fields: [paymentOrders.userId], references: [users.id] }),
+}));
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -232,4 +253,5 @@ export type NewAgentMemory = typeof agentMemories.$inferInsert;
 export type AgentMemoryType = 'PREFERENCE' | 'SKILL' | 'CONTEXT';
 export type PortfolioHistory = typeof portfolioHistory.$inferSelect;
 export type NewPortfolioHistory = typeof portfolioHistory.$inferInsert;
-
+export type PaymentOrder = typeof paymentOrders.$inferSelect;
+export type NewPaymentOrder = typeof paymentOrders.$inferInsert;

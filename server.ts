@@ -19,8 +19,29 @@ import * as strategiesRepo from './server/repositories/strategiesRepo.js';
 import * as historyRepo from './server/repositories/portfolioHistoryRepo.js';
 import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
-import { agentRouter } from './server/api/agent.js';
+import { agentRouter }    from './server/api/agent.js';
+import { ecpayRouter }    from './server/api/ecpay.js';
+import { researchRouter } from './server/api/research.js';
 import { startAutonomousAgent } from './server/services/autonomousAgent.js';
+import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
+import type { ScreenerResultRow } from './src/terminal/types/market.js';
+import { callAISimple } from './server/utils/llmPipeline.js';
+
+// ─── Error helper (Fix #4) ────────────────────────────────────────────────────
+// Centralises: (a) `e instanceof Error` narrowing, (b) no raw DB/stack leaks
+// in production, (c) consistent { error } response shape.
+import type { Response } from 'express';
+function handleApiError(res: Response, e: unknown): void {
+  const msg = e instanceof Error ? e.message : 'Internal server error';
+  const safe = process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : msg;
+  res.status(500).json({ error: safe });
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+/** Fix #1: hard cap on screener input — prevents DoS via 10 k-symbol batch */
+const MAX_SCREENER_SYMBOLS = 50;
 
 // Lazy-load Neon DB
 let dbAvailable = false;
@@ -66,53 +87,8 @@ function toTradingViewSymbol(input: string): string {
 /**
  * Calls OpenRouter with automatic fallback to other free models on failure
  */
-async function callAIWithFallback(prompt: string, jsonMode: boolean = false): Promise<string> {
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) throw new Error('AI key missing');
-
-  const modelsToTry = await getTopFreeModels(3);
-
-  let lastError: any = null;
-
-  for (const modelId of modelsToTry) {
-    try {
-      console.log(`[AI] Attempting request with model: ${modelId}...`);
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://hermes-ai.trading',
-          'X-Title': 'Hermes AI Trading'
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-          ...(jsonMode && { response_format: { type: 'json_object' } })
-        }),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        console.warn(`[AI] Model ${modelId} failed (${res.status}): ${errText.slice(0, 100)}`);
-        continue; // Try next model
-      }
-
-      const json = await res.json() as any;
-      const content = json?.choices?.[0]?.message?.content;
-      if (content) {
-        console.log(`[AI] Success with model: ${modelId}`);
-        return content;
-      }
-    } catch (err) {
-      console.warn(`[AI] Error calling ${modelId}:`, (err as Error).message);
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error('All AI models failed to respond');
-}
+// callAIWithFallback removed — replaced by callAISimple from server/utils/llmPipeline.ts
+// (cost-aware-llm-pipeline: model routing, immutable cost tracking, retry, prompt caching)
 
 const UA_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -521,7 +497,7 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
   }
 
   try {
-    const text = await callAIWithFallback(prompt, jsonMode);
+    const text = await callAISimple(prompt, jsonMode, req.userId);
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
@@ -532,9 +508,6 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const sym = req.params.symbol;
   const tvSym = toTradingViewSymbol(sym);
-  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!apiKey) return res.status(500).json({ error: 'AI key missing' });
-
   console.log(`[AI] Generating summary for ${sym} (TV Symbol: ${tvSym})...`);
 
   try {
@@ -546,13 +519,16 @@ app.get('/api/ai/summarize/:symbol', authMiddleware, async (req: AuthRequest, re
     ]);
 
     const quote = quoteRes.status === 'fulfilled' ? quoteRes.value : null;
-    const news = newsRes.status === 'fulfilled' ? (newsRes.value as any).news : [];
+    const newsData = newsRes.status === 'fulfilled' ? (newsRes.value as any) : null;
+    const news = Array.isArray(newsData?.news) ? newsData.news : [];
     
     // Flatten nested TV responses
     const tvO = tvOverview.status === 'fulfilled' ? (tvOverview.value as any)?.data || tvOverview.value : null;
     const tvI = tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null;
 
-    const newsText = news.slice(0, 3).map((n: any) => `- ${n.title}`).join('\n');
+    const newsText = news.length > 0 
+      ? news.slice(0, 3).map((n: any) => `- ${n.title || n.headline || '無標題'}`).join('\n')
+      : '無近期相關新聞';
     const techText = tvI ? JSON.stringify(tvI).slice(0, 500) : '無技術指標數據';
 
     const prompt = `你是一位專業的金融分析師。請針對 ${sym} 提供深入的 AI 摘要分析。
@@ -568,12 +544,21 @@ ${newsText}
 3. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
-    const resultText = await callAIWithFallback(prompt);
+    const resultText = await callAISimple(prompt, false, req.userId);
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {
-    console.error(`[AI] Error:`, e);
-    res.status(500).json({ error: e.message });
+    console.error(`[AI] Summarize Error for ${sym}:`, e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    
+    // Pass through 402 Payment Required status
+    const status = errMsg.includes('402') ? 402 : 500;
+    
+    res.status(status).json({ 
+      error: `AI 摘要生成失敗: ${errMsg}`,
+      symbol: sym,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -588,7 +573,7 @@ app.post('/api/auth/register', async (req, res) => {
     const user = await usersRepo.createUser({ email, passwordHash, name: name ?? null });
     setTokenCookie(res, user.id);
     res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -601,7 +586,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!valid) { res.status(401).json({ error: 'Invalid credentials' }); return; }
     setTokenCookie(res, user.id);
     res.json({ user: { id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier } });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
@@ -609,7 +594,7 @@ app.get('/api/auth/me', authMiddleware, async (req: AuthRequest, res) => {
     const user = await usersRepo.findUserById(req.userId!);
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.put('/api/auth/update', authMiddleware, async (req: AuthRequest, res) => {
@@ -618,7 +603,7 @@ app.put('/api/auth/update', authMiddleware, async (req: AuthRequest, res) => {
     const user = await usersRepo.updateUser(req.userId!, { name });
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     res.json({ id: user.id, email: user.email, name: user.name, tier: user.subscriptionTier });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/auth/logout', (_req, res) => {
@@ -628,12 +613,12 @@ app.post('/api/auth/logout', (_req, res) => {
 
 app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.quote(req.params.symbol as string); res.json(q); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.chart(req.params.symbol as string, req.query); res.json(q.quotes); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
@@ -641,24 +626,24 @@ app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
     const syms = (req.query.symbols as string)?.split(',') || [];
     const results = await NativeYahooApi.quote(syms);
     res.json(Array.isArray(results) ? results : [results]);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/news/feed', authMiddleware, async (_req, res) => {
   try {
     const data = await NativeYahooApi.search('Market');
     res.json(data.news || []);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
   try { const data = await NativeYahooApi.search(req.params.query as string); res.json(data.quotes || []); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) => {
@@ -670,21 +655,21 @@ app.get('/api/calendar/:symbol', authMiddleware, async (req: AuthRequest, res) =
 
 app.get('/api/forex/:pair', authMiddleware, async (req: AuthRequest, res) => {
   try { const q = await NativeYahooApi.quote(req.params.pair as string); res.json({ rate: q?.regularMarketPrice ?? 32.5 }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/portfolio/history', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await historyRepo.getHistoryByUser(req.userId!);
     res.json(list.map(h => ({ id: h.id, totalEquity: Number(h.totalEquity), recordedAt: h.date })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const items = await watchlistRepo.getWatchlistByUser(req.userId!);
     res.json(items.map(i => ({ symbol: i.symbol, name: i.name, addedAt: i.addedAt })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
@@ -693,36 +678,50 @@ app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
     if (!symbol) { res.status(400).json({ error: 'symbol required' }); return; }
     const item = await watchlistRepo.addWatchlistItem({ userId: req.userId!, symbol: symbol.toUpperCase(), name: name ?? null, addedAt: Date.now() });
     res.status(201).json(item);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.delete('/api/watchlist/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await watchlistRepo.removeWatchlistItem(req.userId!, req.params.symbol);
     res.json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await alertsRepo.getAlertsByUser(req.userId!);
     res.json(list.map(a => ({ id: a.id, symbol: a.symbol, condition: a.condition, target: Number(a.target), triggered: a.triggered, triggeredAt: a.triggeredAt, triggeredPrice: a.triggeredPrice != null ? Number(a.triggeredPrice) : undefined })));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
-app.post('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/api/alerts', authMiddleware, alertsWriteLimiter, async (req: AuthRequest, res) => {
   try {
     const { symbol, condition, target } = req.body;
-    const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(target) });
+    // nodejs-backend-patterns: validate input before hitting the DB
+    if (!symbol || typeof symbol !== 'string') {
+      return res.status(400).json({ error: 'symbol is required and must be a string' });
+    }
+    if (!['above', 'below'].includes(condition)) {
+      return res.status(400).json({ error: 'condition must be "above" or "below"' });
+    }
+    const targetNum = Number(target);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target must be a valid number' });
+    }
+    const alert = await alertsRepo.createAlert(req.userId!, { symbol, condition, target: String(targetNum) });
     res.json(alert);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Internal server error';
+    res.status(500).json({ error: msg });
+  }
 });
 
 app.delete('/api/alerts/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await alertsRepo.deleteAlert(req.userId!, Number(req.params.id));
     res.json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => {
@@ -770,7 +769,7 @@ app.post('/api/trade/execute', authMiddleware, async (req: AuthRequest, res) => 
       }
     }
     res.json({ ok: true, trade });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
@@ -796,25 +795,25 @@ app.get('/api/positions', authMiddleware, async (req: AuthRequest, res) => {
       return { symbol: p.symbol, name: q?.shortName || p.name || p.symbol, shares, avgCost, currency: cur, currentPrice, pnl, pnlPercent, marketValue, marketValueTWD };
     });
     res.json({ positions: enriched, usdtwd });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/trades', authMiddleware, async (req: AuthRequest, res) => {
-  try { res.json(await tradesRepo.getTradesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  try { res.json(await tradesRepo.getTradesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
   try { const value = await settingsRepo.getSetting(req.userId!, req.params.key as string); res.json({ value: value ?? null }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
   try { await settingsRepo.setSetting(req.userId!, req.params.key as string, req.body.value); res.json({ ok: true }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
-  try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/tv/overview/:symbol', async (req, res) => {
@@ -822,7 +821,7 @@ app.get('/api/tv/overview/:symbol', async (req, res) => {
     const data = await TV.getOverview(req.params.symbol);
     if (data === null) return res.status(503).json({ error: 'TV Service Down' });
     res.json(data);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
@@ -891,7 +890,181 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
   });
 });
 
+app.get('/api/tv/overview/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getOverview(req.params.symbol);
+    res.json(data || {});
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.get('/api/tv/indicators/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIndicators(req.params.symbol, (req.query.timeframe as any) || '1d');
+    res.json(data || {});
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.get('/api/tv/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getNewsHeadlines(req.params.symbol);
+    res.json(data || []);
+  } catch (e: any) {
+    console.warn(`[TV News] Fallback to empty list for ${req.params.symbol}:`, e?.message ?? e);
+    res.json([]);
+  }
+});
+
+app.get('/api/tv/ideas/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const data = await TV.getIdeas(req.params.symbol, (req.query.sort as any) || 'popular');
+    res.json(data || []);
+  } catch (e) { handleApiError(res, e); }
+});
+
+// ── Stock Screener ─────────────────────────────────────────────────────────────
+// Batch-scans a list of symbols against technical criteria.
+// Uses Yahoo Finance for quotes + 90-day price history for indicator computation.
+app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthRequest, res) => {
+  const { symbols = [], filters = {} } = req.body ?? {};
+  if (!Array.isArray(symbols) || symbols.length === 0) {
+    return res.status(400).json({ error: 'symbols array required' });
+  }
+  // Fix #1: cap symbols to prevent event-loop saturation
+  if (symbols.length > MAX_SCREENER_SYMBOLS) {
+    return res.status(400).json({
+      error: `Max ${MAX_SCREENER_SYMBOLS} symbols per request`,
+    });
+  }
+
+  // Fix #5: typed accumulator — no more results: any[]
+  const results: ScreenerResultRow[] = [];
+
+  await Promise.allSettled(
+    symbols.map(async (sym: string) => {
+      try {
+        const [quoteRaw, histRaw] = await Promise.allSettled([
+          NativeYahooApi.quote(sym),
+          NativeYahooApi.chart(sym, { interval: '1d', period1: String(Date.now() - 120 * 24 * 3600 * 1000) }),
+        ]);
+
+        const quote: any = quoteRaw.status === 'fulfilled' ? quoteRaw.value : null;
+        const hist = histRaw.status === 'fulfilled' ? (histRaw.value as any).quotes ?? [] : [];
+
+        const price = quote?.regularMarketPrice ?? 0;
+        const changePct = quote?.regularMarketChangePercent ?? 0;
+        const name = quote?.shortName ?? quote?.longName ?? sym;
+
+        // ── Technical indicators ──────────────────────────────────────────────
+        const closes: number[] = hist.map((h: any) => Number(h.close)).filter((v: number) => !isNaN(v));
+        const vols: number[] = hist.map((h: any) => Number(h.volume)).filter((v: number) => !isNaN(v));
+
+        // RSI(14)
+        let rsi = 50;
+        if (closes.length >= 15) {
+          let avgUp = 0, avgDn = 0;
+          for (let i = closes.length - 14; i < closes.length; i++) {
+            const d = closes[i] - closes[i - 1];
+            if (d > 0) avgUp += d; else avgDn -= d;
+          }
+          avgUp /= 14; avgDn /= 14;
+          rsi = avgDn === 0 ? 100 : 100 - 100 / (1 + avgUp / avgDn);
+        }
+
+        // SMA5, SMA20, SMA60
+        const last = (arr: number[], n: number) => arr.slice(-n);
+        const mean = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const sma5  = closes.length >= 5  ? mean(last(closes, 5))  : price;
+        const sma20 = closes.length >= 20 ? mean(last(closes, 20)) : null;
+        const sma60 = closes.length >= 60 ? mean(last(closes, 60)) : null;
+
+        // MACD(12,26,9)
+        const ema = (arr: number[], p: number) => {
+          const k = 2 / (p + 1); let e = arr[0];
+          for (let i = 1; i < arr.length; i++) e = arr[i] * k + e * (1 - k);
+          return e;
+        };
+        let macdHistogram = 0;
+        if (closes.length >= 26) {
+          const e12 = ema(closes, 12);
+          const e26 = ema(closes, 26);
+          const macdLine = e12 - e26;
+          // For signal, use last 9 MACD values approximation
+          const slice = closes.slice(-35);
+          const macdSlice = slice.map((_, i, arr) => {
+            if (i < 26) return 0;
+            return ema(arr.slice(0, i + 1), 12) - ema(arr.slice(0, i + 1), 26);
+          }).filter((v) => v !== 0);
+          const signalLine = macdSlice.length >= 9 ? ema(macdSlice, 9) : macdLine;
+          macdHistogram = macdLine - signalLine;
+        }
+
+        // Volume ratio (current / 20-day avg)
+        const avgVol20 = vols.length >= 20 ? mean(last(vols, 20)) : (vols.length ? mean(vols) : 1);
+        const currentVol = vols[vols.length - 1] ?? 0;
+        const volumeRatio = avgVol20 > 0 ? currentVol / avgVol20 : 1;
+
+        // ── Signal detection ──────────────────────────────────────────────────
+        const signals: string[] = [];
+        if (rsi < 30) signals.push('RSI 超賣');
+        if (rsi > 70) signals.push('RSI 超買');
+        if (sma20 && sma5 > sma20 && closes.length >= 6) {
+          const prevSma5 = mean(last(closes.slice(0, -1), 5));
+          const prevSma20 = mean(last(closes.slice(0, -1), 20));
+          if (prevSma5 <= prevSma20) signals.push('均線金叉');
+        }
+        if (sma20 && sma5 < sma20 && closes.length >= 6) {
+          const prevSma5 = mean(last(closes.slice(0, -1), 5));
+          const prevSma20 = mean(last(closes.slice(0, -1), 20));
+          if (prevSma5 >= prevSma20) signals.push('均線死叉');
+        }
+        if (macdHistogram > 0) signals.push('MACD 多頭');
+        if (macdHistogram < 0) signals.push('MACD 空頭');
+        if (volumeRatio >= 2) signals.push('異常爆量');
+        if (sma20 && price > sma20) signals.push('強勢多頭');
+
+        // ── Apply filters ─────────────────────────────────────────────────────
+        if (filters.rsiBelow !== undefined && rsi >= filters.rsiBelow) return;
+        if (filters.rsiAbove !== undefined && rsi <= filters.rsiAbove) return;
+        if (filters.macdBullish && macdHistogram <= 0) return;
+        if (filters.macdBearish && macdHistogram >= 0) return;
+        if (filters.goldenCrossOnly && !signals.includes('均線金叉')) return;
+        if (filters.deathCrossOnly && !signals.includes('均線死叉')) return;
+        if (filters.volumeSpikeMin !== undefined && volumeRatio < filters.volumeSpikeMin) return;
+        if (filters.aboveSMA20 && sma20 && price <= sma20) return;
+        if (filters.belowSMA20 && sma20 && price >= sma20) return;
+
+        results.push({
+          symbol: sym,
+          name,
+          price,
+          changePct,
+          rsi: Number(rsi.toFixed(1)),
+          macdHistogram: Number(macdHistogram.toFixed(4)),
+          sma5: Number(sma5.toFixed(2)),
+          sma20: sma20 !== null ? Number(sma20.toFixed(2)) : null,
+          sma60: sma60 !== null ? Number(sma60.toFixed(2)) : null,
+          volumeRatio: Number(volumeRatio.toFixed(2)),
+          signals,
+          marketCap: quote?.marketCap ?? null,
+        });
+      } catch (err) {
+        console.warn(`[Screener] Skipping ${sym}:`, (err as Error).message);
+      }
+    })
+  );
+
+  res.json({ results, scanned: symbols.length });
+});
+
 app.use('/api/agent', authMiddleware, agentRouter);
+
+// ECPay payment routes — notify endpoint is called by ECPay server (no auth),
+// checkout endpoint requires auth to associate order with user.
+app.use('/api/payment/ecpay', ecpayRouter);
+
+// Research Pro routes — SEC Edgar, Congressional trades
+app.use('/api/research', authMiddleware, researchRouter);
+
 
 app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => {
   const rawSymbol = req.params.symbol as string, isTWStock = /^\d{4,5}$/.test(rawSymbol), yahooSymbol = isTWStock ? `${rawSymbol}.TW` : rawSymbol;
@@ -918,7 +1091,7 @@ app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => 
       technical: techResult ? { sma20: techResult.latest.sma20, sma50: techResult.latest.sma50, macdLine: techResult.latest.macdLine, rsi14: techResult.latest.rsi14, recommendation: techResult.recommendation, score: techResult.score } : null,
       sentiment
     });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
@@ -927,7 +1100,7 @@ app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
     const data = await NativeYahooApi.chart(symbol, { period1, period2 });
     if (data.quotes.length < 50) throw new Error('Insufficient data for backtest');
     res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000));
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.use((err: any, req: any, res: any, next: any) => {
