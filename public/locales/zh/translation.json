@@ -133,7 +133,17 @@
     "colChange": "漲跌 (CHG%)",
     "colVol": "量比 (VOL)",
     "colSignals": "技術訊號 (SIGNALS)",
-    "loadMoreCount": "載入更多 LOAD MORE ({{visible}}/{{total}})"
+    "loadMoreCount": "載入更多 LOAD MORE ({{visible}}/{{total}})",
+    "signals": {
+      "rsiOversold": "RSI 超賣",
+      "rsiOverbought": "RSI 超買",
+      "goldenCross": "均線金叉",
+      "deathCross": "均線死叉",
+      "macdBullish": "MACD 多頭",
+      "macdBearish": "MACD 空頭",
+      "volSpike": "異常爆量",
+      "strongBull": "強勢多頭"
+    }
   },
   "research": {
     "title": "標的研究",

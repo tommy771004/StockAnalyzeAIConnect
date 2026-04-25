@@ -138,7 +138,21 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
     return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
   });
 
+  const translateSignal = (sig: string) => {
+    // Map backend Chinese signals to i18n keys
+    if (sig === 'RSI 超賣') return t('screener.signals.rsiOversold');
+    if (sig === 'RSI 超買') return t('screener.signals.rsiOverbought');
+    if (sig === '均線金叉') return t('screener.signals.goldenCross');
+    if (sig === '均線死叉') return t('screener.signals.deathCross');
+    if (sig === 'MACD 多頭') return t('screener.signals.macdBullish');
+    if (sig === 'MACD 空頭') return t('screener.signals.macdBearish');
+    if (sig === '異常爆量') return t('screener.signals.volSpike');
+    if (sig === '強勢多頭') return t('screener.signals.strongBull');
+    return sig;
+  };
+
   const signalColor = (sig: string) => {
+    // Use the raw backend signal for color logic to stay consistent
     if (sig.includes('超賣') || sig.includes('金叉') || sig.includes('多頭')) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
     if (sig.includes('超買') || sig.includes('死叉') || sig.includes('空頭')) return 'text-rose-400 bg-rose-400/10 border-rose-400/20';
     return 'text-(--color-term-muted) bg-white/5 border-white/10';
@@ -216,9 +230,9 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                   ? "bg-(--color-term-accent)/20 border-(--color-term-accent) text-(--color-term-accent)"
                   : "bg-(--color-term-panel) border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) hover:border-white/20"
               )}
-              title={t.desc}
+              title={t(t.desc)}
             >
-              <span className={activeTemplate === t.id ? '' : t.color}>{t.label}</span>
+              <span className={activeTemplate === t.id ? '' : t.color}>{t(t.label)}</span>
             </button>
           ))}
         </div>
@@ -275,13 +289,13 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                       <input type="checkbox" checked={!!customFilters.macdBullish}
                         onChange={e => setCustomFilters(f => ({ ...f, macdBullish: e.target.checked || undefined, macdBearish: undefined }))}
                         className="w-4 h-4 accent-(--color-term-accent)" />
-                      MACD 多頭 (Bullish)
+                      {t('screener.macdBullish')}
                     </label>
                     <label className="flex items-center gap-2 text-xs cursor-pointer text-(--color-term-text)">
                       <input type="checkbox" checked={!!customFilters.aboveSMA20}
                         onChange={e => setCustomFilters(f => ({ ...f, aboveSMA20: e.target.checked || undefined, belowSMA20: undefined }))}
                         className="w-4 h-4 accent-(--color-term-accent)" />
-                      價格 &gt; SMA20 (Uptrend)
+                      {t('screener.priceAboveSma20')}
                     </label>
                   </div>
                   <div className="sm:col-span-2 lg:col-span-4">
@@ -438,7 +452,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                               key={sig}
                               className={cn("px-2 py-0.5 rounded-sm text-[10px] font-bold border whitespace-nowrap", signalColor(sig))}
                             >
-                              {sig}
+                              {translateSignal(sig)}
                             </span>
                           ))}
                         </div>

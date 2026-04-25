@@ -133,7 +133,17 @@
     "colChange": "CHG%",
     "colVol": "VOL RATIO",
     "colSignals": "SIGNALS",
-    "loadMoreCount": "LOAD MORE ({{visible}}/{{total}})"
+    "loadMoreCount": "LOAD MORE ({{visible}}/{{total}})",
+    "signals": {
+      "rsiOversold": "RSI Oversold",
+      "rsiOverbought": "RSI Overbought",
+      "goldenCross": "Golden Cross",
+      "deathCross": "Death Cross",
+      "macdBullish": "MACD Bullish",
+      "macdBearish": "MACD Bearish",
+      "volSpike": "Volume Spike",
+      "strongBull": "Strong Bull"
+    }
   },
   "research": {
     "title": "Research",
