@@ -35,6 +35,8 @@ import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js'
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
 import { callAISimple } from './server/utils/llmPipeline.js';
+import { hashStrategyParams } from './server/utils/hashUtil.js';
+import { backtestRepo } from './server/repositories/backtestRepo.js';
 import { runAdvancedBacktest } from './server/services/backtestEngine.js';
 import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
@@ -661,14 +663,13 @@ app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequ
 
 app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, res) => {
   const { symbol, period, config } = req.body;
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    // 修正: NativeYahooApi 返回的格式是 { quotes: [...] }
-    const historyData = await NativeYahooApi.chart(symbol, { 
+    const historyData = await NativeYahooApi.chart(symbol, {
       period1: Math.floor(Date.now() / 1000) - (period || 180) * 86400,
-      interval: '1d' 
+      interval: '1d'
     });
-    
-    // 直接使用 quotes 陣列，並確保格式正確
+
     const quotes = historyData.quotes.map((q: any) => ({
       date: q.date instanceof Date ? q.date.toISOString() : q.date,
       close: q.close
@@ -676,7 +677,36 @@ app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, r
 
     const result = await runAdvancedBacktest(symbol, quotes, config);
 
-    res.json({ ok: true, data: result });
+    // Save backtest session to DB
+    const paramsHash = hashStrategyParams(config?.params ?? {});
+    const session = await backtestRepo.createSession({
+      userId: req.userId,
+      symbol,
+      strategyParamsHash: paramsHash,
+      metrics: result.metrics,
+      tradeCount: result.trades?.length ?? 0,
+      finishedAt: new Date(),
+    });
+
+    // Save trades
+    if (session && result.trades) {
+      for (const t of result.trades) {
+        await backtestRepo.addTrade({
+          sessionId: session.id,
+          symbol,
+          side: t.side ?? 'BUY',
+          entryDate: new Date(t.entryDate),
+          entryPrice: t.entryPrice.toString(),
+          exitDate: t.exitDate ? new Date(t.exitDate) : null,
+          exitPrice: t.exitPrice?.toString() ?? null,
+          qty: t.qty?.toString() ?? '0',
+          pnl: t.pnl?.toString() ?? null,
+          pnlPct: t.pnlPct?.toString() ?? null,
+        });
+      }
+    }
+
+    res.json({ ok: true, data: result, sessionId: session?.id });
   } catch (e) {
     handleApiError(res, e);
   }
@@ -816,6 +846,64 @@ app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest,
     const { getPerformance } = await import('./server/services/performanceService.js');
     const result = await getPerformance(req.userId, period, startingEquity);
     res.json({ ok: true, period, ...result });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+// ── Backtest Alignment ───────────────────────────────────────────────────────
+app.get('/api/autotrading/alignment', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const sessionId = parseInt(String(req.query.sessionId ?? '0'), 10);
+    if (Number.isNaN(sessionId) || sessionId <= 0) {
+      return res.status(400).json({ error: 'sessionId required' });
+    }
+
+    const session = await backtestRepo.getSession(sessionId);
+    if (!session || session.userId !== req.userId) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const btTrades = await backtestRepo.getTradesBySession(sessionId);
+    const trades = await tradesRepo.listByUser(req.userId, { symbol: session.symbol });
+
+    // Pair trades by entry/exit dates (within tolerance)
+    interface PairedTrade {
+      btTrade: any;
+      liveTrade: any | null;
+      slippage: number | null;
+      pnlDeviation: number | null;
+    }
+    const paired: PairedTrade[] = btTrades.map(bt => {
+      const liveTrade = trades.find(lt =>
+        lt.ticker === session.symbol &&
+        Math.abs(
+          new Date(lt.date).getTime() - new Date(bt.entryDate).getTime()
+        ) < 86400000 // within 1 day
+      );
+
+      const slippage = liveTrade && bt.entryPrice && liveTrade.entry
+        ? (Number(liveTrade.entry) - Number(bt.entryPrice)) / Number(bt.entryPrice)
+        : null;
+
+      const pnlDeviation = liveTrade && bt.pnl && liveTrade.pnl
+        ? Number(liveTrade.pnl) - Number(bt.pnl)
+        : null;
+
+      return { btTrade: bt, liveTrade: liveTrade ?? null, slippage, pnlDeviation };
+    });
+
+    res.json({
+      ok: true,
+      sessionId,
+      symbol: session.symbol,
+      backtestMetrics: session.metrics,
+      totalPaired: paired.filter(p => p.liveTrade).length,
+      totalBacktestTrades: btTrades.length,
+      totalLiveTrades: trades.length,
+      paired,
+    });
   } catch (e) {
     handleApiError(res, e);
   }

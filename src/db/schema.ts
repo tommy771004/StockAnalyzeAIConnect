@@ -11,6 +11,7 @@ import {
   numeric,
   boolean,
   bigint,
+  integer,
   timestamp,
   jsonb,
   uniqueIndex,
@@ -321,6 +322,50 @@ export const notificationSettingsRelations = relations(notificationSettings, ({ 
   user: one(users, { fields: [notificationSettings.userId], references: [users.id] }),
 }));
 
+// ─── Backtest Sessions & Trades ────────────────────────────────────────────────
+export const backtestSessions = pgTable('backtest_sessions', {
+  id: serial('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  symbol: text('symbol').notNull(),
+  strategyParamsHash: text('strategy_params_hash').notNull(),
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  finishedAt: timestamp('finished_at'),
+  metrics: jsonb('metrics').notNull(),
+  tradeCount: integer('trade_count').default(0),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, t => [
+  index('backtest_user_idx').on(t.userId),
+  index('backtest_symbol_idx').on(t.symbol),
+  index('backtest_hash_idx').on(t.strategyParamsHash),
+]);
+
+export const backtestSessionsRelations = relations(backtestSessions, ({ one, many }) => ({
+  user: one(users, { fields: [backtestSessions.userId], references: [users.id] }),
+  trades: many(backtestTrades),
+}));
+
+export const backtestTrades = pgTable('backtest_trades', {
+  id: serial('id').primaryKey(),
+  sessionId: integer('session_id').notNull().references(() => backtestSessions.id, { onDelete: 'cascade' }),
+  symbol: text('symbol').notNull(),
+  side: text('side').notNull(), // 'BUY' | 'SELL'
+  entryDate: timestamp('entry_date').notNull(),
+  entryPrice: numeric('entry_price').notNull(),
+  exitDate: timestamp('exit_date'),
+  exitPrice: numeric('exit_price'),
+  qty: numeric('qty').notNull(),
+  pnl: numeric('pnl'),
+  pnlPct: numeric('pnl_pct'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, t => [
+  index('backtest_trades_session_idx').on(t.sessionId),
+]);
+
+export const backtestTradesRelations = relations(backtestTrades, ({ one }) => ({
+  session: one(backtestSessions, { fields: [backtestTrades.sessionId], references: [backtestSessions.id] }),
+}));
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
@@ -350,3 +395,7 @@ export type OrderRow = typeof orders.$inferSelect;
 export type NewOrderRow = typeof orders.$inferInsert;
 export type NotificationSetting = typeof notificationSettings.$inferSelect;
 export type NewNotificationSetting = typeof notificationSettings.$inferInsert;
+export type BacktestSession = typeof backtestSessions.$inferSelect;
+export type NewBacktestSession = typeof backtestSessions.$inferInsert;
+export type BacktestTrade = typeof backtestTrades.$inferSelect;
+export type NewBacktestTrade = typeof backtestTrades.$inferInsert;

@@ -15,6 +15,13 @@
       "when": 1777114347965,
       "tag": "0001_goofy_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777114501986,
+      "tag": "0002_fine_sasquatch",
+      "breakpoints": true
     }
   ]
 }

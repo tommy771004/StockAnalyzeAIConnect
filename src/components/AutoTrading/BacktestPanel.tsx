@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Play, TrendingUp, History, BarChart3, ChevronRight, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AlignmentView } from './AlignmentView';
 
 interface Props {
   symbol: string;
@@ -15,7 +16,9 @@ interface Props {
 export function BacktestPanel({ symbol, config }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [period, setPeriod] = useState(180);
+  const [showAlignment, setShowAlignment] = useState(false);
 
   const runBacktest = async () => {
     setLoading(true);
@@ -26,7 +29,11 @@ export function BacktestPanel({ symbol, config }: Props) {
         body: JSON.stringify({ symbol, period, config })
       });
       const data = await res.json();
-      if (data.ok) setResult(data.data);
+      if (data.ok) {
+        setResult(data.data);
+        setSessionId(data.sessionId);
+        setShowAlignment(false);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -112,7 +119,36 @@ export function BacktestPanel({ symbol, config }: Props) {
             </ResponsiveContainer>
           </div>
 
+          {/* Toggle Buttons */}
+          {sessionId && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAlignment(false)}
+                className={cn(
+                  'flex-1 px-3 py-1.5 text-[9px] font-bold rounded transition-all',
+                  !showAlignment
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-white/5 text-white/50 border border-white/10'
+                )}
+              >
+                Trade Log
+              </button>
+              <button
+                onClick={() => setShowAlignment(true)}
+                className={cn(
+                  'flex-1 px-3 py-1.5 text-[9px] font-bold rounded transition-all',
+                  showAlignment
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-white/5 text-white/50 border border-white/10'
+                )}
+              >
+                Alignment Analysis
+              </button>
+            </div>
+          )}
+
           {/* Trade Log */}
+          {!showAlignment && (
           <div className="bg-white/2 border border-white/5 rounded-sm overflow-hidden">
             <div className="p-2 border-b border-white/5 flex items-center gap-2">
               <BarChart3 className="h-3 w-3 text-violet-400" />
@@ -139,6 +175,12 @@ export function BacktestPanel({ symbol, config }: Props) {
               ))}
             </div>
           </div>
+          )}
+
+          {/* Alignment View */}
+          {showAlignment && sessionId && (
+            <AlignmentView sessionId={sessionId} />
+          )}
         </div>
       ) : (
         <div className="h-[300px] flex flex-col items-center justify-center border border-dashed border-white/10 rounded-sm bg-black/20">
