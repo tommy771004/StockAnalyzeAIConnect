@@ -10,6 +10,7 @@ import { CryptoPage } from './terminal/pages/Crypto';
 import { SettingsPage } from './terminal/pages/Settings';
 import { AlertsPage } from './terminal/pages/Alerts';
 import { ScreenerPage } from './terminal/pages/Screener';
+import { BacktestTerminalPage } from './terminal/pages/Backtest';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
 import { SEO } from './components/SEO';
@@ -21,6 +22,7 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'crypto',
   'portfolio',
   'research',
+  'backtest',
   'news',
   'alerts',
   'screener',
@@ -41,6 +43,7 @@ const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   crypto: 'SEARCH COINS...',
   portfolio: 'SEARCH HOLDINGS...',
   research: 'Search AAPL...',
+  backtest: 'BACKTEST...',
   news: '搜尋 . . .',
   alerts: 'SEARCH ALERTS...',
   screener: 'SCREENER ACTIVE...',
@@ -90,6 +93,7 @@ export default function App() {
       {view === 'crypto' && <CryptoPage />}
       {view === 'portfolio' && <PortfolioPage />}
       {view === 'research' && <ResearchPage />}
+      {view === 'backtest' && <BacktestTerminalPage />}
       {view === 'news' && <NewsPage />}
       {view === 'settings' && <SettingsPage />}
       {view === 'alerts' && <AlertsPage />}
