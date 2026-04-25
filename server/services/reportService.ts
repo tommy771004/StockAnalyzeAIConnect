@@ -3,7 +3,7 @@
  * 最終進化版：智慧交易報告服務 — 具備成長時間軸與 AI 價值歸因
  */
 import { callLLM } from '../utils/llmPipeline.js';
-import { agentMemoryRepo } from '../repositories/agentMemoryRepo.js';
+import * as agentMemoryRepo from '../repositories/agentMemoryRepo.js';
 import { getTradesByUser } from '../repositories/tradesRepo.js';
 
 interface ReportData {
