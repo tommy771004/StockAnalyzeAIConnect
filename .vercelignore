@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-electron
+electron
+release
+src
+.git
+.agents
+.claude
+.windsurf
+*.log
