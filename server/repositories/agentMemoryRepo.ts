@@ -32,5 +32,25 @@ export const agentMemoryRepo = {
       .limit(limit);
     
     return results;
+  },
+
+  /**
+   * Alias / additional methods for API
+   */
+  async getMemoriesByUser(userId: string, limitNum = 50) {
+    return await db.select()
+      .from(agentMemories)
+      .where(eq(agentMemories.userId, userId))
+      .orderBy(desc(agentMemories.createdAt))
+      .limit(limitNum);
+  },
+
+  async createMemory(params: { userId: string; memoryType: 'PREFERENCE' | 'SKILL' | 'CONTEXT'; content: any }) {
+    return await this.saveMemory(params.userId, params.memoryType, params.content);
+  },
+
+  async deleteMemory(memoryId: number, userId: string) {
+    return await db.delete(agentMemories)
+      .where(and(eq(agentMemories.id, memoryId), eq(agentMemories.userId, userId)));
   }
 };

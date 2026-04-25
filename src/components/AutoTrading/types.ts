@@ -131,6 +131,14 @@ export interface DecisionHeat {
   timestamp: string;
 }
 
+export interface CommanderLog {
+  id: string;
+  command: string;
+  actionTaken: string;
+  status: 'SUCCESS' | 'FAILED';
+  timestamp: string;
+}
+
 export interface EquitySnapshot {
   timestamp: string;
   equity: number;
