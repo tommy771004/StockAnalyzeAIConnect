@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createChart, IChartApi, ISeriesApi, ColorType, Time, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries } from 'lightweight-charts';
 import { useSettings } from '../contexts/SettingsContext';
 import { HistoricalData } from '../types';
@@ -10,6 +11,7 @@ import type { TickData } from '../workers/socket.worker';
 interface Props {
   symbol?: string;
   data?: HistoricalData[];
+  timeframe?: string;
   /**
    * When true, ChartWidget creates a socket.worker.ts Worker and subscribes to
    * live TICK_UPDATE messages.  Ticks update the chart directly via series.update()
@@ -59,7 +61,14 @@ function resolveApiBaseUrl(): string | undefined {
   }
 }
 
-const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, onTimeframeChange }) => {
+const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, timeframe: timeframeProp, onTimeframeChange }) => {
+  const { t } = useTranslation();
+  const [internalTimeframe, setInternalTimeframe] = useState("1D");
+  const timeframe = timeframeProp || internalTimeframe;
+  const setTimeframe = (t: string) => {
+    setInternalTimeframe(t);
+    if (onTimeframeChange) onTimeframeChange(t);
+  };
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
@@ -76,7 +85,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   const [chartType, setChartType] = useState<ChartType>('candle');
   const [showSMA, setShowSMA] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
-  const [timeframe, setTimeframe] = useState('1D');
+  
   const [hoverData, setHoverData] = useState<any>(null);
 
   const isDark = settings.theme !== 'light';
@@ -115,7 +124,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   useEffect(() => {
     isInitializedRef.current = false;
     logicalRangeRef.current = null;
-  }, [symbol]);
+  }, [symbol, timeframe]);
 
   /**
    * Live-mode Worker integration (Rule: Frontend Performance §2 "Golden Rule")
@@ -207,16 +216,24 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         rightOffset: 0,
         barSpacing: 12,
         minBarSpacing: 1,
-        tickMarkFormatter: (time: number) => {
-          const date = new Date(time * 1000);
-          return date.toLocaleTimeString('zh-TW', { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'Asia/Taipei'
-          });
-        },
-      },
+tickMarkFormatter: (time: number) => {
+  const date = new Date(time * 1000);
+  if (["1D", "5D", "1W"].includes(timeframe)) {
+    return date.toLocaleTimeString("zh-TW", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Taipei"
+    });
+  } else {
+    return date.toLocaleDateString("zh-TW", {
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "Asia/Taipei"
+    });
+  }
+},
+},
       rightPriceScale: {
         borderColor: gridColor,
         autoScale: true,
@@ -229,16 +246,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
       localization: {
         locale: 'zh-Hant-TW',
         dateFormat: 'yyyy/MM/dd',
-        timeFormatter: (time: number) => {
-          const date = new Date(time * 1000);
-          return date.toLocaleTimeString('zh-TW', { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit',
-            timeZone: 'Asia/Taipei'
-          });
-        },
+       
       },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
@@ -368,6 +376,31 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
     };
   }, [isDark, focusMode]); // Removed chartType from here to prevent full chart reset
 
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({
+      timeScale: {
+        tickMarkFormatter: (time: number) => {
+          const date = new Date(time * 1000);
+          if (["1D", "5D", "1W"].includes(timeframe)) {
+            return date.toLocaleTimeString("zh-TW", {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Asia/Taipei"
+            });
+          } else {
+            return date.toLocaleDateString("zh-TW", {
+              month: "2-digit",
+              day: "2-digit",
+              timeZone: "Asia/Taipei"
+            });
+          }
+        }
+      }
+    });
+  }, [timeframe]);
+
   // Data & Series update effect - Separated from Chart creation to preserve state
   useEffect(() => {
     if (!chartRef.current || !processedData.length) return;
@@ -480,14 +513,14 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
             <button 
               onClick={() => setChartType('candle')}
               className={safeCn("p-2 rounded-md transition-all active:scale-95", chartType === 'candle' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
-              title="K線圖"
+              title={t('chart.candle', 'K線圖')}
             >
               <BarChart3 size={18} />
             </button>
             <button 
               onClick={() => setChartType('area')}
               className={safeCn("p-2 rounded-md transition-all active:scale-95", chartType === 'area' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
-              title="面積圖"
+              title={t('chart.area', '面積圖')}
             >
               <TrendingUp size={18} />
             </button>
@@ -531,7 +564,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
               }
             }}
             className="p-1.5 text-zinc-500 hover:text-indigo-500 hover:bg-white/5 rounded-md transition-all" 
-            title="縮放至完整數據"
+            title={t('chart.fitContent', '縮放至完整數據')}
           >
             <Maximize2 size={16} />
           </button>
@@ -541,7 +574,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
       <div className="flex-1 relative bg-white/5 dark:bg-black/10">
         {/* Floating Timeframe Group - Integrated into Chart with Zero-Clutter Transparency */}
         <div className="absolute top-2 right-2 z-30 flex items-center gap-1 p-0.5 pointer-events-auto bg-zinc-950/20 backdrop-blur-sm rounded-lg">
-          {['1D', '5D', '1M', '6M', 'YTD', '1Y'].map((t) => (
+          {['1D', '5D', '1W', '1M', '6M', 'YTD', '1Y'].map((t) => (
             <button
               key={t}
               onClick={() => {
@@ -564,7 +597,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/5 dark:bg-white/5 backdrop-blur-sm">
             <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-2" />
             <span className="text-[10px] font-black text-zinc-500 max-w-[200px] text-center uppercase tracking-[0.2em]">
-              正在獲取市場行情...
+              {t('chart.loading', '正在獲取市場行情...')}
             </span>
           </div>
         )}
@@ -577,29 +610,29 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         {hoverData && (
           <div className="absolute top-3 left-3 z-40 bg-zinc-950/85 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-2xl pointer-events-none flex flex-col gap-1.5 min-w-[160px] shadow-indigo-500/10">
              <div className="text-[11px] text-zinc-400 font-bold mb-1 border-b border-white/10 pb-1.5 uppercase tracking-wide flex justify-between items-center">
-               <span>行情回放</span>
+               <span>{t('chart.replay', '行情回放')}</span>
                <span className="font-mono text-[10px] opacity-70">{hoverData.time}</span>
              </div>
              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-zinc-500 font-bold">開:</span>
+                 <span className="text-[10px] text-zinc-500 font-bold">{t('chart.open', '開')}:</span>
                  <span className="text-[11px] font-mono font-bold text-zinc-100">{Number(hoverData.open ?? 0).toFixed(2)}</span>
                </div>
                <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-zinc-500 font-bold">高:</span>
+                 <span className="text-[10px] text-zinc-500 font-bold">{t('chart.high', '高')}:</span>
                  <span className="text-[11px] font-mono font-bold text-emerald-400">{Number(hoverData.high ?? 0).toFixed(2)}</span>
                </div>
                <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-zinc-500 font-bold">低:</span>
+                 <span className="text-[10px] text-zinc-500 font-bold">{t('chart.low', '低')}:</span>
                  <span className="text-[11px] font-mono font-bold text-rose-400">{Number(hoverData.low ?? 0).toFixed(2)}</span>
                </div>
                <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-zinc-500 font-bold">收:</span>
+                 <span className="text-[10px] text-zinc-500 font-bold">{t('chart.close', '收')}:</span>
                  <span className="text-[11px] font-mono font-bold text-zinc-100">{Number(hoverData.close ?? 0).toFixed(2)}</span>
                </div>
              </div>
              <div className="flex justify-between items-center mt-1 border-t border-white/10 pt-1.5">
-               <span className="text-[10px] text-zinc-500 font-bold uppercase">成交量:</span>
+               <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('chart.volBase', '成交量')}:</span>
                <span className="text-[11px] font-mono font-bold text-zinc-300">{(Number(hoverData.volume ?? 0) / 1000).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}K</span>
              </div>
              {hoverData.sma !== undefined && hoverData.sma !== null && (

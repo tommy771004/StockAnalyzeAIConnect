@@ -279,10 +279,11 @@ export function useStockAnalysis({ symbol, model, systemInstruction = '', active
     dataState,
     loadData,
     norm,
+    timeframe,
     setTimeframe
   }), [
     quote, hist, aiAns, aiStatus, indic, news, cal, twse, sentiment, 
-    mtfData, mtfStatus, newsStatus, dataState, loadData, norm, setTimeframe
+    mtfData, mtfStatus, newsStatus, dataState, loadData, norm, timeframe, setTimeframe
   ]);
 
   return result;

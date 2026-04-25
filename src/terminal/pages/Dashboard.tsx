@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
@@ -91,6 +92,7 @@ export function WatchlistPanel({
   onAdd: (s: string) => Promise<void>;
   onDelete: (s: string) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [newSymbol, setNewSymbol] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
@@ -104,7 +106,7 @@ export function WatchlistPanel({
 
   return (
     <Panel
-      title="WATCHLIST"
+      title={t('dashboard.watchlist', 'WATCHLIST')}
       actions={
         <div className="flex items-center gap-2">
           {/* Add button */}
@@ -147,7 +149,7 @@ export function WatchlistPanel({
           <input
             autoFocus
             className="flex-1 bg-transparent px-2 text-[12px] font-bold tracking-widest text-(--color-term-text) focus:outline-none placeholder:text-(--color-term-muted)/50"
-            placeholder="ENTER TICKER..."
+            placeholder={t('dashboard.enterTicker', 'ENTER TICKER...')}
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
           />
@@ -232,10 +234,11 @@ export function TopMoversPanel({
   loading: boolean;
   onSelect: (s: string) => void;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'gainers' | 'losers'>('gainers');
   const rows = tab === 'gainers' ? gainers : losers;
   return (
-    <Panel title="TOP MOVERS" collapsible className="min-h-[220px]">
+    <Panel title={t('dashboard.topMovers', 'TOP MOVERS')} collapsible className="min-h-[220px]">
       <div className="flex border-b border-(--color-term-border) text-[11px] tracking-widest">
         {(['gainers', 'losers'] as const).map((k) => (
           <button
@@ -255,7 +258,7 @@ export function TopMoversPanel({
       </div>
       <ul className="divide-y divide-(--color-term-border)/60">
         {loading && rows.length === 0 ? (
-          <li className="px-3 py-4 text-center text-[11px] text-(--color-term-muted)">Loading…</li>
+          <li className="px-3 py-4 text-center text-[11px] text-(--color-term-muted)">{t('common.loading')}</li>
         ) : (
           rows.map((m) => (
             <li 
@@ -285,9 +288,10 @@ export function TopMoversPanel({
 
 // ─── MarketPulsePanel ──────────────────────────────────────────────────────────
 export function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+  const { t } = useTranslation();
   return (
     <Panel
-      title="MARKET PULSE (WATCHLIST)"
+      title={t('dashboard.marketPulse', 'MARKET PULSE')}
       actions={
         <span className="flex items-center gap-1 text-[11px] tracking-widest text-(--color-term-positive)">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--color-term-positive)" />
@@ -304,6 +308,7 @@ export function MarketPulsePanel({ watchlist, onSelect }: { watchlist: Watchlist
 
 // ─── Dynamic Heatmap ────────────────────────────────────────────────────────
 export function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+  const { t } = useTranslation();
   if (!watchlist || watchlist.length === 0) {
     return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">Pulse unavailable</div>;
   }
@@ -343,6 +348,7 @@ export function HeatCell({
   onSelect: (s: string) => void;
   size?: 'md' | 'lg';
 }) {
+  const { t } = useTranslation();
   const isDummy = cell.symbol === '--';
   const shade = isDummy 
     ? 'bg-zinc-800/20' 
@@ -391,6 +397,7 @@ export function SelectedChartPanel({
   loading: boolean;
   isLive: boolean;
 }) {
+  const { t } = useTranslation();
   const last = candles[candles.length - 1];
   const first = candles[0];
   const close   = last?.close  ?? row.last;
@@ -454,13 +461,14 @@ export function SelectedChartPanel({
       <div className="relative flex-1 min-h-0">
         {loading && chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center text-[12px] text-(--color-term-muted)">
-            Loading chart…
+            {t('common.loading')}
           </div>
         ) : (
           <ChartWidget
             symbol={row.symbol}
             data={chartData}
             liveMode={isLive}
+            timeframe={range}
             onTimeframeChange={(t) => setRange(t as any)}
           />
         )}
@@ -472,6 +480,7 @@ export function SelectedChartPanel({
 
 // ─── MarketNewsPanel ───────────────────────────────────────────────────────────
 export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<NewsCategory['id'] | 'ALL'>('ALL');
   
   const filteredNews = useMemo(() => {
@@ -502,7 +511,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
     >
       {filteredNews.length === 0 ? (
         <div className="flex h-full items-center justify-center text-[11px] text-(--color-term-muted)">
-          No recent {filter !== 'ALL' ? filter : ''} news.
+          {t('dashboard.noRecentNews', 'No recent news')}
         </div>
       ) : (
         <ul className="divide-y divide-(--color-term-border)/60">
@@ -553,6 +562,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
 type TradeStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
+  const { t } = useTranslation();
   const [qty, setQty]           = useState(100);
   const [orderPrice, setOrderPrice] = useState(price);
   const [side, setSide]         = useState<'buy' | 'sell'>('buy');
@@ -593,7 +603,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
     <Panel accent="amber" className="min-h-[260px]">
       <header className="flex h-9 items-center justify-between border-b border-(--color-term-border) bg-(--color-term-accent)/10 px-3">
         <span className="text-[11px] font-semibold tracking-[0.22em] text-(--color-term-accent)">
-          QUICK TRADE
+          {t('dashboard.quickTrade', 'QUICK TRADE')}
         </span>
       </header>
       <div className="space-y-3 p-3">
@@ -612,18 +622,18 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
         </div>
         <div className="grid grid-cols-2 gap-2">
           <LabeledInput
-            label="QUANTITY"
+            label={t('dashboard.quantity', 'QUANTITY')}
             value={qty}
             onChange={(v) => setQty(Number(v) || 0)}
           />
           <LabeledInput
-            label="PRICE"
+            label={t('dashboard.price', 'PRICE')}
             value={orderPrice.toFixed(2)}
             onChange={(v) => setOrderPrice(Number(v) || 0)}
           />
         </div>
         <div className="flex items-center justify-between border-t border-(--color-term-border) pt-3 text-[11px]">
-          <span className="tracking-widest text-(--color-term-muted)">EST. TOTAL</span>
+          <span className="tracking-widest text-(--color-term-muted)">{t('dashboard.estTotal', 'EST. TOTAL')}</span>
           <span className="font-semibold tabular-nums text-(--color-term-text)">
             ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
@@ -676,6 +686,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
 
 // ─── Shared primitives ─────────────────────────────────────────────────────────
 export function Field({ label, children }: { label: string; children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-1">
       {label && (
@@ -697,6 +708,7 @@ export function LabeledInput({
   value: string | number;
   onChange: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[10px] tracking-widest text-(--color-term-muted)">{label}</span>

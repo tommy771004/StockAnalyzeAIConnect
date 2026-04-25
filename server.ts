@@ -29,7 +29,6 @@ import {
 } from './server/services/autonomousAgent.js';
 import { DEFAULT_AGENT_CONFIG, DEFAULT_RISK_CONFIG, DEFAULT_TRADING_HOURS } from './server/services/autotradingDefaults.js';
 import { isTradingSession } from './server/services/tradingSession.js';
-import { isTwHoliday, getEarlyCloseTime } from './server/services/twCalendar.js';
 import { riskManager } from './server/services/RiskManager.js';
 import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
@@ -64,15 +63,10 @@ let dbAvailable = false;
 try {
   await import('./src/db/index.js');
   dbAvailable = true;
-  // 環境守門：
-  //  - Vercel Serverless 不能跑常駐 agent（無法維持 setTimeout 與 WebSocket）
-  //  - AUTOTRADING_DISABLED=1 可手動關閉（例如測試、藍綠部署）
-  const onVercel = !!process.env.VERCEL;
-  const explicitlyDisabled = process.env.AUTOTRADING_DISABLED === '1';
-  if (!onVercel && !explicitlyDisabled) {
+  // Only start these in non-vercel environments
+  if (!process.env.VERCEL) {
+    // 修正：異步啟動自動交易引擎並恢復配置 (P1)
     startAutonomousAgent().catch(e => console.error('[AutoAgent] 啟動失敗:', e));
-  } else {
-    console.log(`[AutoAgent] 跳過啟動（${onVercel ? 'Vercel' : 'AUTOTRADING_DISABLED'}）— AutoTrading 需另行部署於 Render/Railway/VPS。`);
   }
 } catch (e) {
   console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
@@ -578,15 +572,8 @@ app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
 app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {
   const symbols = String(req.query.symbols ?? '2330.TW').split(',').map(s => s.trim()).filter(Boolean);
   const cfg = getAgentConfig();
-  const now = new Date();
-  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours, now) }));
-  res.json({
-    ok: true,
-    sessions: result,
-    twHoliday: isTwHoliday(now),
-    twEarlyClose: getEarlyCloseTime(now),
-    nowTaipei: new Date(now.getTime() + 8 * 3600 * 1000).toISOString(),
-  });
+  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours) }));
+  res.json({ ok: true, sessions: result });
 });
 
 app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
@@ -709,118 +696,6 @@ app.post('/api/autotrading/optimize', authMiddleware, async (req: AuthRequest, r
   }
 });
 
-// ── Orders 生命週期 ──────────────────────────────────────────────────────────
-app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const onlyOpen = String(req.query.open ?? '0') === '1';
-    const { ordersRepo } = await import('./server/repositories/ordersRepo.js');
-    const rows = onlyOpen ? await ordersRepo.listOpenByUser(req.userId) : await ordersRepo.listByUser(req.userId, 100);
-    res.json({ ok: true, orders: rows });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const id = parseInt(String(req.params.id), 10);
-    if (Number.isNaN(id)) return res.status(400).json({ error: 'invalid id' });
-    const { ordersRepo } = await import('./server/repositories/ordersRepo.js');
-    const row = await ordersRepo.cancel(id, '使用者手動取消');
-    res.json({ ok: !!row, order: row });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-// ── Notification settings ────────────────────────────────────────────────────
-app.get('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { db } = await import('./src/db/index.js');
-    const { notificationSettings } = await import('./src/db/schema.js');
-    const { eq } = await import('drizzle-orm');
-    const rows = await db.select().from(notificationSettings).where(eq(notificationSettings.userId, req.userId));
-    // 安全處理：不外洩完整 token，只回前 6 字符遮罩
-    const masked = rows.map(r => ({ ...r, target: maskToken(r.target) }));
-    res.json({ ok: true, settings: masked });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-app.put('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { channel, target, triggers, enabled = true, id } = req.body ?? {};
-    if (!channel || !target || !Array.isArray(triggers)) {
-      return res.status(400).json({ error: 'channel/target/triggers 為必填' });
-    }
-    const { db } = await import('./src/db/index.js');
-    const { notificationSettings } = await import('./src/db/schema.js');
-    const { eq, and } = await import('drizzle-orm');
-    if (id) {
-      const [row] = await db.update(notificationSettings).set({
-        channel, target, triggers, enabled, updatedAt: new Date(),
-      }).where(and(eq(notificationSettings.id, id), eq(notificationSettings.userId, req.userId))).returning();
-      return res.json({ ok: true, setting: row });
-    }
-    const [row] = await db.insert(notificationSettings).values({
-      userId: req.userId, channel, target, triggers, enabled,
-    }).returning();
-    res.json({ ok: true, setting: row });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-app.delete('/api/autotrading/notifications/:id', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const id = parseInt(String(req.params.id), 10);
-    if (Number.isNaN(id)) return res.status(400).json({ error: 'invalid id' });
-    const { db } = await import('./src/db/index.js');
-    const { notificationSettings } = await import('./src/db/schema.js');
-    const { eq, and } = await import('drizzle-orm');
-    await db.delete(notificationSettings).where(and(eq(notificationSettings.id, id), eq(notificationSettings.userId, req.userId)));
-    res.json({ ok: true });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-app.post('/api/autotrading/notifications/test', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const { channel, target } = req.body ?? {};
-    if (!channel || !target) return res.status(400).json({ error: 'channel/target 為必填' });
-    const { notifier } = await import('./server/services/notifier/index.js');
-    const result = await notifier.test(channel, target);
-    res.json(result);
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-function maskToken(s: string): string {
-  if (s.length <= 8) return s.slice(0, 2) + '***';
-  return s.slice(0, 6) + '***' + s.slice(-4);
-}
-
-app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const period = String(req.query.period ?? 'all') as 'all' | '1d' | '1w' | '1m' | '3m' | 'ytd';
-    const startingEquity = Number(req.query.startingEquity ?? getAgentConfig().budgetLimitTWD ?? 10_000_000);
-    const { getPerformance } = await import('./server/services/performanceService.js');
-    const result = await getPerformance(req.userId, period, startingEquity);
-    res.json({ ok: true, period, ...result });
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
 app.get('/api/autotrading/report', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -855,6 +730,33 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
+  }
+});
+
+app.post('/api/ai/research', authMiddleware, async (req: AuthRequest, res) => {
+  const { query } = req.body;
+  if (!query) { res.status(400).json({ error: 'query required' }); return; }
+  
+  try {
+    const { searchArxiv } = await import('./server/utils/scienceService.js');
+    const arxivData = await searchArxiv(query, 3);
+    
+    let context = '';
+    if (arxivData && arxivData.status === 'success' && arxivData.data) {
+      context = arxivData.data.map((p: any) => `Title: ${p.title}\\nSummary: ${p.summary}`).join('\\n\\n');
+    }
+
+    const prompt = `你是一個專業的量化金融研究員。使用者詢問：「${query}」。
+請嘗試協助他解答。
+以下是從 arXiv 搜尋到的最新相關論文摘要作為參考：
+${context || '無直接相關論文'}
+
+請總結這些研究，並根據你的知識，嘗試提供可行的量化策略邏輯或參數設定建議。`;
+
+    const text = await callAISimple(prompt, false, req.userId, 'free');
+    res.json({ text });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -1082,90 +984,39 @@ app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const twseList = await fetchAndCacheTWSE();
     const nameMap = new Map(twseList.map(e => [e.code, e]));
-    
-    const isChinese = hasChinese(query);
-    const isNumeric = /^[0-9]{4,6}[A-Za-z]?$/.test(query); // matches typical TW codes like 2330 or 00679B
 
+    // Always do a local fuzzy search first
+    const localResults = twseFuzzySearch(twseList, query, 10);
     let quotes: Array<{
       symbol: string; shortname?: string; longname?: string;
       chineseName?: string; exchDisp?: string; typeDisp?: string;
-    }> = [];
+    }> = localResults.map(e => ({
+      symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
+      shortname: e.name,
+      longname: e.name,
+      chineseName: e.name,
+      exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
+      typeDisp: 'Equity',
+    }));
 
-    if (isChinese) {
-      // Pure Chinese query → only search local TWSE/TPEx data (Instant)
-      const localResults = twseFuzzySearch(twseList, query);
-      quotes = localResults.map(e => ({
-        symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
-        shortname: e.name,
-        longname: e.name,
-        chineseName: e.name,
-        exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
-        typeDisp: 'Equity',
-      }));
-    } else if (isNumeric) {
-      // Numeric query → search local TWSE/TPEx first
-      const localResults = twseFuzzySearch(twseList, query, 8);
-      const hasExactLocalMatch = localResults.some(e => e.code === query);
-
-      quotes = localResults.map(e => ({
-        symbol: e.code + (e.market === 'TWSE' ? '.TW' : '.TWO'),
-        shortname: e.name,
-        longname: e.name,
-        chineseName: e.name,
-        exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
-        typeDisp: 'Equity',
-      }));
-
-      // If we didn't find an exact TW match, run Yahoo search in parallel with a strict 400ms timeout
-      // to capture potential US numeric tickers, but don't block for long.
-      if (!hasExactLocalMatch) {
-        const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
-        const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 400));
-        
-        const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
-        const existing = new Set(quotes.map(q => q.symbol));
-        
-        (yahooData.quotes || []).forEach((q: any) => {
-          if (!existing.has(q.symbol)) {
-            const code = (q.symbol as string).replace(/\.(TW|TWO)$/, '');
-            const entry = nameMap.get(code);
-            quotes.push({ ...q, chineseName: entry?.name });
-            existing.add(q.symbol);
-          }
-        });
-      }
-    } else {
-      // English query → Parallel Yahoo (with 800ms timeout) and local search
-      const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
-      const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 800));
-      
-      const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
-      quotes = (yahooData.quotes || []).map((q: Record<string, unknown>) => {
-        const sym = (q.symbol as string) || '';
+    // For any query, we also ping Yahoo with a 600ms timeout
+    // This allows searching "蘋果" to find AAPL, or "TSMC" to find TSM
+    const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
+    const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 600));
+    
+    const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
+    const existing = new Set(quotes.map(q => q.symbol));
+    
+    (yahooData.quotes || []).forEach((q: any) => {
+      const sym = (q.symbol as string) || '';
+      if (!existing.has(sym)) {
         const code = sym.replace(/\.(TW|TWO)$/, '');
         const entry = nameMap.get(code);
-        return { ...q, chineseName: entry?.name };
-      });
-      
-      // Mix in local TWSE results if the query starts with a number
-      if (/^\d/.test(query)) {
-        const localResults = twseFuzzySearch(twseList, query, 5);
-        const existing = new Set(quotes.map(q => q.symbol));
-        for (const e of localResults) {
-          const sym = e.code + (e.market === 'TWSE' ? '.TW' : '.TWO');
-          if (!existing.has(sym)) {
-            quotes.unshift({
-              symbol: sym,
-              shortname: e.name,
-              longname: e.name,
-              chineseName: e.name,
-              exchDisp: e.market === 'TWSE' ? '台灣證交所' : '台灣櫃買中心',
-              typeDisp: 'Equity',
-            });
-          }
-        }
+        quotes.push({ ...q, chineseName: entry?.name });
+        existing.add(sym);
       }
-    }
+    });
+
     // Return { quotes: [...] } so client-side `res.quotes` works correctly
     res.json({ quotes });
   } catch (e) {
@@ -1203,7 +1054,11 @@ app.post('/api/watchlist', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { symbol, name } = req.body ?? {};
     if (!symbol) { res.status(400).json({ error: 'symbol required' }); return; }
-    const item = await watchlistRepo.addWatchlistItem({ userId: req.userId!, symbol: symbol.toUpperCase(), name: name ?? null, addedAt: Date.now() });
+    
+    // Auto-resolve symbol for fuzzy queries (e.g. adding '台積電' becomes '2330.TW')
+    const resolvedSymbol = await resolveQueryToYahooSymbol(symbol);
+    
+    const item = await watchlistRepo.addWatchlistItem({ userId: req.userId!, symbol: resolvedSymbol, name: name ?? null, addedAt: Date.now() });
     res.status(201).json(item);
   } catch (e) { handleApiError(res, e); }
 });
@@ -1351,20 +1206,71 @@ app.get('/api/tv/overview/:symbol', async (req, res) => {
   } catch (e) { handleApiError(res, e); }
 });
 
-app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-  const input = req.params.symbol as string;
-  const canonical = parseSymbol(input);
-  const yahooSymbol = toYahoo(input);
-  const tvSymbol = toTradingViewSymbol(input);
+async function resolveQueryToYahooSymbol(query: string): Promise<string> {
+  const q = query.trim().toUpperCase();
+  if (!q) return q;
 
-  console.log(`[Research] Fetching data for: Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
+  // Already looks like a clean symbol? Wait, Chinese won't match this.
+  // Actually, we can just hit Yahoo search directly if we don't find it in TWSE.
+  
+  const twseList = await fetchAndCacheTWSE();
+  const nameMap = new Map(twseList.map(e => [e.code, e]));
+
+  // 1. Exact TWSE Code or Name
+  const exactLocal = twseList.find(e => e.code === q || e.name === q);
+  if (exactLocal) return exactLocal.code + (exactLocal.market === 'TWSE' ? '.TW' : '.TWO');
+
+  // 2. Local Fuzzy Search
+  const localResults = twseFuzzySearch(twseList, q, 1);
+  if (localResults.length > 0 && (localResults[0].name === q || localResults[0].code === q)) {
+    return localResults[0].code + (localResults[0].market === 'TWSE' ? '.TW' : '.TWO');
+  }
+
+  // 3. Fallback to Yahoo Search (to handle Chinese aliases like "蘋果" -> AAPL, or "TSMC" -> TSM)
+  try {
+    const data = await NativeYahooApi.search(q);
+    if (data && data.quotes && data.quotes.length > 0) {
+      // Prefer equity, fallback to first
+      const equity = data.quotes.find((x: any) => x.quoteType === 'EQUITY' || x.quoteType === 'ETF');
+      return equity ? equity.symbol : data.quotes[0].symbol;
+    }
+  } catch(e) {}
+
+  // 4. Just return the parsed version if nothing worked
+  return toYahoo(parseSymbol(q).raw);
+}
+
+app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  const rawInput = req.params.symbol as string;
+  let yahooSymbol = await resolveQueryToYahooSymbol(rawInput);
+  
+  // Re-parse to get canonical for TradingView, since Yahoo Symbol is resolved
+  const tvSymbol = toTradingViewSymbol(yahooSymbol);
+
+  console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol}`);
+
+  const requestedTimeframe = (req.query.timeframe as string) || '1M';
+  
+  let interval: '1m' | '5m' | '15m' | '1h' | '1d' = '1h';
+  let periodDays = 30;
+  switch (requestedTimeframe) {
+    case '1D': interval = '1m'; periodDays = 1; break;
+    case '5D': interval = '5m'; periodDays = 5; break;
+    case '1W': interval = '15m'; periodDays = 7; break;
+    case '1M': interval = '1h'; periodDays = 30; break;
+    case '6M': interval = '1d'; periodDays = 180; break;
+    case '1Y': interval = '1d'; periodDays = 365; break;
+    case 'YTD': interval = '1d'; periodDays = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); break;
+    default: interval = '1d'; periodDays = 90;
+  }
+  const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
 
   const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary] = await Promise.allSettled([
     NativeYahooApi.quote(yahooSymbol as string),
     TV.getOverview(tvSymbol),
-    TV.getIndicators(tvSymbol, (req.query.timeframe as any) || '1d'),
+    TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d'), // keeping TV indicators behavior safely
     TV.getNewsHeadlines(tvSymbol),
-    NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: String(Date.now() - 90 * 24 * 3600 * 1000) }),
+    NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }),
     NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']),
   ]);
 

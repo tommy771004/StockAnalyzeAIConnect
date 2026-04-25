@@ -19,7 +19,8 @@ export function ResearchPage() {
   const [viewMode, setViewMode] = useState<'standard' | 'pro'>('standard');
   const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
-  const { data, loading } = useResearchData(activeSymbol);
+  const [timeRange, setTimeRange] = useState('1M');
+  const { data, loading } = useResearchData(activeSymbol, timeRange);
 
   // Fetch available free models on mount
   useEffect(() => {
@@ -150,7 +151,7 @@ export function ResearchPage() {
 
         <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
         {viewMode === 'standard' ? (
-          <ChartPanel symbol={activeSymbol} history={history} />
+          <ChartPanel symbol={activeSymbol} history={history} range={timeRange} setRange={setTimeRange} />
         ) : (
           <div className="flex flex-col gap-3 min-h-0 overflow-auto">
             <SecFilingsPanel symbol={activeSymbol} />
@@ -218,19 +219,20 @@ function StatBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+import { useTranslation } from 'react-i18next';
 import ChartWidget from '../../components/ChartWidget';
 
-function ChartPanel({ symbol, history }: { symbol: string, history: any[] }) {
-  const [range, setRange] = useState('1M');
+function ChartPanel({ symbol, history, range, setRange }: { symbol: string, history: any[], range: string, setRange: (r: string) => void }) {
+  const { t } = useTranslation();
   return (
-    <Panel title="交互式圖表 (Price Action)" collapsible className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
+    <Panel title={t('research.priceAction', '交互式圖表 (Price Action)')} collapsible className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
       <div className="relative flex-1 min-h-0">
         {history.length > 0 ? (
-          <ChartWidget symbol={symbol} data={history} onTimeframeChange={setRange} />
+          <ChartWidget symbol={symbol} data={history} timeframe={range} onTimeframeChange={setRange} />
         ) : (
           <div className="flex h-full items-center justify-center text-(--color-term-muted)">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
-            正在載入 K 線數據...
+            {t('common.loading')}
           </div>
         )}
       </div>

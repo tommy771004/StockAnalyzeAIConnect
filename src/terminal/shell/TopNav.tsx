@@ -95,7 +95,7 @@ export function TopNav({
       return;
     }
     
-    debounceRef.current = setTimeout(() => doSearch(query), 200);
+    debounceRef.current = setTimeout(() => doSearch(query), 350);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, doSearch]);
 

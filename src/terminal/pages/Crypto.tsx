@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
 import { formatPct, toneClass } from '../ui/format';
@@ -9,6 +10,7 @@ import { cn } from '../../lib/utils';
 const CRYPTO_SYMBOLS = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'AVAX-USD', 'DOGE-USD', 'ADA-USD', 'DOT-USD'];
 
 export function CryptoPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,15 +45,15 @@ export function CryptoPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3">
       <div className="col-span-12 min-h-[300px]">
-        <Panel title="REAL-TIME CRYPTO MARKETS (USD)" collapsible>
+        <Panel title={t('crypto.title', 'REAL-TIME CRYPTO MARKETS (USD)')} collapsible>
           <table className="w-full text-[12px]">
             <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) sticky top-0 z-10">
               <tr className="border-b border-(--color-term-border)">
-                <th className="px-4 py-3 text-left">PAIR</th>
-                <th className="px-4 py-3 text-left">NAME</th>
-                <th className="px-4 py-3 text-right">PRICE (USD)</th>
-                <th className="px-4 py-3 text-right">24H CHG</th>
-                <th className="px-4 py-3 text-right">TREND (SMOOTHED)</th>
+                <th className="px-4 py-3 text-left">{t('crypto.pair', 'PAIR')}</th>
+                <th className="px-4 py-3 text-left">{t('crypto.name', 'NAME')}</th>
+                <th className="px-4 py-3 text-right">{t('crypto.price', 'PRICE (USD)')}</th>
+                <th className="px-4 py-3 text-right">{t('crypto.24hChg', '24H CHG')}</th>
+                <th className="px-4 py-3 text-right">{t('crypto.trend', 'TREND (SMOOTHED)')}</th>
               </tr>
             </thead>
             <tbody>

@@ -3,7 +3,7 @@
  * 策略沙盒實驗室：管理影子策略與進行 A/B 測試
  */
 import React, { useState } from 'react';
-import { FlaskConical, Copy, ArrowUpCircle, Trash2, Zap, Sliders, ChevronRight } from 'lucide-react';
+import { FlaskConical, Copy, ArrowUpCircle, Trash2, Zap, Sliders, Search, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { AgentConfig, StrategyParams } from './types';
 
@@ -16,14 +16,69 @@ interface Props {
 
 export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }: Props) {
   const [editingName, setEditingName] = useState<string | null>(null);
+  const [researchQuery, setResearchQuery] = useState('');
+  const [researchResult, setResearchResult] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const cloneCurrent = () => {
     const name = `Sandbox_${Math.floor(Math.random() * 1000)}`;
     onUpdateShadow(name, { params: JSON.parse(JSON.stringify(config.params)), symbols: config.symbols });
   };
 
+  const handleResearch = async () => {
+    if (!researchQuery) return;
+    setIsSearching(true);
+    setResearchResult('');
+    try {
+      const res = await fetch('/api/ai/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: researchQuery })
+      });
+      const data = await res.json();
+      if (data && data.text) {
+        setResearchResult(data.text);
+      }
+    } catch (e) {
+      console.error(e);
+      setResearchResult('Error performing research.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* AI Research Assistant */}
+      <div className="bg-white/5 border border-white/10 rounded-sm p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <Search className="h-4 w-4 text-cyan-400" />
+          <div className="text-[11px] font-bold text-white uppercase">AI Research Assistant</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-1.5 text-[11px] text-white outline-none"
+            placeholder="例如：幫我找最近關於動能策略在台股市場有效性的論文..."
+            value={researchQuery}
+            onChange={e => setResearchQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleResearch()}
+          />
+          <button
+            onClick={handleResearch}
+            disabled={isSearching}
+            className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-[10px] font-bold flex items-center transition-all"
+          >
+            {isSearching ? <Loader2 className="h-3 w-3 animate-spin" /> : 'SEARCH'}
+          </button>
+        </div>
+        {researchResult && (
+           <div className="mt-3 p-3 bg-black/30 border border-white/5 rounded text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
+             {researchResult}
+           </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-sm">
         <div className="flex items-center gap-3">
