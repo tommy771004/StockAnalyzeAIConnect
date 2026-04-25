@@ -726,7 +726,7 @@ app.post('/api/ai/call', authMiddleware, async (req: AuthRequest, res) => {
   }
 
   try {
-    const text = await callAISimple(prompt, jsonMode, req.userId);
+    const text = await callAISimple(prompt, jsonMode, req.userId, 'free', model);
     res.json({ text });
   } catch (e: any) { 
     res.status(500).json({ error: e.message }); 
@@ -773,7 +773,7 @@ ${newsText}
 3. 投資建議（看多/看空/中立）與理由。
 請以繁體中文回答，維持專業、簡潔的風格。`;
 
-    const resultText = await callAISimple(prompt, false, req.userId);
+    const resultText = await callAISimple(prompt, false, req.userId, 'free', req.query.model as string);
     console.log(`[AI] Summary generated successfully (${resultText.length} chars).`);
     res.json({ text: resultText });
   } catch (e: any) {

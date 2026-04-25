@@ -318,7 +318,7 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
       }
     }
 
-    const chatModel = await getBestFreeModel();
+    const chatModel = req.body.model || await getBestFreeModel();
     const rawReply = await callOpenRouter(messages, chatModel, openrouterKey);
     const { cleanText, skills } = parseExtractedSkills(rawReply);
 
@@ -532,7 +532,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
     ];
 
     // Phase 1: Call LLM with Tools (non-streaming for tool handling, stream text chunks)
-    const streamModel = await getBestFreeModel();
+    const streamModel = req.body.model || await getBestFreeModel();
     const apiRes = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {

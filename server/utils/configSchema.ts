@@ -61,5 +61,5 @@ export const AgentConfigPatchSchema = z.object({
   tickIntervalMs: z.number().min(5_000).max(3_600_000),
   budgetLimitTWD: z.number().positive(),
   maxDailyLossTWD: z.number().positive(),
-  strategies: z.array(z.string()).optional(),
+  strategies: z.array(z.enum(['RSI_REVERSION', 'BOLLINGER_BREAKOUT', 'MACD_CROSS', 'AI_LLM'])).optional(),
 }).partial();

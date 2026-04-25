@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
-import { Terminal, SendHorizontal, BrainCircuit, X, Loader2 } from 'lucide-react';
-import { streamAgentChat, type AgentStreamChunk, type GenUIComponent } from '../../services/aiService';
+import { Terminal, SendHorizontal, BrainCircuit, X, Loader2, Cpu } from 'lucide-react';
+import { streamAgentChat, getFreeModels, type AgentStreamChunk, type GenUIComponent } from '../../services/aiService';
 import ChartWidget from '../../components/ChartWidget';
 
 interface AgentPanelProps {
@@ -30,10 +30,21 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen) endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isOpen) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Fetch available free models
+      getFreeModels().then(models => {
+        setAvailableModels(models);
+        if (models.length > 0 && !selectedModel) {
+          setSelectedModel(models[0].id);
+        }
+      });
+    }
   }, [messages, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,6 +75,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
         message: userMessage.content,
         symbol: selectedSymbol,
         history: uiHistory,
+        model: selectedModel,
         onChunk: (chunk: AgentStreamChunk) => {
           setMessages((prev) =>
             prev.map((m) => {
@@ -139,6 +151,27 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+
+          {/* Model Selection Bar */}
+          <div className="flex items-center gap-2 border-b border-(--color-term-border)/50 bg-(--color-term-bg)/30 px-4 py-2">
+            <Cpu className="h-3 w-3 text-(--color-term-muted)" />
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="flex-1 bg-transparent text-[10px] text-(--color-term-text) outline-none appearance-none cursor-pointer hover:text-(--color-term-accent) transition-colors"
+            >
+              {availableModels.length === 0 ? (
+                <option disabled>Loading models...</option>
+              ) : (
+                availableModels.map(m => (
+                  <option key={m.id} value={m.id} className="bg-(--color-term-panel)">
+                    {m.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <div className="text-[9px] text-(--color-term-muted) border border-(--color-term-border) px-1 rounded uppercase tracking-tighter">Free Tier</div>
           </div>
 
           {/* Chat History */}

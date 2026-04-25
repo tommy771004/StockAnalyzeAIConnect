@@ -418,8 +418,9 @@ export async function callAISimple(
   jsonMode  = false,
   userId?:  string,
   tier:     'free' | 'basic' | 'pro' = 'free',
+  model?:   string,
 ): Promise<string> {
-  const { text } = await callLLM({ prompt, jsonMode, userId, tier });
+  const { text } = await callLLM({ prompt, jsonMode, userId, tier, forceModel: model });
   return text;
 }
 

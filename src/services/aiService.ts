@@ -660,9 +660,10 @@ export async function streamAgentChat(params: {
   symbol?:     string;
   history?:    Array<{ role: 'user' | 'assistant'; content: string }>;
   locale?:     string;
+  model?:      string;
   onChunk:     (chunk: AgentStreamChunk) => void;
 }): Promise<void> {
-  const { message, symbol, history = [], locale = i18n.language || 'zh-TW', onChunk } = params;
+  const { message, symbol, history = [], locale = i18n.language || 'zh-TW', model, onChunk } = params;
 
   const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -672,7 +673,7 @@ export async function streamAgentChat(params: {
       method:      'POST',
       headers:     { 'Content-Type': 'application/json' },
       credentials: 'include', // send HttpOnly cookie (Phase 1 rule)
-      body: JSON.stringify({ message, symbol, history, locale }),
+      body: JSON.stringify({ message, symbol, history, locale, model }),
     });
   } catch (err: unknown) {
     onChunk({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' });
@@ -741,5 +742,23 @@ export async function streamAgentChat(params: {
         currentEvent = '';
       }
     }
+  }
+}
+
+/**
+ * Fetches available free models for selection in the UI.
+ */
+export async function getFreeModels(): Promise<{ id: string; name: string }[]> {
+  try {
+    const apiKey = await getOpenRouterKey();
+    const list = await getOpenRouterFreeModels(apiKey);
+    return list.map(id => {
+      // Clean up names for display
+      let name = id.split('/').pop() || id;
+      name = name.replace(':free', '').replace(/-/g, ' ').toUpperCase();
+      return { id, name };
+    });
+  } catch {
+    return [{ id: OPENROUTER_FALLBACK, name: 'Llama 3.3 70B' }];
   }
 }

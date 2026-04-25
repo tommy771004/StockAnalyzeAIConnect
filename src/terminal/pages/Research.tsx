@@ -2,12 +2,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
 import { useResearchData } from '../hooks/useResearchData';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Cpu } from 'lucide-react';
 import { formatPct, toneClass } from '../ui/format';
 import type { CandlePoint } from '../types';
 import { PersonaSelector } from '../ui/PersonaSelector';
 import { SecFilingsPanel } from '../ui/SecFilingsPanel';
 import { CongressTradesPanel } from '../ui/CongressTradesPanel';
+import { getFreeModels } from '../../services/aiService';
+
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
   const [searchInput, setSearchInput] = useState('');
@@ -15,7 +17,19 @@ export function ResearchPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [persona, setPersona] = useState('hermes');
   const [viewMode, setViewMode] = useState<'standard' | 'pro'>('standard');
+  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const { data, loading } = useResearchData(activeSymbol);
+
+  // Fetch available free models on mount
+  useEffect(() => {
+    getFreeModels().then(models => {
+      setAvailableModels(models);
+      if (models.length > 0 && !selectedModel) {
+        setSelectedModel(models[0].id);
+      }
+    });
+  }, []);
 
   // Listen for global symbol-search events (from TopNav search bar and Screener page)
   useEffect(() => {
@@ -34,7 +48,8 @@ export function ResearchPage() {
     const fetchSummary = async () => {
       setAiLoading(true);
       try {
-        const res = await fetch(`/api/ai/summarize/${activeSymbol}?persona=${persona}`);
+        const url = `/api/ai/summarize/${activeSymbol}?persona=${persona}${selectedModel ? `&model=${encodeURIComponent(selectedModel)}` : ''}`;
+        const res = await fetch(url);
         const json = await res.json();
         if (!res.ok) {
           setAiSummary(json.error || `AI 服務錯誤 (HTTP ${res.status})`);
@@ -48,7 +63,7 @@ export function ResearchPage() {
       }
     };
     if (activeSymbol) fetchSummary();
-  }, [activeSymbol, persona]);
+  }, [activeSymbol, persona, selectedModel]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +125,26 @@ export function ResearchPage() {
           </div>
 
           <PersonaSelector value={persona} onChange={setPersona} compact />
+          
+          <div className="flex items-center gap-2 bg-(--color-term-surface) px-3 py-1 rounded border border-(--color-term-border) h-8">
+            <Cpu className="h-3.5 w-3.5 text-(--color-term-muted)" />
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="bg-transparent text-[11px] font-bold text-(--color-term-text) outline-none appearance-none cursor-pointer uppercase tracking-wider"
+            >
+              {availableModels.length === 0 ? (
+                <option disabled>Loading...</option>
+              ) : (
+                availableModels.map(m => (
+                  <option key={m.id} value={m.id} className="bg-(--color-term-panel)">
+                    {m.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
           {loading ? <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" /> : null}
         </header>
 
@@ -124,7 +159,12 @@ export function ResearchPage() {
         )}
       </div>
       <aside className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-4">
-        <AISummaryPanel summary={aiSummary} loading={aiLoading} persona={persona} />
+        <AISummaryPanel 
+          summary={aiSummary} 
+          loading={aiLoading} 
+          persona={persona} 
+          modelName={availableModels.find(m => m.id === selectedModel)?.name}
+        />
         {viewMode === 'standard' ? (
           <>
             <ValuationPanel tv={tv} />
@@ -340,7 +380,7 @@ function RecentNewsPanel({ news }: { news: any[] }) {
   );
 }
 
-function AISummaryPanel({ summary, loading, persona }: { summary: string; loading: boolean; persona: string }) {
+function AISummaryPanel({ summary, loading, persona, modelName }: { summary: string; loading: boolean; persona: string; modelName?: string }) {
   const PERSONA_LABEL: Record<string, string> = {
     hermes: 'Terminal AI (通用)',
     buffett: '華倫·巴菲特視角',
@@ -369,8 +409,9 @@ function AISummaryPanel({ summary, loading, persona }: { summary: string; loadin
             {summary}
           </p>
         )}
-        <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2">
-          {PERSONA_LABEL[persona] ?? persona} · Powered by OpenRouter
+        <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-2 flex justify-between">
+          <span>{PERSONA_LABEL[persona] ?? persona}</span>
+          <span>{modelName || 'OpenRouter'}</span>
         </div>
       </div>
     </Panel>
