@@ -34,19 +34,38 @@ export async function getWantGooNews(category: string = '焦點'): Promise<NewsI
     });
     const html = await res.text();
     
-    // Simple regex to extract news items from WantGoo
-    // Structure: <h3 class="title"><a href="/news/1253418">Title</a></h3>
-    const matches = html.matchAll(/<h3 class="title">\s*<a href="\/news\/(\d+)"[^>]*>([^<]+)<\/a>/g);
+    // Attempt to extract news items from WantGoo HTML
+    // We try multiple patterns to ensure resilience
     const news: NewsItem[] = [];
     
+    // Pattern 1: <h3 class="title"><a href="/news/1253418">Title</a></h3>
+    const matches = html.matchAll(/<h3 class="title">\s*<a href="\/news\/(\d+)"[^>]*>([^<]+)<\/a>/g);
     for (const match of matches) {
       news.push({
         id: match[1],
         title: match[2].trim(),
         source: 'WantGoo',
-        published: Math.floor(Date.now() / 1000), // WantGoo list doesn't have easy timestamp in HTML without more complex parsing
+        published: Math.floor(Date.now() / 1000),
         link: `https://www.wantgoo.com/news/${match[1]}`
       });
+    }
+
+    // Pattern 2: Search for list items in common containers if Pattern 1 yields nothing
+    if (news.length === 0) {
+      const listMatches = html.matchAll(/<li[^>]*>.*?<a href="\/news\/(\d+)"[^>]*title="([^"]+)"/g);
+      for (const match of listMatches) {
+        news.push({
+          id: match[1],
+          title: match[2].trim(),
+          source: 'WantGoo',
+          published: Math.floor(Date.now() / 1000),
+          link: `https://www.wantgoo.com/news/${match[1]}`
+        });
+      }
+    }
+
+    if (news.length === 0) {
+      console.warn(`[NewsService] No news found in HTML for category ${category}. HTML length: ${html.length}`);
     }
     
     return news;

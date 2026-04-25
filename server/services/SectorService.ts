@@ -75,31 +75,74 @@ export async function getSectorSymbols(sectorId: string): Promise<string[]> {
       }
     });
     
+    if (res.status === 404 || res.status === 403) {
+      console.warn(`[SectorService] JSON API failed with ${res.status} for ${sectorId}. Falling back to HTML scraping.`);
+      return await scrapeSectorHtml(sectorId);
+    }
+
     if (!res.ok) {
-      console.error(`[SectorService] WantGoo API returned ${res.status} ${res.statusText} for ${sectorId}`);
-      return [];
+      console.error(`[SectorService] WantGoo API returned ${res.status} for ${sectorId}`);
+      return await scrapeSectorHtml(sectorId);
     }
 
     const data = await res.json();
-    
-    // WantGoo API usually returns an array of objects
-    // Format based on common WantGoo patterns: [{ stockNo: '1101', ... }, ...]
     const list = Array.isArray(data) ? data : (data.stocks || data.data || data.list || []);
     
     if (!Array.isArray(list) || list.length === 0) {
-      console.warn(`[SectorService] No stocks found in response for ${sectorId}. Data keys:`, Object.keys(data));
-      return [];
+      console.warn(`[SectorService] No stocks found in JSON response for ${sectorId}. Data keys:`, Object.keys(data));
+      return await scrapeSectorHtml(sectorId);
     }
     
     const codes: string[] = list.map((item: any) => {
-      // Handle different possible key names (stockNo is common in WantGoo API)
       return item.stockNo || item.code || item.symbol || item.id || (typeof item === 'string' ? item : null);
     }).filter(Boolean);
 
-    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} (e.g., ${codes.slice(0, 3).join(', ')})`);
+    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} via JSON API`);
     return codes;
   } catch (e) {
-    console.error(`[SectorService] Failed to fetch symbols for ${sectorId} via JSON API:`, e);
+    console.error(`[SectorService] JSON API error for ${sectorId}, trying HTML fallback:`, e);
+    return await scrapeSectorHtml(sectorId);
+  }
+}
+
+/**
+ * Fallback: Scrape the HTML page since the JSON API is often blocked or 404'd.
+ * URL: https://www.wantgoo.com/index/{id}/stocks
+ */
+async function scrapeSectorHtml(sectorId: string): Promise<string[]> {
+  const encodedId = sectorId.startsWith('^') ? encodeURIComponent(sectorId) : sectorId;
+  const url = `https://www.wantgoo.com/index/${encodedId}/stocks`;
+  
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Referer': 'https://www.wantgoo.com/'
+      }
+    });
+
+    if (!res.ok) {
+      console.error(`[SectorService] HTML scrape failed with status ${res.status} for ${url}`);
+      return [];
+    }
+
+    const html = await res.text();
+    // Pattern: <a class="stock-name-a" href="/stock/3122"><span>笙泉</span><span>3122</span></a>
+    // The code is in the second span, or more reliably in the href.
+    const matches = html.matchAll(/href="\/stock\/(\d{4,6})"/g);
+    let codes = Array.from(new Set(Array.from(matches).map(m => m[1])));
+
+    if (codes.length === 0) {
+      // Backup pattern if structure changes slightly
+      const altMatches = html.matchAll(/<span>(\d{4,6})<\/span>/g);
+      codes = Array.from(new Set(Array.from(altMatches).map(m => m[1])));
+    }
+
+    console.log(`[SectorService] Found ${codes.length} symbols for ${sectorId} via HTML scraping`);
+    return codes;
+  } catch (err) {
+    console.error(`[SectorService] HTML scraping error for ${sectorId}:`, err);
     return [];
   }
 }

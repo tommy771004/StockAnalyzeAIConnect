@@ -923,7 +923,12 @@ app.get('/api/news/feed', authMiddleware, async (req, res) => {
     
     // 3. Fallback: 如果 WantGoo 抓不到 (Cloudflare 阻擋)，試試 Yahoo 作為備援
     if (!news || news.length === 0) {
-      const yahooQuery = category === '理財' ? 'Financial News' : (category === '台股' ? 'Taiwan Stock' : 'Market');
+      let yahooQuery = 'Market';
+      if (category === '台股') yahooQuery = '台灣股市 新聞';
+      else if (category === '美股') yahooQuery = 'US Stock News';
+      else if (category === '理財') yahooQuery = '個人理財 投資';
+      else if (category === '國際') yahooQuery = 'International Business';
+      
       const data = await NativeYahooApi.search(yahooQuery);
       return res.json(data.news || []);
     }
@@ -1450,12 +1455,16 @@ app.get('/api/sectors/:id/symbols', authMiddleware, async (req: AuthRequest, res
     const twseList = await fetchAndCacheTWSE();
     const marketMap = new Map(twseList.map(s => [s.code, s.market]));
     
+    // Determine default market for this sector ID (e.g. ^05x, ^04x, ^06x are often OTC)
+    const isOTCSector = req.params.id.startsWith('^05') || req.params.id.startsWith('^04') || req.params.id.startsWith('^06');
+    const defaultSuffix = isOTCSector ? '.TWO' : '.TW';
+
     const symbols = codes.map(code => {
       const market = marketMap.get(code);
       if (market === 'TWSE') return `${code}.TW`;
       if (market === 'TPEX') return `${code}.TWO`;
-      // Default to .TW if unknown but 4 digits
-      if (/^\d{4}$/.test(code)) return `${code}.TW`;
+      // Default based on sector context if unknown but is numeric code
+      if (/^\d{4,5}$/.test(code)) return `${code}${defaultSuffix}`;
       return code;
     });
     
