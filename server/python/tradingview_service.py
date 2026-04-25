@@ -111,6 +111,26 @@ def get_news(exchange: str, symbol: str):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/news/feed")
+def get_news_feed(category: str = "all"):
+    try:
+        # Map categories to TV parameters
+        area = "world"
+        section = "all"
+        
+        if category == "美股":
+            area = "americas"
+        elif category == "國際":
+            area = "world"
+        elif category == "crypto":
+            area = "crypto"
+            
+        raw = news_scraper.scrape_headlines(area=area, section=section, sort="latest")
+        data = flatten_response(raw)
+        return {"status": "success", "data": data}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/ideas")
 def get_ideas(symbol: str, sort: str = "popular"):
     try:

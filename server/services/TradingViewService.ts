@@ -141,6 +141,10 @@ export async function getIdeas(sym: SymbolInput, sort: 'popular' | 'recent' = 'p
   return call<TVIdeaItem[]>('/ideas', { symbol: canonical.code, sort });
 }
 
+export async function getGlobalNewsFeed(category: string = 'all'): Promise<TVNewsHeadline[] | null> {
+  return call<TVNewsHeadline[]>('/news/feed', { category });
+}
+
 export async function getCalendarEarnings(
   countries: string[] = ['america'],
   days = 7,

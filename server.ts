@@ -903,15 +903,36 @@ app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/news/feed', authMiddleware, async (req, res) => {
   const category = (req.query.category as string) || '焦點';
   try {
-    if (category === 'Market' || category === '國際') {
-      const data = await NativeYahooApi.search(category === 'Market' ? 'Market' : 'International Finance');
+    // 1. 優先處理「美股」與「國際」— 這些類別 TradingView 資料更豐富
+    if (category === '美股' || category === '國際') {
+      const tvNews = await TV.getGlobalNewsFeed(category);
+      if (tvNews && tvNews.length > 0) {
+        return res.json(tvNews.map(item => ({
+          id: item.id || item.storyPath,
+          title: item.title,
+          source: item.source,
+          published: item.published,
+          link: item.storyPath ? `https://www.tradingview.com${item.storyPath}` : '',
+          providerPublishTime: item.published
+        })));
+      }
+    }
+
+    // 2. 處理「台股」、「理財」、「焦點」— 使用 WantGoo (中文化內容)
+    const news = await News.getWantGooNews(category);
+    
+    // 3. Fallback: 如果 WantGoo 抓不到 (Cloudflare 阻擋)，試試 Yahoo 作為備援
+    if (!news || news.length === 0) {
+      const yahooQuery = category === '理財' ? 'Financial News' : (category === '台股' ? 'Taiwan Stock' : 'Market');
+      const data = await NativeYahooApi.search(yahooQuery);
       return res.json(data.news || []);
     }
     
-    // Use WantGoo for Taiwan/Industry news
-    const news = await News.getWantGooNews(category);
     res.json(news);
-  } catch (e) { handleApiError(res, e); }
+  } catch (e) { 
+    console.error('[NewsFeed] Error:', e);
+    handleApiError(res, e); 
+  }
 });
 
 app.post('/api/ai/news-analyze', authMiddleware, async (req: AuthRequest, res) => {
