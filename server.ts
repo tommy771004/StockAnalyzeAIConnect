@@ -25,8 +25,10 @@ import { researchRouter } from './server/api/research.js';
 import {
   startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
   getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
-  setWsBroadcast, getLossStreakCount, resetCircuitBreaker,
+  setWsBroadcast, getLossStreakCount, resetCircuitBreaker, deactivateKillSwitch,
 } from './server/services/autonomousAgent.js';
+import { DEFAULT_AGENT_CONFIG, DEFAULT_RISK_CONFIG, DEFAULT_TRADING_HOURS } from './server/services/autotradingDefaults.js';
+import { isTradingSession } from './server/services/tradingSession.js';
 import { riskManager } from './server/services/RiskManager.js';
 import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
@@ -554,6 +556,26 @@ app.post('/api/autotrading/kill-switch', authMiddleware, (_req, res) => {
   res.json(result);
 });
 
+app.post('/api/autotrading/kill-switch/release', authMiddleware, (_req, res) => {
+  const result = deactivateKillSwitch();
+  res.json(result);
+});
+
+app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
+  res.json({
+    config: DEFAULT_AGENT_CONFIG,
+    risk: DEFAULT_RISK_CONFIG,
+    tradingHours: DEFAULT_TRADING_HOURS,
+  });
+});
+
+app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {
+  const symbols = String(req.query.symbols ?? '2330.TW').split(',').map(s => s.trim()).filter(Boolean);
+  const cfg = getAgentConfig();
+  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours) }));
+  res.json({ ok: true, sessions: result });
+});
+
 app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
   res.json(getAgentConfig());
 });
@@ -585,6 +607,19 @@ app.get('/api/autotrading/balance', authMiddleware, async (_req, res) => {
   } catch (e) {
     handleApiError(res, e);
   }
+});
+
+app.get('/api/autotrading/broker/status', authMiddleware, (_req, res) => {
+  const cfg = getAgentConfig();
+  res.json({
+    ok: true,
+    config: {
+      brokerId: cfg.mode === 'real' ? 'sinopac' : 'simulated',
+      accountId: '',
+      mode: cfg.mode,
+    },
+    bridgeUrl: process.env.SINOPAC_BRIDGE_URL ?? 'http://localhost:8001',
+  });
 });
 
 app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequest, res) => {

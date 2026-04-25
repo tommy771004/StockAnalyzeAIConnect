@@ -22,12 +22,21 @@ async function callApi(path: string, method = 'GET', body?: unknown) {
     credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || `HTTP ${res.status}`);
+  }
   return res.json();
 }
 
 export function AutoTradingPage() {
   const ws = useAutotradingWS();
   const [mainTab, setMainTab] = React.useState('LIVE_VIEW');
+  const [defaults, setDefaults] = React.useState<{ config: AgentConfig } | null>(null);
+
+  React.useEffect(() => {
+    api.getAutotradingDefaults().then((d: any) => setDefaults(d)).catch(() => {/* 未登入時跳過 */});
+  }, []);
 
   const handleStart = async (cfg: Partial<AgentConfig>) => {
     await callApi('/api/autotrading/start', 'POST', cfg);
@@ -42,10 +51,11 @@ export function AutoTradingPage() {
   };
 
   const handleUpdateConfig = async (cfg: Record<string, unknown>) => {
-    await callApi('/api/autotrading/config', 'PUT', cfg);
+    return await callApi('/api/autotrading/config', 'PUT', cfg);
   };
 
-  const currentSymbols = ws.config?.symbols ?? ['2330.TW', '2317.TW'];
+  // 監控標的優先序：WS 載入 > /defaults > 空陣列
+  const currentSymbols = ws.config?.symbols ?? defaults?.config.symbols ?? [];
 
   return (
     <div className="h-full flex flex-col gap-2 overflow-hidden font-mono">

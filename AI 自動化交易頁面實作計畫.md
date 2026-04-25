@@ -202,3 +202,49 @@ interface IBrokerAdapter {
    - Q2 提到的 Greeks 計算與期貨保證金計算（目前重心仍在個股）。
 3. **WebSocket/後端 API (Backend API) 完善**：
    - 確保 `server/api/` (如 `agent.ts`) 和 WebSocket 端點完全吻合 `AutoTradingPage.tsx` 的前端呼叫 (`/api/autotrading/*`)，並測試端到端（End-to-End）連線。
+
+---
+
+## 🔧 2026-04 改善紀錄（Trading Automation Improvements）
+
+本輪聚焦在「假資料 / 寫死值 / 假按鈕 / 風控空轉」等問題，補齊核心防呆與設定持久化。
+
+### 已完成
+1. **預設值集中化** — 新增 `server/services/autotradingDefaults.ts` 作為 single source of truth；
+   `autonomousAgent`、`RiskManager`、前端 `RiskControlPanel`、`AgentControlPanel`、`AutoTradingPage`
+   不再各自寫死預算 / 虧損 / 監控標的 / 策略參數。
+2. **盤前盤後守門** — 新增 `server/services/tradingSession.ts`，每次 tick 前檢查台股 / 美股
+   是否處於盤中時段，週末或非交易時段自動跳過分析迴圈並寫入 SESSION log。
+3. **交易稅費統一** — 抽出 `server/services/twFees.ts`：手續費 0.1425% (可帶折扣)、證交稅 0.3%、
+   ETF 0.1%、當沖（同日買賣同檔）證交稅減半至 0.15%。`SimulatedAdapter` 已改用此模組並追蹤
+   買進日期供當沖判定。
+4. **RiskManager 真正接入 OrderExecutor** — `agentTick` 在送出委託前呼叫
+   `riskManager.validateOrder`，超過單筆上限 / 部位佔比 / 預算上限會直接攔截並寫 `RISK_CHK` log；
+   每次 SELL 平倉後將實現損益餵入 `recordPnl`，達上限自動觸發 Kill Switch。
+5. **WebSocket 訊息補齊** —
+   - `decisionHeat` 修正為 `decision_heat`（與前端 `useAutotradingWS` 對齊）。
+   - 補上 `equity_update`（每 5 秒一筆權益曲線）與 `global_sentiment`（移動平均的 0–100 情緒分）。
+6. **Kill Switch 流程** — 後端新增 `POST /api/autotrading/kill-switch/release`，前端
+   `RiskControlPanel` 解除按鈕改呼叫該端點；觸發時同時聯動 `riskManager.activateKillSwitch()`，
+   讓任何外部 caller 都會被風控擋下。
+7. **新端點**
+   - `GET /api/autotrading/defaults`：返回伺服器端預設配置（前端 hydrate 用）。
+   - `GET /api/autotrading/session?symbols=...`：判斷是否盤中。
+   - `GET /api/autotrading/broker/status`：回傳目前券商與 Sinopac Bridge URL。
+8. **設定面板完整化**
+   - `RiskControlPanel`：新增「單筆部位上限 / 最大部位佔比 / 個股停損 %」欄位、即時驗證、
+     儲存/失敗 toast、解除 Kill Switch 直連 API。
+   - `BrokerSettings`：增加 Bridge URL 欄位、stub 券商（KGI / Yuantra / Fugle / IB）顯示
+     「Coming Soon」並停用「測試連線」按鈕、最後測試時間提示。
+   - `AgentControlPanel` / `AutoTradingPage`：載入時呼叫 `getAutotradingDefaults()`，
+     不再寫死 `2330.TW / 2317.TW` 與策略魔術數字。
+9. **Schema 強化** — `configSchema.ts` 補上 `tradingHours`、`tickIntervalMs` 範圍、`maxPositionPct`、
+   `riskPerTradePct`、`sizingMethod` 等欄位驗證。
+
+### 仍待後續處理
+1. 真實 KGI / Yuantra 券商的本地 Windows 服務橋接（目前 UI 已停用）。
+2. 選擇權 Greeks（Black-Scholes）與期貨保證金的 Python microservice。
+3. 台股交易日曆 API 整合 — 國定假日與提早收盤的 fallback。
+4. 訂單生命週期狀態機（PENDING → PARTIAL → FILLED → CANCELLED）含重試。
+5. 通知通道（Email / Telegram / Discord webhook）。
+6. 績效儀表板（勝率、夏普、最大回撤）與回測 ↔ 實盤偏差分析。
