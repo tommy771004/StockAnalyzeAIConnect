@@ -115,9 +115,9 @@ export function Panel({
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
-              className="overflow-hidden"
+              className="flex-1 min-h-0 overflow-hidden"
             >
-              <div className={cn('min-h-0', bodyClassName)}>{children}</div>
+              <div className={cn('h-full min-h-0', bodyClassName)}>{children}</div>
             </motion.div>
           )}
         </AnimatePresence>
