@@ -445,6 +445,11 @@
     "backtest": {
       "title": "Backtest: {{symbol}}",
       "desc": "Simulate using current strategy and historical data",
+      "descConfigurable": "Override symbol and strategy here without affecting your Strategy tab config",
+      "symbolLabel": "Symbol",
+      "strategyLabel": "Strategy",
+      "periodLabel": "Period",
+      "resetToConfig": "Use Config",
       "periods": {
         "30d": "Last 30 Days",
         "90d": "Last 90 Days",

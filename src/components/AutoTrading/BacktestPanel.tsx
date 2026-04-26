@@ -2,14 +2,15 @@
  * src/components/AutoTrading/BacktestPanel.tsx
  * 詳細回測介面：設定區間、執行回測、查看報表
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play, TrendingUp, History, BarChart3, ChevronRight, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { runBacktest as runGlobalBacktest } from '../../services/api';
 import { fetchJ } from '../../utils/api';
-import { DEFAULT_BACKTEST_METRICS, getDateRangeByPeriod, mapToBacktestStrategy, normalizeBacktestResult } from '../../utils/backtest';
+import { BACKTEST_STRATEGIES, DEFAULT_BACKTEST_METRICS, getDateRangeByPeriod, mapToBacktestStrategy, normalizeBacktestResult, type BacktestStrategyId } from '../../utils/backtest';
+import { mapBacktestStrategyToStrategyType } from './strategyParamSchema';
 import type { BacktestResult } from '../../types';
 import type { AgentConfig } from './types';
 
@@ -24,26 +25,61 @@ export function BacktestPanel({ symbol, config }: Props) {
   const [error, setError] = useState('');
   const [result, setResult] = useState<(BacktestResult & { strategy: string }) | null>(null);
   const [period, setPeriod] = useState(180);
-  const canRun = !!symbol?.trim();
-  const selectedStrategy = useMemo(
+
+  // 來自 props 的預設值（Strategy tab 配置）
+  const defaultSymbol = symbol?.trim() ?? '';
+  const defaultStrategy = useMemo<BacktestStrategyId>(
     () => mapToBacktestStrategy(config?.strategies?.[0]),
     [config?.strategies],
   );
 
+  // 本地覆寫值：使用者可在此面板直接調整，無需回 Strategy tab
+  const [symbolInput, setSymbolInput] = useState<string>(defaultSymbol);
+  const [strategyInput, setStrategyInput] = useState<BacktestStrategyId>(defaultStrategy);
+  const [symbolDirty, setSymbolDirty] = useState(false);
+  const [strategyDirty, setStrategyDirty] = useState(false);
+
+  // 當外部 props 變動時，若使用者尚未自行覆寫，跟著同步
+  useEffect(() => {
+    if (!symbolDirty) setSymbolInput(defaultSymbol);
+  }, [defaultSymbol, symbolDirty]);
+
+  useEffect(() => {
+    if (!strategyDirty) setStrategyInput(defaultStrategy);
+  }, [defaultStrategy, strategyDirty]);
+
+  const trimmedSymbol = symbolInput.trim().toUpperCase();
+  const canRun = trimmedSymbol.length > 0 && !loading;
+  const isOverridden = symbolDirty || strategyDirty;
+
+  const resetToConfig = () => {
+    setSymbolInput(defaultSymbol);
+    setStrategyInput(defaultStrategy);
+    setSymbolDirty(false);
+    setStrategyDirty(false);
+  };
+
   const runBacktest = async (): Promise<void> => {
-    if (!symbol?.trim()) return;
+    if (!trimmedSymbol) return;
     setLoading(true);
     setError('');
+
+    // 將 BacktestStrategyId (rsi/macd/...) 反轉成 AgentConfig 用的 StrategyType
+    const strategyType = mapBacktestStrategyToStrategyType(strategyInput);
+    const overrideConfig: Partial<AgentConfig> = {
+      ...(config || {}),
+      strategies: [strategyType],
+    };
 
     try {
       const data = await fetchJ<{ ok?: boolean; data?: unknown }>('/api/autotrading/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, period, config }),
+        body: JSON.stringify({ symbol: trimmedSymbol, period, config: overrideConfig }),
       });
 
       if (data.ok && data.data) {
-        setResult(normalizeBacktestResult(data.data, selectedStrategy));
+        setResult(normalizeBacktestResult(data.data, strategyInput));
         return;
       }
 
@@ -52,13 +88,13 @@ export function BacktestPanel({ symbol, config }: Props) {
       try {
         const { period1, period2 } = getDateRangeByPeriod(period);
         const fallback = await runGlobalBacktest({
-          symbol: symbol.trim().toUpperCase(),
-          strategy: selectedStrategy,
+          symbol: trimmedSymbol,
+          strategy: strategyInput,
           initialCapital: 1_000_000,
           period1,
           period2,
         });
-        setResult(normalizeBacktestResult(fallback, selectedStrategy));
+        setResult(normalizeBacktestResult(fallback, strategyInput));
       } catch (fallbackError) {
         const message = fallbackError instanceof Error ? fallbackError.message : 'Backtest failed';
         setError(message);
@@ -76,33 +112,81 @@ export function BacktestPanel({ symbol, config }: Props) {
   return (
     <div className="space-y-4">
       {/* Control Header */}
-      <div className="flex items-center justify-between bg-white/5 border border-(--color-term-border) p-3 rounded-sm">
+      <div className="bg-white/5 border border-(--color-term-border) p-3 rounded-sm space-y-3">
         <div className="flex items-center gap-3">
-          <History className="h-4 w-4 text-violet-400" />
-          <div>
-            <div className="text-[11px] font-bold text-white">{t('autotrading.backtest.title', { symbol })}</div>
-            <div className="text-[9px] text-(--color-term-muted)">{t('autotrading.backtest.desc')}</div>
+          <History className="h-4 w-4 text-violet-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-bold text-white">
+              {t('autotrading.backtest.title', { symbol: trimmedSymbol || '---' })}
+            </div>
+            <div className="text-[9px] text-(--color-term-muted)">
+              {t('autotrading.backtest.descConfigurable', '可在此修改回測標的與策略，不會影響 Strategy tab 的正式配置')}
+            </div>
           </div>
+          {isOverridden && (
+            <button
+              type="button"
+              onClick={resetToConfig}
+              className="text-[9px] uppercase tracking-widest text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors px-2 py-1 border border-(--color-term-border) rounded"
+            >
+              {t('autotrading.backtest.resetToConfig', '套用配置')}
+            </button>
+          )}
         </div>
-        
-        <div className="flex items-center gap-2">
-          <select 
-            value={period} 
-            onChange={(e) => setPeriod(Number(e.target.value))}
-            className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white outline-none"
-          >
-            <option value={30}>{t('autotrading.backtest.periods.30d')}</option>
-            <option value={90}>{t('autotrading.backtest.periods.90d')}</option>
-            <option value={180}>{t('autotrading.backtest.periods.180d')}</option>
-            <option value={365}>{t('autotrading.backtest.periods.1y')}</option>
-          </select>
-          
+
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 min-w-[140px]">
+            <span className="text-[9px] uppercase tracking-widest text-(--color-term-muted)">
+              {t('autotrading.backtest.symbolLabel', '標的 (Symbol)')}
+            </span>
+            <input
+              type="text"
+              value={symbolInput}
+              onChange={(e) => { setSymbolInput(e.target.value); setSymbolDirty(true); }}
+              placeholder="2330.TW"
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white outline-none focus:border-(--color-term-accent)"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 min-w-[180px]">
+            <span className="text-[9px] uppercase tracking-widest text-(--color-term-muted)">
+              {t('autotrading.backtest.strategyLabel', '策略 (Strategy)')}
+            </span>
+            <select
+              value={strategyInput}
+              onChange={(e) => { setStrategyInput(e.target.value as BacktestStrategyId); setStrategyDirty(true); }}
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-(--color-term-accent)"
+            >
+              {BACKTEST_STRATEGIES.map((s) => (
+                <option key={s.id} value={s.id} className="bg-(--color-term-panel)">
+                  {s.label}（{s.en}）
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[9px] uppercase tracking-widest text-(--color-term-muted)">
+              {t('autotrading.backtest.periodLabel', '期間 (Period)')}
+            </span>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(Number(e.target.value))}
+              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-(--color-term-accent)"
+            >
+              <option value={30}>{t('autotrading.backtest.periods.30d')}</option>
+              <option value={90}>{t('autotrading.backtest.periods.90d')}</option>
+              <option value={180}>{t('autotrading.backtest.periods.180d')}</option>
+              <option value={365}>{t('autotrading.backtest.periods.1y')}</option>
+            </select>
+          </label>
+
           <button
             onClick={runBacktest}
-            disabled={loading || !canRun}
+            disabled={!canRun}
             className={cn(
-              "flex items-center gap-2 px-4 py-1 rounded text-[10px] font-bold transition-all",
-              loading || !canRun ? "bg-white/10 text-white/50 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/20"
+              'flex items-center gap-2 px-4 py-1.5 rounded text-[11px] font-bold transition-all self-end',
+              !canRun ? 'bg-white/10 text-white/50 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/20'
             )}
           >
             {loading ? <Activity className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
