@@ -201,3 +201,22 @@ body {
     animation-delay: 0s !important;
   }
 }
+
+/* ── Color Role Tokens ─────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --color-action:       theme(colors.cyan.400);
+    --color-constructive: theme(colors.emerald.400);
+    --color-destructive:  theme(colors.rose.400);
+    --color-caution:      theme(colors.amber.400);
+    --color-feature:      theme(colors.violet.400);
+  }
+}
+
+/* ── Focus Ring Utility ────────────────────────────────────────────── */
+@layer utilities {
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(6 182 212), 0 0 0 3px #000;
+  }
+}
