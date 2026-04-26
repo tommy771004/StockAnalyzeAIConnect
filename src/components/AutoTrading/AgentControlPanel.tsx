@@ -180,7 +180,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
         {activeTab === 'accounts' && <CopyTradingPanel />}
         {activeTab === 'backtest' && <BacktestPanel symbol={symbols[0]} config={{ mode, strategies, params, symbols, symbolConfigs: {} }} />}
         {activeTab === 'commander' && <CommanderTerminal />}
-        {activeTab === 'broker' && <BrokerSettings onConnect={async (c) => { const res = await fetch('/api/autotrading/broker/connect', { method: 'POST', body: JSON.stringify(c) }); return res.json(); }} disabled={isRunning} />}
+        {activeTab === 'broker' && <BrokerSettings onConnect={api.connectAutotradingBroker} disabled={isRunning} />}
       </div>
     </div>
   );

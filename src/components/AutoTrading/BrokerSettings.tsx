@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Shield, Key, FileText, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { BROKER_OPTIONS } from './types';
+import * as api from '../../services/api';
 
 interface Props {
   onConnect: (config: any) => Promise<{ ok: boolean; message: string; requiresLocalSetup?: boolean }>;
@@ -39,10 +40,9 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch('/api/autotrading/broker/status', { credentials: 'include' });
-        const data = await res.json();
+        const data = await api.getAutotradingBrokerStatus();
         if (data.ok && data.config) {
-          setSelectedBroker(data.config.brokerId);
+          setSelectedBroker(data.config.brokerId ?? 'simulated');
           setAccountId(data.config.accountId ?? '');
           setBridgeUrl(data.bridgeUrl ?? '');
           setStatus({ type: 'success', msg: t('autotrading.broker.restoreConfig', { broker: data.config.brokerId }) });
@@ -233,7 +233,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
         <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 rounded-sm flex items-start gap-3">
           <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
           <div className="text-[10px] text-emerald-300 leading-relaxed">
-            模擬交易模式已啟動。系統將自動模擬台灣市場的交易稅與手續費（含當沖減半），無需任何憑證或連線設定即可開始測試 AI 策略。
+            {t('autotrading.broker.simulatedModeNote', '模擬交易模式已啟動。系統將自動模擬台灣市場的交易稅與手續費（含當沖減半），無需任何憑證或連線設定即可開始測試 AI 策略。')}
           </div>
         </div>
       )}

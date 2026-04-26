@@ -299,7 +299,12 @@ export interface ScreenerFilters {
   belowSMA20?: boolean;
 }
 
-export const getSectors = (): Promise<any[]> => fetchJ<any[]>('/api/sectors');
+export interface SectorItem {
+  id: string;
+  name: string;
+}
+
+export const getSectors = (): Promise<SectorItem[]> => fetchJ<SectorItem[]>('/api/sectors');
 
 export const getSectorSymbols = (id: string): Promise<string[]> =>
   fetchJ<string[]>(`/api/sectors/${encodeURIComponent(id)}/symbols`);
@@ -445,3 +450,65 @@ export const getAutotradingLogs = (limit = 100) =>
   fetchJ<any[]>(`/api/autotrading/logs?limit=${encodeURIComponent(String(limit))}`);
 export const getAutotradingPositions = () => fetchJ<any[]>('/api/autotrading/positions');
 export const getAutotradingBalance = () => fetchJ<any>('/api/autotrading/balance');
+export const getAutotradingBrokerStatus = () =>
+  fetchJ<{
+    ok: boolean;
+    config?: { brokerId?: string; accountId?: string; mode?: string };
+    bridgeUrl?: string;
+  }>('/api/autotrading/broker/status');
+export const connectAutotradingBroker = (config: {
+  brokerId: string;
+  apiKey?: string;
+  apiSecret?: string;
+  certPath?: string;
+  accountId?: string;
+  bridgeUrl?: string;
+  mode?: string;
+}) =>
+  fetchJ<{ ok: boolean; message: string; requiresLocalSetup?: boolean }>('/api/autotrading/broker/connect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+export const postAutotradingCommand = (command: string) =>
+  fetchJ<{ ok: boolean; actionTaken?: string; error?: string }>('/api/autotrading/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command }),
+  });
+export const optimizeAutotrading = (params: { symbol: string; period?: number }) =>
+  fetchJ<{ ok: boolean; proposal?: unknown }>('/api/autotrading/optimize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+export const getAutotradingReport = () =>
+  fetchJ<{ ok: boolean; report?: unknown }>('/api/autotrading/report');
+export const getAutotradingFollowers = () =>
+  fetchJ<{ ok: boolean; followers?: unknown[]; message?: string }>('/api/autotrading/followers');
+export const getAutotradingNotifications = () =>
+  fetchJ<{ ok: boolean; settings?: Array<{ id: number; channel: string; target: string; enabled: boolean; triggers: string[] }> }>(
+    '/api/autotrading/notifications',
+  );
+export const putAutotradingNotifications = (draft: { channel: string; target: string; triggers: string[] }) =>
+  fetchJ<{ ok: boolean; error?: string }>('/api/autotrading/notifications', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  });
+export const deleteAutotradingNotification = (id: number) =>
+  fetchJ<{ ok: boolean }>(`/api/autotrading/notifications/${id}`, {
+    method: 'DELETE',
+  });
+export const testAutotradingNotification = (payload: { channel: string; target: string }) =>
+  fetchJ<{ ok: boolean; message?: string; error?: string }>('/api/autotrading/notifications/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+export const getAutotradingOrders = (open = false) =>
+  fetchJ<{ ok: boolean; orders?: unknown[]; error?: string }>(`/api/autotrading/orders?open=${open ? '1' : '0'}`);
+export const cancelAutotradingOrder = (id: number) =>
+  fetchJ<{ ok: boolean; message?: string; error?: string }>(`/api/autotrading/orders/${id}/cancel`, {
+    method: 'POST',
+  });

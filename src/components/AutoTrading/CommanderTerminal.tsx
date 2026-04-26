@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Terminal, Send, Zap, Bot, ShieldCheck, Ghost } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { CommanderLog } from './types';
+import * as api from '../../services/api';
 
 export function CommanderTerminal() {
   const { t } = useTranslation();
@@ -27,12 +28,7 @@ export function CommanderTerminal() {
     setInput('');
 
     try {
-      const res = await fetch('/api/autotrading/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: userCmd })
-      });
-      const data = await res.json();
+      const data = await api.postAutotradingCommand(userCmd);
       
       const newLog: CommanderLog = {
         id: Math.random().toString(36).substring(7),
@@ -44,7 +40,16 @@ export function CommanderTerminal() {
       
       setLogs(prev => [...prev, newLog]);
     } catch (e) {
-      console.error(e);
+      setLogs(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(7),
+          command: userCmd,
+          actionTaken: `${t('autotrading.commander.errorPrefix')}${(e as Error).message}`,
+          status: 'FAILED',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setLoading(false);
     }

@@ -4,8 +4,9 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, TrendingUp, Star, RefreshCw, Trophy, Zap, ShieldCheck, PieChart, Sparkles } from 'lucide-react';
+import { TrendingUp, Star, RefreshCw, Trophy, Zap, ShieldCheck, PieChart, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import * as api from '../../services/api';
 
 export function AlphaReport() {
   const { t } = useTranslation();
@@ -15,8 +16,7 @@ export function AlphaReport() {
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/autotrading/report');
-      const data = await res.json();
+      const data = await api.getAutotradingReport();
       if (data.ok) setReport(data.report);
     } catch (e) {
       console.error(e);
@@ -66,13 +66,13 @@ export function AlphaReport() {
           </div>
           <div className="text-[9px] text-violet-400 uppercase font-bold mb-2 tracking-widest">{t('autotrading.alphaReport.aiValueAdded', 'AI Value Added')}</div>
           <div className="text-3xl font-mono text-white">+{report.aiValueAdded.toLocaleString()} <span className="text-[10px] opacity-40">{t('autotrading.common.twd', 'TWD')}</span></div>
-          <div className="text-[9px] text-white/40 mt-2 italic">透過 AI 過濾機制比純技術策略多創造的價值。</div>
+          <div className="text-[9px] text-white/40 mt-2 italic">{t('autotrading.alphaReport.aiValueAddedNote', '透過 AI 過濾機制比純技術策略多創造的價值。')}</div>
         </div>
 
         <div className="md:col-span-2 bg-black/40 border border-white/5 p-6 rounded-sm space-y-4">
            <div className="flex justify-between items-center">
               <span className="text-[10px] font-bold text-white uppercase tracking-wider">{t('autotrading.alphaReport.neuralConfidenceEvolution', 'Neural Confidence Evolution')}</span>
-              <span className="text-[9px] text-white/30 italic">過去 7 天平均信心走勢</span>
+              <span className="text-[9px] text-white/30 italic">{t('autotrading.alphaReport.confidenceTimelineLabel', '過去 7 天平均信心走勢')}</span>
            </div>
            <div className="h-20 flex items-end gap-1.5">
               {report.confidenceTimeline?.map((c: number, i: number) => (
@@ -131,7 +131,7 @@ export function AlphaReport() {
              <Trophy className="h-8 w-8 text-amber-400 mx-auto mb-2 animate-bounce" />
              <div className="text-[11px] font-bold text-white uppercase mb-1">{t('autotrading.alphaReport.growthStatusAdvancing', 'Growth Status: Advancing')}</div>
              <div className="text-[9px] text-white/50">
-                系統已成功學習您的風險偏好，本週決策一致性達到 95%。
+                {t('autotrading.alphaReport.growthDescription', '系統已成功學習您的風險偏好，本週決策一致性達到 95%。')}
              </div>
           </div>
         </div>

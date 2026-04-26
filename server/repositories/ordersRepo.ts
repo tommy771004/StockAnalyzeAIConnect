@@ -34,6 +34,15 @@ export const ordersRepo = {
     return row ?? null;
   },
 
+  async findByIdForUser(id: number, userId: string): Promise<OrderRow | null> {
+    const [row] = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  },
+
   async listByUser(userId: string, limit = 100): Promise<OrderRow[]> {
     return db
       .select()

@@ -54,7 +54,7 @@ export function PerformanceDashboard() {
       const res = await api.getPerformance(period);
       setData(res);
     } catch (e) {
-      setError((e as Error).message ?? '載入失敗');
+      setError((e as Error).message ?? t('autotrading.performance.loadFailed', '載入失敗'));
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export function PerformanceDashboard() {
       )}
 
       {!data && !error && (
-        <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{loading ? '計算中...' : '尚無數據'}</div>
+        <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{loading ? t('autotrading.performance.computing', '計算中...') : t('autotrading.performance.noData', '尚無數據')}</div>
       )}
 
       {data && (
@@ -142,7 +142,7 @@ export function PerformanceDashboard() {
                   <div key={key} className="flex items-center justify-between px-3 py-2 text-[10px]">
                     <span className="font-bold text-white/80">{key}</span>
                     <div className="flex items-center gap-4 font-mono">
-                      <span>{v.trades} 筆</span>
+                      <span>{v.trades} {t('autotrading.performance.trades', '筆')}</span>
                       <span className={v.winRate >= 50 ? 'text-emerald-400' : 'text-amber-400'}>{v.winRate.toFixed(1)}%</span>
                       <span className={v.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{fmtTwd(v.pnl)}</span>
                     </div>
@@ -213,7 +213,8 @@ interface SparklineProps {
   fillBelow?: boolean;
 }
 function Sparkline({ points, color, fillBelow }: SparklineProps) {
-  if (points.length < 2) return <div className="text-[9px] text-(--color-term-muted)">資料不足</div>;
+  const { t } = useTranslation();
+  if (points.length < 2) return <div className="text-[9px] text-(--color-term-muted)">{t('autotrading.performance.insufficientData', '資料不足')}</div>;
   const w = 600;
   const h = 80;
   const min = Math.min(...points);

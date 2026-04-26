@@ -394,6 +394,11 @@
         "neuralAiSignal": "AI decision engine combining news, sentiment, and technical signals."
       },
       "sectorTargeting": "Sector Targeting",
+      "sectorsLoading": "Loading sectors...",
+      "sectorsEmpty": "No sectors available",
+      "sectorsLoadFailed": "Failed to load sectors",
+      "sectorSymbolsLoadFailed": "Failed to load sector constituents",
+      "loadingSymbols": "Loading...",
       "selector": {
         "title": "AI Strategies & Weights",
         "weight": "Weight",
@@ -533,6 +538,7 @@
       "unsupported": "This broker is not supported yet",
       "testAndSave": "Test and Save Broker Connection",
       "lastTested": "Last tested: {{time}}",
+      "simulatedModeNote": "Simulation mode is active. The system models Taiwan trading tax and fees (including day-trade discount), so you can test AI strategies without broker credentials.",
       "brokers": {
         "simulated": {
           "name": "Simulated Broker (AI Paper Trading)",
@@ -557,6 +563,10 @@
       "noNeed": "Current parameters are already near-optimal for this symbol.",
       "scanning": "SCANNING...",
       "scanForEvolution": "SCAN FOR EVOLUTION",
+      "hint": "Searching for parameter sets that improve profitability on {{symbol}}",
+      "proposalFound": "Evolution proposal found! Expected ROI improvement: {{pct}}%",
+      "applyNow": "Apply Evolution Params",
+      "scanPrompt": "Click the button above to start parameter optimization scan",
       "currentConfig": "Current Config",
       "suggestedConfig": "Suggested Config",
       "field": {
@@ -579,12 +589,25 @@
       "drawdownWarn": "Warning",
       "equityCurve": "Equity Curve",
       "drawdown": "Drawdown",
-      "strategyAttribution": "Strategy Attribution"
+      "strategyAttribution": "Strategy Attribution",
+      "loadFailed": "Load failed",
+      "computing": "Computing...",
+      "noData": "No data yet",
+      "insufficientData": "Insufficient data"
     },
     "orderBook": {
       "title": "Order Lifecycle",
       "empty": "No orders yet",
       "cancelOrder": "Cancel order",
+      "columns": {
+        "time": "Time",
+        "symbol": "Symbol",
+        "side": "Side",
+        "quantity": "Quantity",
+        "avgFillPrice": "Avg Fill",
+        "retries": "Retries",
+        "status": "Status"
+      },
       "side": {
         "buy": "BUY",
         "sell": "SELL",
@@ -604,10 +627,13 @@
       "evolvingData": "Evolving Report Data...",
       "achievements": "Achievements",
       "aiValueAdded": "AI Value Added",
+      "aiValueAddedNote": "Incremental value created by AI filtering compared to pure technical strategy.",
       "neuralConfidenceEvolution": "Neural Confidence Evolution",
+      "confidenceTimelineLabel": "Average confidence trend over the last 7 days",
       "companionJournal": "Your AI Companion's Journal",
       "attributionMatrix": "Attribution Matrix",
       "growthStatusAdvancing": "Growth Status: Advancing",
+      "growthDescription": "The system has learned your risk preference, and decision consistency reached 95% this week.",
       "achievement": {
         "criticalDefense": "CRITICAL_DEFENSE",
         "alphaCatcher": "ALPHA_CATCHER",
@@ -630,7 +656,12 @@
       "offline": "Offline",
       "autoStoploss": "Auto-Stoploss",
       "testingPhaseNoExecution": "TESTING_PHASE: NO_REAL_EXECUTION",
-      "balancePrefix": "BAL"
+      "balancePrefix": "BAL",
+      "fetchFailed": "Failed to load follower accounts",
+      "retry": "Retry",
+      "empty": "No follower accounts available",
+      "staggeredEntryTitle": "Staggered Entry Technique Active",
+      "staggeredEntryDesc": "The system assigns microsecond-level random delays per account so orders spread across tiny price gaps, reducing coordinated market impact."
     },
     "notifications": {
       "title": "Notification Channels",

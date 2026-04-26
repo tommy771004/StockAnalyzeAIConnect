@@ -6,25 +6,34 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Users, Ghost, Zap, Clock, ShieldCheck, Target, ArrowRightLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import * as api from '../../services/api';
+
+interface FollowerAccount {
+  id: string;
+  name: string;
+  multiplier: number;
+  enabled: boolean;
+  mode: 'live' | 'shadow';
+  delay: number;
+  balance: number;
+}
 
 export function CopyTradingPanel() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
-  const [followers, setFollowers] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<FollowerAccount[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchFollowers = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch('/api/autotrading/followers');
-      const data = await res.json();
-      if (data.ok) setFollowers(data.followers);
-      else throw new Error(data.message);
+      const data = await api.getAutotradingFollowers();
+      if (!data.ok) throw new Error(data.message ?? t('autotrading.copyTrading.fetchFailed', '無法載入跟單帳戶'));
+      setFollowers((data.followers ?? []) as FollowerAccount[]);
     } catch (e) {
-      // Fallback for demo/missing API
-      setFollowers([
-        { id: 'acc_001', name: '家人帳戶_A', multiplier: 0.5, enabled: true, mode: 'live', delay: 1500, balance: 485200 },
-        { id: 'acc_002', name: '影子測試_B', multiplier: 1.0, enabled: true, mode: 'shadow', delay: 0, balance: 200000 }
-      ]);
+      setFollowers([]);
+      setError((e as Error).message || t('autotrading.copyTrading.fetchFailed', '無法載入跟單帳戶'));
     } finally {
       setLoading(false);
     }
@@ -42,6 +51,19 @@ export function CopyTradingPanel() {
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="p-3 border border-rose-500/30 bg-rose-500/10 rounded-sm flex items-center justify-between gap-3">
+          <div className="text-[10px] text-rose-300">{error}</div>
+          <button
+            type="button"
+            onClick={fetchFollowers}
+            className="px-2 py-1 text-[9px] border border-rose-400/40 text-rose-200 rounded hover:bg-rose-500/20"
+          >
+            {t('autotrading.copyTrading.retry', '重試')}
+          </button>
+        </div>
+      )}
+
       {/* 系統拓撲圖裝飾 */}
       <div className="bg-black/20 border border-white/5 p-4 rounded-sm flex items-center justify-center gap-8 py-6">
          <div className="flex flex-col items-center gap-2">
@@ -61,6 +83,11 @@ export function CopyTradingPanel() {
       </div>
 
       <div className="grid grid-cols-1 gap-3">
+        {followers.length === 0 && !error && (
+          <div className="p-4 text-[10px] text-(--color-term-muted) text-center border border-(--color-term-border) rounded-sm">
+            {t('autotrading.copyTrading.empty', '目前沒有可用的跟單帳戶')}
+          </div>
+        )}
         {followers.map((acc) => (
           <div key={acc.id} className={cn(
             "group bg-black/40 border rounded-sm p-4 transition-all duration-500",
@@ -134,10 +161,10 @@ export function CopyTradingPanel() {
 
       <div className="p-3 bg-white/5 rounded border border-white/5">
          <div className="text-[10px] text-cyan-400 font-bold mb-1 uppercase flex items-center gap-2">
-            <Zap className="h-3 w-3" /> 階梯入場技術啟動中
+            <Zap className="h-3 w-3" /> {t('autotrading.copyTrading.staggeredEntryTitle', '階梯入場技術啟動中')}
          </div>
          <div className="text-[9px] text-white/40 leading-relaxed">
-            系統會自動為各帳戶分配微秒級的隨機延遲，以確保訂單分佈在不同的微小價差區間，最大程度減少集體交易對市場造成的負面衝擊。
+            {t('autotrading.copyTrading.staggeredEntryDesc', '系統會自動為各帳戶分配微秒級的隨機延遲，以確保訂單分佈在不同的微小價差區間，最大程度減少集體交易對市場造成的負面衝擊。')}
          </div>
       </div>
     </div>

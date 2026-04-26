@@ -19,6 +19,13 @@ import * as alertsRepo from './server/repositories/alertsRepo.js';
 import * as settingsRepo from './server/repositories/settingsRepo.js';
 import * as strategiesRepo from './server/repositories/strategiesRepo.js';
 import * as historyRepo from './server/repositories/portfolioHistoryRepo.js';
+import { ordersRepo } from './server/repositories/ordersRepo.js';
+import {
+  listNotificationSettingsByUser,
+  upsertNotificationSettingByTarget,
+  deleteNotificationSettingByUser,
+  type NotifyEvent,
+} from './server/repositories/notificationSettingsRepo.js';
 import { calcIndicators } from './server/utils/technical.js';
 import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter }    from './server/api/agent.js';
@@ -40,7 +47,9 @@ import { runAdvancedBacktest } from './server/services/backtestEngine.js';
 import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
 import { generateWeeklyReport } from './server/services/reportService.js';
+import { getPerformance, type Period as PerformancePeriod } from './server/services/performanceService.js';
 import { copyTradingService } from './server/services/copyTradingService.js';
+import { notifier } from './server/services/notifier/index.js';
 import {
   isAblyEnabled,
   getAutotradingRealtimeMeta,
@@ -777,6 +786,192 @@ app.get('/api/autotrading/report', authMiddleware, async (req: AuthRequest, res)
 
 app.get('/api/autotrading/followers', authMiddleware, (_req, res) => {
   res.json({ ok: true, followers: copyTradingService.getFollowers() });
+});
+
+app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const allowedPeriods = new Set<PerformancePeriod>(['1d', '1w', '1m', '3m', 'ytd', 'all']);
+  const periodRaw = String(req.query.period ?? '1m') as PerformancePeriod;
+  const period = allowedPeriods.has(periodRaw) ? periodRaw : '1m';
+
+  try {
+    const result = await getPerformance(req.userId, period);
+    res.json(result);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const openOnly = String(req.query.open ?? '0') === '1';
+
+  try {
+    const rows = openOnly
+      ? await ordersRepo.listOpenByUser(req.userId)
+      : await ordersRepo.listByUser(req.userId, 200);
+
+    const normalized = rows.map((row) => {
+      const ext = row as unknown as {
+        filledQty?: number | string;
+        avgFillPrice?: number | string | null;
+        retryCount?: number;
+      };
+      const qtyNum = Number(row.qty ?? 0);
+      const status = String(row.status ?? 'PENDING').toUpperCase();
+      const filledQty = Number(ext.filledQty ?? 0);
+      const normalizedFilledQty = Number.isFinite(filledQty) && filledQty > 0
+        ? filledQty
+        : (status === 'FILLED' ? qtyNum : 0);
+      const avgFillPrice = ext.avgFillPrice ?? (status === 'FILLED' ? row.price : null);
+
+      return {
+        id: row.id,
+        brokerOrderId: row.brokerOrderId ?? null,
+        symbol: row.symbol,
+        side: row.side,
+        qty: row.qty,
+        price: row.price,
+        status,
+        filledQty: normalizedFilledQty,
+        avgFillPrice,
+        retryCount: Number(ext.retryCount ?? 0) || 0,
+        lastError: row.lastError ?? null,
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+      };
+    });
+
+    res.json({ ok: true, orders: normalized });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const id = Number.parseInt(String(req.params.id), 10);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ ok: false, error: 'Invalid order id' });
+
+  try {
+    const order = await ordersRepo.findByIdForUser(id, req.userId);
+    if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
+
+    const status = String(order.status ?? '').toUpperCase();
+    if (status !== 'PENDING' && status !== 'PARTIAL') {
+      return res.status(400).json({ ok: false, error: `Order is not cancellable (${status})` });
+    }
+
+    if (order.brokerOrderId) {
+      try {
+        await simulatedAdapter.cancelOrder(order.brokerOrderId);
+      } catch {
+        // ignore adapter cancellation failure and still mark local lifecycle to cancelled
+      }
+    }
+
+    await ordersRepo.cancel(id, 'User requested cancellation');
+    res.json({ ok: true, message: 'Order cancelled' });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  try {
+    const settings = await listNotificationSettingsByUser(req.userId);
+    res.json({
+      ok: true,
+      settings: settings.map((s) => ({
+        id: s.id,
+        channel: s.channel,
+        target: s.target,
+        enabled: s.enabled,
+        triggers: Array.isArray(s.triggers) ? s.triggers : [],
+      })),
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.put('/api/autotrading/notifications', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const channel = String(req.body?.channel ?? '').trim();
+  const target = String(req.body?.target ?? '').trim();
+  const rawTriggers = Array.isArray(req.body?.triggers) ? req.body.triggers : [];
+
+  const allowedChannels = new Set(['telegram', 'discord', 'webhook', 'email']);
+  const allowedTriggers = new Set<NotifyEvent>(['kill_switch', 'risk_block', 'fill', 'daily_report']);
+  const triggers = rawTriggers
+    .map((x: unknown) => String(x))
+    .filter((x: string): x is NotifyEvent => allowedTriggers.has(x as NotifyEvent));
+
+  if (!allowedChannels.has(channel)) return res.status(400).json({ ok: false, error: 'Unsupported channel' });
+  if (!target) return res.status(400).json({ ok: false, error: 'target is required' });
+  if (triggers.length === 0) return res.status(400).json({ ok: false, error: 'At least one trigger is required' });
+
+  try {
+    const setting = await upsertNotificationSettingByTarget(req.userId, {
+      channel,
+      target,
+      triggers,
+      enabled: true,
+    });
+    res.json({
+      ok: true,
+      setting: {
+        id: setting.id,
+        channel: setting.channel,
+        target: setting.target,
+        enabled: setting.enabled,
+        triggers: Array.isArray(setting.triggers) ? setting.triggers : [],
+      },
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.delete('/api/autotrading/notifications/:id', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const id = Number.parseInt(String(req.params.id), 10);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ ok: false, error: 'Invalid id' });
+
+  try {
+    const deleted = await deleteNotificationSettingByUser(req.userId, id);
+    if (!deleted) return res.status(404).json({ ok: false, error: 'Setting not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/notifications/test', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const channel = String(req.body?.channel ?? '').trim();
+  const target = String(req.body?.target ?? '').trim();
+  if (!channel || !target) return res.status(400).json({ ok: false, error: 'channel and target are required' });
+
+  try {
+    const result = await notifier.test(channel, target);
+    res.json(result);
+  } catch (e) {
+    handleApiError(res, e);
+  }
 });
 
 

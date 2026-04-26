@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, ArrowRight, Check, X, RefreshCw, TrendingUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import * as api from '../../services/api';
 
 interface Props {
   symbol: string;
@@ -21,12 +22,7 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
     setScanning(true);
     setProposal(null);
     try {
-      const res = await fetch('/api/autotrading/optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, period: 90 })
-      });
-      const data = await res.json();
+      const data = await api.optimizeAutotrading({ symbol, period: 90 });
       if (data.ok && data.proposal) {
         setProposal(data.proposal);
       } else {
@@ -46,7 +42,7 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
           <Sparkles className="h-5 w-5 text-violet-400 animate-pulse" />
           <div>
             <div className="text-[11px] font-bold text-white uppercase tracking-wider">{t('autotrading.optimizer.title', 'Auto-Optimizer')}</div>
-            <div className="text-[9px] text-violet-400/70 italic">尋找能讓 {symbol} 獲利更高的參數組合</div>
+            <div className="text-[9px] text-violet-400/70 italic">{t('autotrading.optimizer.hint', '尋找能讓 {{symbol}} 獲利更高的參數組合', { symbol })}</div>
           </div>
         </div>
         <button
@@ -66,7 +62,7 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
         <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-sm p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-400" />
-            <span className="text-[11px] font-bold text-emerald-400 uppercase">進化提案發現！預期提升 {proposal.improvementPct}% ROI</span>
+            <span className="text-[11px] font-bold text-emerald-400 uppercase">{t('autotrading.optimizer.proposalFound', '進化提案發現！預期提升 {{pct}}% ROI', { pct: proposal.improvementPct })}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -100,7 +96,7 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
               onClick={() => onApply(proposal.betterParams)}
               className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold py-2 rounded flex items-center justify-center gap-2"
             >
-              <Check className="h-3 w-3" /> 立即套用進化參數
+              <Check className="h-3 w-3" /> {t('autotrading.optimizer.applyNow', '立即套用進化參數')}
             </button>
             <button
               onClick={() => setProposal(null)}
@@ -113,7 +109,7 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
       ) : !scanning && (
         <div className="h-[200px] flex flex-col items-center justify-center border border-dashed border-white/5 rounded-sm opacity-20">
            <Sparkles className="h-6 w-6 mb-2" />
-           <div className="text-[10px]">點擊上方按鈕開始進行參數優化掃描</div>
+           <div className="text-[10px]">{t('autotrading.optimizer.scanPrompt', '點擊上方按鈕開始進行參數優化掃描')}</div>
         </div>
       )}
     </div>

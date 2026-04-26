@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, Plus, Trash2, Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import * as api from '../../services/api';
 
 const CHANNELS = [
   {
@@ -73,9 +74,8 @@ export function NotificationSettings() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch('/api/autotrading/notifications', { credentials: 'include' });
-      const data = await res.json();
-      if (data.ok) setRows(data.settings);
+      const data = await api.getAutotradingNotifications();
+      if (data.ok) setRows(data.settings ?? []);
     } finally { setLoading(false); }
   }
 
@@ -93,13 +93,7 @@ export function NotificationSettings() {
       return;
     }
     try {
-      const res = await fetch('/api/autotrading/notifications', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
-      });
-      const data = await res.json();
+      const data = await api.putAutotradingNotifications(draft);
       if (!data.ok) throw new Error(data.error ?? t('autotrading.notifications.saveFailed', '儲存失敗'));
       setDraft({ channel: 'telegram', target: '', triggers: ['kill_switch'] });
       load();
@@ -110,19 +104,13 @@ export function NotificationSettings() {
   }
 
   async function remove(id: number) {
-    await fetch(`/api/autotrading/notifications/${id}`, { method: 'DELETE', credentials: 'include' });
+    await api.deleteAutotradingNotification(id);
     load();
   }
 
   async function test(channel: string, target: string) {
     try {
-      const res = await fetch('/api/autotrading/notifications/test', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, target }),
-      });
-      const data = await res.json();
+      const data = await api.testAutotradingNotification({ channel, target });
       setToast({
         type: data.ok ? 'success' : 'error',
         msg: data.message ?? (data.ok ? t('autotrading.notifications.testSent', '測試訊息已送出') : t('common.error', '發生錯誤')),
@@ -145,7 +133,10 @@ export function NotificationSettings() {
 
       {/* Existing rows */}
       <div className="space-y-1">
-        {rows.length === 0 && (
+        {loading && (
+          <div className="text-[10px] text-(--color-term-muted) px-2 py-3 text-center">{t('common.loading', '載入中...')}</div>
+        )}
+        {!loading && rows.length === 0 && (
           <div className="text-[10px] text-(--color-term-muted) px-2 py-3 text-center">{t('autotrading.notifications.empty', '尚未設定任何通道')}</div>
         )}
         {rows.map(r => (

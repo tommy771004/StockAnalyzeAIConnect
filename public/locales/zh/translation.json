@@ -395,6 +395,11 @@
         "neuralAiSignal": "整合新聞、情緒與技術訊號的 AI 決策。"
       },
       "sectorTargeting": "產業板塊篩選",
+      "sectorsLoading": "載入類股中...",
+      "sectorsEmpty": "目前沒有可用類股",
+      "sectorsLoadFailed": "無法載入類股清單",
+      "sectorSymbolsLoadFailed": "查詢類股成分失敗",
+      "loadingSymbols": "載入中...",
       "selector": {
         "title": "AI 策略與權重",
         "weight": "權重",
@@ -534,6 +539,7 @@
       "unsupported": "此券商尚未支援",
       "testAndSave": "測試並儲存券商連線",
       "lastTested": "最後測試時間：{{time}}",
+      "simulatedModeNote": "模擬交易模式已啟動。系統將自動模擬台灣市場的交易稅與手續費（含當沖減半），無需任何憑證或連線設定即可開始測試 AI 策略。",
       "brokers": {
         "simulated": {
           "name": "模擬券商（AI 模擬交易）",
@@ -558,6 +564,10 @@
       "noNeed": "目前參數已接近最佳配置，暫無優化需求。",
       "scanning": "掃描中...",
       "scanForEvolution": "開始進化掃描",
+      "hint": "尋找能讓 {{symbol}} 獲利更高的參數組合",
+      "proposalFound": "進化提案發現！預期提升 {{pct}}% ROI",
+      "applyNow": "立即套用進化參數",
+      "scanPrompt": "點擊上方按鈕開始進行參數優化掃描",
       "currentConfig": "目前配置",
       "suggestedConfig": "建議配置",
       "field": {
@@ -580,12 +590,25 @@
       "drawdownWarn": "警戒",
       "equityCurve": "資產曲線",
       "drawdown": "回撤曲線",
-      "strategyAttribution": "策略歸因"
+      "strategyAttribution": "策略歸因",
+      "loadFailed": "載入失敗",
+      "computing": "計算中...",
+      "noData": "尚無數據",
+      "insufficientData": "資料不足"
     },
     "orderBook": {
       "title": "訂單生命週期",
       "empty": "尚無訂單",
       "cancelOrder": "取消委託",
+      "columns": {
+        "time": "時間",
+        "symbol": "標的",
+        "side": "側",
+        "quantity": "數量",
+        "avgFillPrice": "成交均價",
+        "retries": "重試",
+        "status": "狀態"
+      },
       "side": {
         "buy": "買入",
         "sell": "賣出",
@@ -605,10 +628,13 @@
       "evolvingData": "報告演算中...",
       "achievements": "成就",
       "aiValueAdded": "AI 增益價值",
+      "aiValueAddedNote": "透過 AI 過濾機制比純技術策略多創造的價值。",
       "neuralConfidenceEvolution": "神經信心演化",
+      "confidenceTimelineLabel": "過去 7 天平均信心走勢",
       "companionJournal": "AI 交易夥伴日誌",
       "attributionMatrix": "歸因矩陣",
       "growthStatusAdvancing": "成長狀態：持續進化",
+      "growthDescription": "系統已成功學習您的風險偏好，本週決策一致性達到 95%。",
       "achievement": {
         "criticalDefense": "關鍵防守",
         "alphaCatcher": "超額捕手",
@@ -631,7 +657,12 @@
       "offline": "離線",
       "autoStoploss": "自動停損",
       "testingPhaseNoExecution": "測試階段：不執行真實下單",
-      "balancePrefix": "餘額"
+      "balancePrefix": "餘額",
+      "fetchFailed": "無法載入跟單帳戶",
+      "retry": "重試",
+      "empty": "目前沒有可用的跟單帳戶",
+      "staggeredEntryTitle": "階梯入場技術啟動中",
+      "staggeredEntryDesc": "系統會自動為各帳戶分配微秒級的隨機延遲，以確保訂單分佈在不同的微小價差區間，最大程度減少集體交易對市場造成的負面衝擊。"
     },
     "notifications": {
       "title": "通知通道",

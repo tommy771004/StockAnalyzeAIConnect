@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Activity, X, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { OrderLifecycleEvent } from './useAutotradingWS';
+import * as api from '../../services/api';
 
 interface OrderRow {
   id: number;
@@ -63,9 +64,8 @@ export function OrderBookPanel({ events }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/autotrading/orders?open=0', { credentials: 'include' });
-      const data = await res.json();
-      if (data.ok) setRows(data.orders);
+      const data = await api.getAutotradingOrders(false);
+      if (data.ok) setRows((data.orders ?? []) as OrderRow[]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -94,7 +94,7 @@ export function OrderBookPanel({ events }: Props) {
 
   async function handleCancel(id: number) {
     try {
-      await fetch(`/api/autotrading/orders/${id}/cancel`, { method: 'POST', credentials: 'include' });
+      await api.cancelAutotradingOrder(id);
       refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -122,13 +122,13 @@ export function OrderBookPanel({ events }: Props) {
           <table className="w-full text-[10px] font-mono">
             <thead className="text-(--color-term-muted) uppercase">
               <tr className="border-b border-(--color-term-border)">
-                <th className="text-left px-2 py-1">時間</th>
-                <th className="text-left px-2 py-1">標的</th>
-                <th className="text-right px-2 py-1">側</th>
-                <th className="text-right px-2 py-1">數量</th>
-                <th className="text-right px-2 py-1">成交均價</th>
-                <th className="text-right px-2 py-1">重試</th>
-                <th className="text-center px-2 py-1">狀態</th>
+                <th className="text-left px-2 py-1">{t('autotrading.orderBook.columns.time', '時間')}</th>
+                <th className="text-left px-2 py-1">{t('autotrading.orderBook.columns.symbol', '標的')}</th>
+                <th className="text-right px-2 py-1">{t('autotrading.orderBook.columns.side', '側')}</th>
+                <th className="text-right px-2 py-1">{t('autotrading.orderBook.columns.quantity', '數量')}</th>
+                <th className="text-right px-2 py-1">{t('autotrading.orderBook.columns.avgFillPrice', '成交均價')}</th>
+                <th className="text-right px-2 py-1">{t('autotrading.orderBook.columns.retries', '重試')}</th>
+                <th className="text-center px-2 py-1">{t('autotrading.orderBook.columns.status', '狀態')}</th>
                 <th className="text-right px-2 py-1"></th>
               </tr>
             </thead>
