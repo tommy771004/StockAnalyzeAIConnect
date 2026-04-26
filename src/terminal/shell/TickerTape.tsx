@@ -11,6 +11,8 @@ import { Settings2, X, Plus, RotateCcw } from 'lucide-react';
 import { formatPct, toneClass } from '../ui/format';
 import { TICKER_LABEL_MAP, TICKER_TAPE_SYMBOLS } from '../hooks/useMarketData';
 import { cn } from '../../lib/utils';
+import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
 import type { PriceFlash } from '../hooks/useMarketData';
 
@@ -258,8 +260,9 @@ function TickerManager({
   const [input, setInput] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const handleAdd = () => {
-    const sym = input.trim().toUpperCase();
+  const handleAdd = async (rawInput?: string) => {
+    const resolved = await resolveSymbolWithLookup(rawInput ?? input);
+    const sym = resolved.trim().toUpperCase();
     if (!sym || list.includes(sym)) { setInput(''); return; }
     setList(prev => [...prev, sym]);
     setInput('');
@@ -295,17 +298,21 @@ function TickerManager({
 
       {/* Add row */}
       <div className="flex gap-2 p-3 border-b border-(--color-term-border)">
-        <input
-          type="text"
+        <StockSymbolAutocomplete
           value={input}
-          onChange={e => setInput(e.target.value.toUpperCase())}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          onValueChange={setInput}
+          onSymbolSubmit={(symbol) => {
+            setInput(symbol);
+            void handleAdd(symbol);
+          }}
           placeholder={t('ticker.placeholder')}
-          className="flex-1 h-8 px-2 bg-(--color-term-bg) border border-(--color-term-border) text-xs font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
+          className="flex-1"
+          inputClassName="h-8 px-2 bg-(--color-term-bg) border border-(--color-term-border) text-xs font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
+          dropdownClassName="left-0 right-0"
         />
         <button
           type="button"
-          onClick={handleAdd}
+          onClick={() => { void handleAdd(); }}
           className="flex items-center gap-1 h-8 px-3 bg-(--color-term-accent) text-black text-xs font-bold hover:opacity-90"
         >
           <Plus size={12} />{t('ticker.add')}

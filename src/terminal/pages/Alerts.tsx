@@ -5,6 +5,8 @@ import type { AlertRecord } from '../types/market';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
 import { Loader2, Bell, Plus, Trash2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
 export function AlertsPage() {
   const { t } = useTranslation();
@@ -46,12 +48,14 @@ export function AlertsPage() {
     }
   });
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAlert.symbol || !newAlert.target) return;
     setAddError('');
+    const resolvedSymbol = await resolveSymbolWithLookup(newAlert.symbol);
+    if (!resolvedSymbol) return;
     addMutation.mutate({
-      symbol: newAlert.symbol.toUpperCase(),
+      symbol: resolvedSymbol,
       condition: newAlert.condition,
       target: Number(newAlert.target),
     });
@@ -114,13 +118,13 @@ export function AlertsPage() {
               >
                 {t('alerts.symbolLabel')}
               </label>
-              <input
+              <StockSymbolAutocomplete
                 id="alert-symbol"
                 value={newAlert.symbol}
-                onChange={e => setNewAlert({ ...newAlert, symbol: e.target.value })}
+                onValueChange={(value) => setNewAlert({ ...newAlert, symbol: value })}
+                onSymbolSubmit={(value) => setNewAlert({ ...newAlert, symbol: value })}
                 placeholder={t('alerts.symbolPlaceholder')}
-                autoComplete="off"
-                className="w-full bg-(--color-term-panel) border border-(--color-term-border) text-sm p-2 outline-none focus:border-sky-500 rounded-sm"
+                inputClassName="w-full bg-(--color-term-panel) border border-(--color-term-border) text-sm p-2 outline-none focus:border-sky-500 rounded-sm"
               />
             </div>
             <div>

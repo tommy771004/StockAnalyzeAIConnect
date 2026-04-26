@@ -20,6 +20,7 @@ import { buildBacktestPdf } from '../utils/exportPdf';
 import { BacktestHeaderSection } from './backtest/BacktestHeaderSection';
 import { BacktestChartSection } from './backtest/BacktestChartSection';
 import { BacktestTradesSection } from './backtest/BacktestTradesSection';
+import { normalizeSymbolInput, searchStockSymbols } from '../utils/stockSymbolLookup';
 
 type StratId = typeof STRATEGIES[number]['id'];
 type BtRunState = 'idle' | 'running' | 'comparing';
@@ -55,9 +56,26 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
     setStrategyParams(prev => setStrategyParamValue(prev, path, value));
   };
 
+  const resolveInputSymbol = async (): Promise<string> => {
+    const raw = symbol.trim();
+    if (!raw) return '';
+
+    const tickerLike = /^[A-Za-z0-9.\-:=/]+$/.test(raw);
+    if (tickerLike) return normalizeSymbolInput(raw);
+
+    try {
+      const fuzzy = await searchStockSymbols(raw, 1);
+      if (fuzzy[0]?.symbol) return normalizeSymbolInput(fuzzy[0].symbol);
+    } catch {
+      // ignore and fall back to normalized raw value
+    }
+    return normalizeSymbolInput(raw);
+  };
+
   const handleCompare = async () => {
-    const sym = symbol.trim().toUpperCase();
+    const sym = await resolveInputSymbol();
     if (!sym) { setError('請輸入股票代碼'); return; }
+    if (sym !== symbol) setSymbol(sym);
     if (new Date(period1) >= new Date(period2)) { setError('開始日期必須早於結束日期'); return; }
     setRunState('comparing');
     setError('');
@@ -89,8 +107,9 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
   };
 
   const handleRun = async () => {
-    const sym = symbol.trim().toUpperCase();
+    const sym = await resolveInputSymbol();
     if (!sym) { setError('請輸入股票/加密貨幣代碼'); return; }
+    if (sym !== symbol) setSymbol(sym);
     if (new Date(period1) >= new Date(period2)) { setError('開始日期必須早於結束日期'); return; }
     if (!symbolsList.includes(sym)) setSymbolsList(p => [sym, ...p]);
 

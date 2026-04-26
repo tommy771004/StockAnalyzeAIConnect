@@ -4,6 +4,8 @@ import { AlertTriangle, Send, ShieldCheck, CheckCircle, XCircle, Loader2 } from 
 import { cn } from '../lib/utils';
 import * as api from '../services/api';
 import { motion, AnimatePresence } from 'motion/react';
+import { StockSymbolAutocomplete } from './common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../utils/stockSymbolLookup';
 
 export default function LiveTradingConsole() {
   const settings = { compactMode: false };
@@ -25,8 +27,14 @@ export default function LiveTradingConsole() {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
+    const resolvedSymbol = await resolveSymbolWithLookup(symbol);
+    if (!resolvedSymbol) {
+      setValidationErr('無法解析標的代碼');
+      return;
+    }
+    setSymbol(resolvedSymbol);
     setShowConfirm(true);
   };
 
@@ -83,8 +91,12 @@ export default function LiveTradingConsole() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-zinc-500 mb-1.5 text-xs font-black uppercase tracking-widest">標的代碼</label>
-          <input type="text" value={symbol} onChange={e => { setSymbol(e.target.value.toUpperCase()); setValidationErr(''); }}
-            className={cn("w-full bg-zinc-950 border border-zinc-800 rounded-xl text-white font-mono font-bold text-base md:text-sm focus:outline-none focus:border-emerald-500/50 transition", compact ? "px-2 py-1.5" : "px-3 py-2.5")} />
+          <StockSymbolAutocomplete
+            value={symbol}
+            onValueChange={(next) => { setSymbol(next); setValidationErr(''); }}
+            onSymbolSubmit={(next) => { setSymbol(next); setValidationErr(''); }}
+            inputClassName={cn("w-full bg-zinc-950 border border-zinc-800 rounded-xl text-white font-mono font-bold text-base md:text-sm focus:outline-none focus:border-emerald-500/50 transition", compact ? "px-2 py-1.5" : "px-3 py-2.5")}
+          />
         </div>
         <div>
           <label className="block text-zinc-500 mb-1.5 text-xs font-black uppercase tracking-widest">數量 (股)</label>

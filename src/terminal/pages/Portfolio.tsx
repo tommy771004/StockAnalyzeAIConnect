@@ -5,6 +5,8 @@ import { Sparkline } from '../ui/Sparkline';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
 import { usePortfolioData } from '../hooks/usePortfolioData';
+import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
 export function PortfolioPage() {
   const { 
@@ -32,8 +34,10 @@ export function PortfolioPage() {
 
   const handleAdd = async () => {
     if (!newPos.symbol || !newPos.shares) return;
+    const resolvedSymbol = await resolveSymbolWithLookup(newPos.symbol);
+    if (!resolvedSymbol) return;
     const updated = [...positions, {
-      symbol: newPos.symbol.toUpperCase(),
+      symbol: resolvedSymbol,
       shares: Number(newPos.shares),
       avgCost: Number(newPos.avgCost) || 0
     }];
@@ -113,12 +117,13 @@ export function PortfolioPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs text-(--color-term-muted) mb-1">股票代號 (如: 2330.TW 或 AAPL)</label>
-                <input 
+                <StockSymbolAutocomplete
                   autoFocus
-                  className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                   value={newPos.symbol}
-                  onChange={e => setNewPos(p => ({ ...p, symbol: e.target.value }))}
+                  onValueChange={value => setNewPos(p => ({ ...p, symbol: value }))}
+                  onSymbolSubmit={value => setNewPos(p => ({ ...p, symbol: value }))}
                   placeholder="SYMBOL"
+                  inputClassName="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">

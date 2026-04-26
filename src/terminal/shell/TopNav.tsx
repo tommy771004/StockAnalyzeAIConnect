@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bell, CircleUserRound, Search, BrainCircuit, Menu, Target, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { TerminalView } from '../types';
-import { searchStocks } from '../../services/api';
 import type { SearchResult } from '../../types';
+import { useStockSymbolSearch } from '../../hooks/useStockSymbolSearch';
+import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
 interface Tab {
   id: TerminalView;
@@ -38,66 +39,27 @@ export function TopNav({
 }: TopNavProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cacheRef = useRef<Map<string, SearchResult[]>>(new Map());
+  const { results, isSearching, searched } = useStockSymbolSearch(query, {
+    minLength: 1,
+    debounceMs: 220,
+    limit: 8,
+  });
 
   const toggleLanguage = () => {
     const nextLng = i18n.language.startsWith('zh') ? 'en' : 'zh';
     i18n.changeLanguage(nextLng);
   };
 
-  // Debounced search
-  const doSearch = useCallback(async (q: string) => {
-    const trimmed = q.trim();
-    if (!trimmed) { setResults([]); setShowDropdown(false); return; }
-    
-    // Check local cache first
-    if (cacheRef.current.has(trimmed)) {
-      setResults(cacheRef.current.get(trimmed)!);
-      setShowDropdown(true);
-      setActiveIdx(-1);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const { quotes } = await searchStocks(trimmed);
-      const res = (quotes || []).slice(0, 8);
-      cacheRef.current.set(trimmed, res);
-      // Keep cache size reasonable
-      if (cacheRef.current.size > 50) {
-        const firstKey = cacheRef.current.keys().next().value;
-        if (firstKey) cacheRef.current.delete(firstKey);
-      }
-      setResults(res);
-      setShowDropdown(true);
-      setActiveIdx(-1);
-    } catch {
-      setResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) { setResults([]); setShowDropdown(false); return; }
-    
-    // If it's already in cache, no need to debounce
-    if (cacheRef.current.has(query.trim())) {
-      doSearch(query);
-      return;
+    if (!query.trim()) {
+      setShowDropdown(false);
+      setActiveIdx(-1);
     }
-    
-    debounceRef.current = setTimeout(() => doSearch(query), 350);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, doSearch]);
+  }, [query]);
 
   // Click outside to close
   useEffect(() => {
@@ -115,22 +77,20 @@ export function TopNav({
     window.location.hash = 'dashboard';
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     setQuery('');
-    setResults([]);
     setShowDropdown(false);
     onChange('dashboard');
   }
 
-  function submitSearch(rawInput: string) {
+  async function submitSearch(rawInput: string) {
     if (results.length > 0 && activeIdx >= 0) {
       selectResult(results[activeIdx]);
       return;
     }
-    const sym = rawInput.trim().toUpperCase();
+    const sym = await resolveSymbolWithLookup(rawInput, results);
     if (!sym) return;
     window.location.hash = 'dashboard';
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     setQuery('');
-    setResults([]);
     setShowDropdown(false);
     onChange('dashboard');
   }
@@ -144,7 +104,7 @@ export function TopNav({
       setActiveIdx(i => Math.max(i - 1, -1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      submitSearch(query);
+      void submitSearch(query);
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
       setActiveIdx(-1);
@@ -226,7 +186,7 @@ export function TopNav({
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
+            onFocus={() => { if (query.trim()) setShowDropdown(true); }}
             className="h-8 w-48 xl:w-64 border border-(--color-term-border) bg-(--color-term-surface) pl-7 pr-7 text-[12px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none transition-colors"
             placeholder={searchPlaceholder}
             autoComplete="off"
@@ -236,7 +196,7 @@ export function TopNav({
           {query && !isSearching && (
             <button
               type="button"
-              onClick={() => { setQuery(''); setResults([]); setShowDropdown(false); inputRef.current?.focus(); }}
+              onClick={() => { setQuery(''); setShowDropdown(false); inputRef.current?.focus(); }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
             >
               <X className="h-3 w-3" />
@@ -300,9 +260,9 @@ export function TopNav({
           )}
 
           {/* No results */}
-          {showDropdown && !isSearching && query && results.length === 0 && (
+          {showDropdown && searched && !isSearching && query && results.length === 0 && (
             <div className="absolute top-full right-0 mt-1 w-64 border border-(--color-term-border) bg-(--color-term-bg) shadow-xl z-[9999] px-3 py-4 text-center text-(--color-term-muted) text-[12px]">
-              找不到「{query}」相關股票
+              {t('symbolSearch.noResults', { query, defaultValue: `找不到「${query}」相關股票` })}
             </div>
           )}
         </div>

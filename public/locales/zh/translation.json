@@ -704,6 +704,10 @@
         "dailyReport": "每日結算"
       }
     }
+  },
+  "symbolSearch": {
+    "searching": "搜尋中...",
+    "noResults": "找不到「{{query}}」相關股票"
   }
 }
 

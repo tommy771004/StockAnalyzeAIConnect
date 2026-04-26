@@ -25,6 +25,8 @@ import { PullToRefreshIndicator } from './PullToRefreshIndicator';
 import * as formatters from '../utils/formatters';
 import { Quote, NewsItem, WatchlistItem, SentimentData } from '../types';
 import { analyzeNewsSentiment } from '../services/aiService';
+import { StockSymbolAutocomplete } from './common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../utils/stockSymbolLookup';
 
 interface Props {
   onSelectSymbol: (symbol: string) => void;
@@ -439,8 +441,10 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
   }, [loadAllData]);
 
   // ── 互動處理 ──
-  const handleAdd = async () => {
-    const sym = addInput.trim().toUpperCase(); if (!sym) return;
+  const handleAdd = async (rawInput?: string) => {
+    const resolved = await resolveSymbolWithLookup(rawInput ?? addInput);
+    const sym = resolved.trim().toUpperCase();
+    if (!sym) return;
     if (stocks.find(s => s.symbol === sym)) { setAddInput(''); setShowAdd(false); return; }
     setLoadState('refreshing'); setAddErr('');
     try {
@@ -693,18 +697,19 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
                   <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">ADD NEW SYMBOL</div>
                   <div className="flex items-center gap-3 bg-black/60 rounded-2xl px-5 border border-white/5 focus-within:border-indigo-500/50 transition">
                     <Search size={16} className="text-zinc-600 shrink-0"/>
-                    <input
+                    <StockSymbolAutocomplete
                       autoFocus
                       value={addInput}
-                      onChange={e => { setAddInput(e.target.value.toUpperCase()); setAddErr(''); }}
-                      onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                      onValueChange={(next) => { setAddInput(next); setAddErr(''); }}
+                      onSymbolSubmit={(next) => { setAddInput(next); setAddErr(''); void handleAdd(next); }}
                       placeholder="SYMBOL..."
-                      className="flex-1 bg-transparent py-4 text-sm font-bold text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 placeholder:text-zinc-700"
+                      className="flex-1"
+                      inputClassName="flex-1 bg-transparent py-4 text-sm font-bold text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 placeholder:text-zinc-700 border-none"
                     />
                   </div>
                   {addErr && <div className="text-[10px] font-bold text-rose-400 px-1">{addErr}</div>}
                   <div className="flex gap-3">
-                    <button type="button" onClick={handleAdd} disabled={busy}
+                    <button type="button" onClick={() => { void handleAdd(); }} disabled={busy}
                       className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-500 text-black hover:bg-indigo-400 transition disabled:opacity-50">
                       {busy ? <Loader2 size={14} className="animate-spin mr-2"/> : null} CONFIRM
                     </button>

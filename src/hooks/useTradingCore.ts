@@ -1,9 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { STORAGE_KEYS } from '../utils/storage';
-import { Order, WatchlistItem, SearchResult, Position } from '../types';
+import { Order, WatchlistItem, Position } from '../types';
 import { pushLog } from '../components/TradeLogger';
+import { useStockSymbolSearch } from './useStockSymbolSearch';
+import { resolveSymbolWithLookup } from '../utils/stockSymbolLookup';
 
 export function useTradeExecution(
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void,
@@ -106,47 +108,30 @@ export function useWatchlistManagement(
   const queryClient = useQueryClient();
   const [wlSearch, setWlSearch] = useState('');
   const [wlAdding, setWlAdding] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    if (wlSearch.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const handler = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await api.searchStocks(wlSearch);
-        setSearchResults(res.quotes || []);
-      } catch (e) {
-        console.warn('[useWatchlistManagement] Search failed:', e);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(handler);
-  }, [wlSearch]);
+  const { results: searchResults, isSearching } = useStockSymbolSearch(wlSearch, {
+    minLength: 1,
+    debounceMs: 220,
+    limit: 12,
+  });
 
   const addToWatchlist = useCallback(
     async (sym: string) => {
+      const resolvedSymbol = await resolveSymbolWithLookup(sym, searchResults);
+      const normalized = resolvedSymbol.trim().toUpperCase();
       const typedWatchlist = watchlist as WatchlistItem[];
-      if (!sym || typedWatchlist.find((w: WatchlistItem) => w.symbol === sym)) return;
+      if (!normalized || typedWatchlist.find((w: WatchlistItem) => w.symbol === normalized)) return;
       try {
-        await api.addWatchlistItem(sym);
+        await api.addWatchlistItem(normalized);
         queryClient.invalidateQueries({ queryKey: [STORAGE_KEYS.WATCHLIST] });
         setWlSearch('');
         setWlAdding(false);
-        showToast(`已新增 ${sym} 至自選股`, 'success');
+        showToast(`已新增 ${normalized} 至自選股`, 'success');
       } catch (e: unknown) {
         console.error('[TradingCore] Failed to add watchlist item:', e);
         showToast('新增自選股失敗，請稍後再試。', 'error');
       }
     },
-    [watchlist, queryClient, showToast]
+    [searchResults, watchlist, queryClient, showToast]
   );
 
   return { addToWatchlist, wlSearch, setWlSearch, wlAdding, setWlAdding, searchResults, isSearching };

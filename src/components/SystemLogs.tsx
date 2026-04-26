@@ -15,6 +15,8 @@ import * as api from '../services/api';
 import { Alert } from '../types';
 import { pushLog } from './TradeLogger';
 import { motion } from 'motion/react';
+import { StockSymbolAutocomplete } from './common/StockSymbolAutocomplete';
+import { resolveSymbolWithLookup } from '../utils/stockSymbolLookup';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Broker {
@@ -202,8 +204,10 @@ export default function SystemLogs() {
     if (!alertForm.symbol || !alertForm.target) { setAlertErr('請填入代碼和目標價格'); return; }
     const target = parseFloat(alertForm.target);
     if (!isFinite(target) || target <= 0) { setAlertErr('目標價格必須是大於 0 的數字'); return; }
+    const resolvedSymbol = await resolveSymbolWithLookup(alertForm.symbol);
+    if (!resolvedSymbol) { setAlertErr('無法解析股票代碼'); return; }
     try {
-      const a = await api.addAlert({ symbol:alertForm.symbol.toUpperCase(), condition:alertForm.condition as 'above' | 'below', target });
+      const a = await api.addAlert({ symbol: resolvedSymbol, condition:alertForm.condition as 'above' | 'below', target });
       setAlerts(p => [a, ...p]);
       setAlertForm({ symbol:'', condition:'above', target:'' });
       setAddingAlert(false); setAlertErr('');
@@ -355,9 +359,13 @@ export default function SystemLogs() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="text-xs text-slate-500 mb-1">股票代碼</div>
-                    <input type="text" placeholder="例: AAPL" value={alertForm.symbol}
-                      onChange={e => setAlertForm(p => ({...p, symbol:e.target.value.toUpperCase()}))}
-                      className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-base sm:text-sm focus:outline-none focus:border-emerald-500/50 font-bold uppercase"/>
+                    <StockSymbolAutocomplete
+                      value={alertForm.symbol}
+                      onValueChange={(next) => setAlertForm(p => ({ ...p, symbol: next }))}
+                      onSymbolSubmit={(next) => setAlertForm(p => ({ ...p, symbol: next }))}
+                      placeholder="例: AAPL / 台積電"
+                      inputClassName="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-base sm:text-sm focus:outline-none focus:border-emerald-500/50 font-bold uppercase"
+                    />
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 mb-1">觸發條件</div>

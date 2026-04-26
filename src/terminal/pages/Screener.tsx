@@ -22,6 +22,7 @@ import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator'
 import { SectorSelector } from '../components/SectorSelector';
 import type { ScreenerResult } from '../../types';
 import type { TerminalView } from '../types';
+import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
 // ── Pre-built scan templates ──────────────────────────────────────────────────
 // Exported to prevent Terser/esbuild minifier TDZ collisions
@@ -116,8 +117,14 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
     setError('');
     try {
       let syms: string[] = [];
-      const manualSymbols = customSymbols.trim()
-        ? customSymbols.split(/[,\s\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
+      const manualSymbolInputs = customSymbols.trim()
+        ? customSymbols.split(/[,\s\n]+/).map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const manualSymbols = manualSymbolInputs.length > 0
+        ? (await Promise.all(manualSymbolInputs.map(token => resolveSymbolWithLookup(token))))
+            .map(sym => sym.trim().toUpperCase())
+            .filter(Boolean)
         : [];
       
       let sectorSymbols: string[] = [];
@@ -408,7 +415,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                     <input
                       type="text"
                       value={customSymbols}
-                      onChange={e => setCustomSymbols(e.target.value.toUpperCase())}
+                      onChange={e => setCustomSymbols(e.target.value)}
                       placeholder="AAPL, NVDA, 2330.TW, BTC-USD …"
                       className="w-full h-11 px-3 bg-(--color-term-bg) border border-(--color-term-border) text-sm font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
                     />

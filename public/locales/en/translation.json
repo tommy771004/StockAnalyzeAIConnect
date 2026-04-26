@@ -703,6 +703,10 @@
         "dailyReport": "Daily report"
       }
     }
+  },
+  "symbolSearch": {
+    "searching": "Searching...",
+    "noResults": "No matches for \"{{query}}\""
   }
 }
 

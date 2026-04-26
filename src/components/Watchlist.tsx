@@ -192,12 +192,12 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
               <input
                 value={wlSearch}
                 onChange={e => setWlSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addToWatchlist(wlSearch.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && addToWatchlist(wlSearch)}
                 placeholder={t('watchlist.search_placeholder', '搜尋代碼或名稱 SYMBOL...')}
                 autoFocus
                 className="flex-1 bg-black/60 border border-white/5 rounded-2xl px-4 py-3 text-xs font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition shadow-inner"
               />
-              <button type="button" onClick={(e) => { addToWatchlist(wlSearch.toUpperCase()); vibrate(20); }} 
+              <button type="button" onClick={(e) => { addToWatchlist(wlSearch); vibrate(20); }} 
                 className="aspect-square flex items-center justify-center rounded-2xl bg-indigo-500 text-black hover:bg-indigo-400 transition shadow-lg active:scale-95 group shrink-0"
               >
                 <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform" />

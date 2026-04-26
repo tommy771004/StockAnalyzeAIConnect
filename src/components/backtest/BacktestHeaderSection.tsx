@@ -9,6 +9,7 @@ import {
   RISK_EXIT_PARAM_SCHEMA,
   STRATEGY_PARAM_SCHEMA,
 } from '../AutoTrading/strategyParamSchema';
+import { StockSymbolAutocomplete } from '../common/StockSymbolAutocomplete';
 
 interface BacktestHeaderSectionProps {
   strategies: readonly BacktestStrategyMeta[];
@@ -80,15 +81,16 @@ export function BacktestHeaderSection({
 
         <div className="flex flex-wrap items-center gap-3 md:gap-4 w-full lg:w-auto">
           <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[160px] relative">
-            <input
-              list="bt-symbols"
+            <StockSymbolAutocomplete
               value={symbol}
-              onChange={e => onSymbolChange(e.target.value.toUpperCase())}
+              onValueChange={onSymbolChange}
+              onSymbolSubmit={onSymbolChange}
               placeholder="代碼 (AAPL, 2330.TW)"
-              className="relative w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 transition"
-              style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
+              className="relative w-full"
+              inputClassName="w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 transition"
+              inputStyle={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
+              dropdownClassName="max-h-64"
             />
-            <datalist id="bt-symbols">{symbolsList.map(s => <option key={s} value={s} />)}</datalist>
           </div>
 
           <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[180px] relative">

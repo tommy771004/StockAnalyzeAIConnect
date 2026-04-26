@@ -1369,9 +1369,43 @@ function twseFuzzySearch(list: TWSEEntry[], query: string, limit = 8): TWSEEntry
     .slice(0, limit);
 }
 
+type SearchCachePayload = { quotes: Array<{
+  symbol: string;
+  shortname?: string;
+  longname?: string;
+  chineseName?: string;
+  exchDisp?: string;
+  typeDisp?: string;
+}> };
+
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const SEARCH_CACHE_LIMIT = 300;
+const searchResponseCache = new Map<string, { expiresAt: number; payload: SearchCachePayload }>();
+
+function readSearchCache(key: string): SearchCachePayload | null {
+  const hit = searchResponseCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expiresAt) {
+    searchResponseCache.delete(key);
+    return null;
+  }
+  return hit.payload;
+}
+
+function writeSearchCache(key: string, payload: SearchCachePayload): void {
+  if (searchResponseCache.size >= SEARCH_CACHE_LIMIT) {
+    const oldest = searchResponseCache.keys().next().value;
+    if (oldest) searchResponseCache.delete(oldest);
+  }
+  searchResponseCache.set(key, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, payload });
+}
+
 app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
   const query = decodeURIComponent(req.params.query as string).trim();
   if (!query) return res.json({ quotes: [] });
+  const cacheKey = query.toLowerCase();
+  const cached = readSearchCache(cacheKey);
+  if (cached) return res.json(cached);
 
   try {
     const twseList = await fetchAndCacheTWSE();
@@ -1391,12 +1425,14 @@ app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
       typeDisp: 'Equity',
     }));
 
-    // For any query, we also ping Yahoo with a 600ms timeout
-    // This allows searching "蘋果" to find AAPL, or "TSMC" to find TSM
-    const yahooPromise = NativeYahooApi.search(query).catch(() => ({ quotes: [] }));
-    const timeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 600));
-    
-    const yahooData = await Promise.race([yahooPromise, timeoutPromise]);
+    // Skip Yahoo for ultra-short Chinese queries to reduce noisy remote calls.
+    const shouldQueryYahoo = query.length > 1 || !hasChinese(query);
+    const yahooData = shouldQueryYahoo
+      ? await Promise.race([
+          NativeYahooApi.search(query).catch(() => ({ quotes: [] })),
+          new Promise<any>((resolve) => setTimeout(() => resolve({ quotes: [] }), 600)),
+        ])
+      : { quotes: [] };
     const existing = new Set(quotes.map(q => q.symbol));
     
     (yahooData.quotes || []).forEach((q: any) => {
@@ -1409,8 +1445,9 @@ app.get('/api/search/:query', authMiddleware, async (req: AuthRequest, res) => {
       }
     });
 
-    // Return { quotes: [...] } so client-side `res.quotes` works correctly
-    res.json({ quotes });
+    const payload = { quotes };
+    writeSearchCache(cacheKey, payload);
+    res.json(payload);
   } catch (e) {
     handleApiError(res, e);
   }

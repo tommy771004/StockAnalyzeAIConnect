@@ -2,13 +2,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
 import { useResearchData } from '../hooks/useResearchData';
-import { Loader2, Search, Cpu, Users, BarChart3, Info } from 'lucide-react';
+import { Loader2, Cpu, Users, BarChart3, Info } from 'lucide-react';
 import { formatPct, toneClass, formatNum } from '../ui/format';
 import type { CandlePoint } from '../types';
 import { PersonaSelector } from '../ui/PersonaSelector';
 import { SecFilingsPanel } from '../ui/SecFilingsPanel';
 import { CongressTradesPanel } from '../ui/CongressTradesPanel';
 import { getFreeModels } from '../../services/aiService';
+import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
 
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
@@ -75,14 +76,6 @@ export function ResearchPage() {
     if (activeSymbol) fetchSummary();
   }, [activeSymbol, persona, selectedModel]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInput.trim()) {
-      setActiveSymbol(searchInput.trim().toUpperCase());
-      setSearchInput('');
-    }
-  };
-
   // Partial loading is handled by individual panels for a better UX.
   // We only show a skeleton if absolutely necessary, but here we'll let the layout render.
 
@@ -112,15 +105,20 @@ export function ResearchPage() {
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
       <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-8">
         <header className="flex items-center gap-4 border border-(--color-term-border) bg-(--color-term-panel) px-4 py-3">
-          <form onSubmit={handleSearch} className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-muted)" />
-            <input
+          <div className="relative flex-1">
+            <StockSymbolAutocomplete
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onValueChange={setSearchInput}
+              onSymbolSubmit={(nextSymbol) => {
+                if (!nextSymbol) return;
+                setActiveSymbol(nextSymbol.toUpperCase());
+                setSearchInput('');
+              }}
               placeholder="搜尋代號 (如: AAPL, 2330)..."
-              className="h-9 w-full rounded-sm border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-sm focus:border-(--color-term-accent) focus:outline-none"
+              showSearchIcon
+              inputClassName="h-9 w-full rounded-sm border border-(--color-term-border) bg-(--color-term-surface) pl-10 pr-4 text-sm focus:border-(--color-term-accent) focus:outline-none"
             />
-          </form>
+          </div>
 
           <div className="flex bg-(--color-term-surface) p-1 rounded border border-(--color-term-border)">
             <button

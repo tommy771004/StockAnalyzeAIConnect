@@ -13,6 +13,8 @@ import { BACKTEST_STRATEGIES, DEFAULT_BACKTEST_METRICS, getDateRangeByPeriod, ma
 import { mapBacktestStrategyToStrategyType } from './strategyParamSchema';
 import type { BacktestResult } from '../../types';
 import type { AgentConfig } from './types';
+import { StockSymbolAutocomplete } from '../common/StockSymbolAutocomplete';
+import { normalizeSymbolInput, searchStockSymbols } from '../../utils/stockSymbolLookup';
 
 interface Props {
   symbol?: string;
@@ -48,8 +50,8 @@ export function BacktestPanel({ symbol, config }: Props) {
     if (!strategyDirty) setStrategyInput(defaultStrategy);
   }, [defaultStrategy, strategyDirty]);
 
-  const trimmedSymbol = symbolInput.trim().toUpperCase();
-  const canRun = trimmedSymbol.length > 0 && !loading;
+  const trimmedSymbol = normalizeSymbolInput(symbolInput);
+  const canRun = symbolInput.trim().length > 0 && !loading;
   const isOverridden = symbolDirty || strategyDirty;
 
   const resetToConfig = () => {
@@ -59,8 +61,28 @@ export function BacktestPanel({ symbol, config }: Props) {
     setStrategyDirty(false);
   };
 
+  const resolveSymbolForRun = async (): Promise<string> => {
+    const raw = symbolInput.trim();
+    if (!raw) return '';
+    const tickerLike = /^[A-Za-z0-9.\-:=/]+$/.test(raw);
+    if (tickerLike) return normalizeSymbolInput(raw);
+
+    try {
+      const fuzzy = await searchStockSymbols(raw, 1);
+      if (fuzzy[0]?.symbol) return normalizeSymbolInput(fuzzy[0].symbol);
+    } catch {
+      // ignore and use normalized raw as fallback
+    }
+    return normalizeSymbolInput(raw);
+  };
+
   const runBacktest = async (): Promise<void> => {
-    if (!trimmedSymbol) return;
+    const resolvedSymbol = await resolveSymbolForRun();
+    if (!resolvedSymbol) return;
+    if (resolvedSymbol !== trimmedSymbol) {
+      setSymbolInput(resolvedSymbol);
+      setSymbolDirty(true);
+    }
     setLoading(true);
     setError('');
 
@@ -75,7 +97,7 @@ export function BacktestPanel({ symbol, config }: Props) {
       const data = await fetchJ<{ ok?: boolean; data?: unknown }>('/api/autotrading/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: trimmedSymbol, period, config: overrideConfig }),
+        body: JSON.stringify({ symbol: resolvedSymbol, period, config: overrideConfig }),
       });
 
       if (data.ok && data.data) {
@@ -88,7 +110,7 @@ export function BacktestPanel({ symbol, config }: Props) {
       try {
         const { period1, period2 } = getDateRangeByPeriod(period);
         const fallback = await runGlobalBacktest({
-          symbol: trimmedSymbol,
+          symbol: resolvedSymbol,
           strategy: strategyInput,
           initialCapital: 1_000_000,
           period1,
@@ -139,12 +161,12 @@ export function BacktestPanel({ symbol, config }: Props) {
             <span className="text-[9px] uppercase tracking-widest text-(--color-term-muted)">
               {t('autotrading.backtest.symbolLabel', '標的 (Symbol)')}
             </span>
-            <input
-              type="text"
+            <StockSymbolAutocomplete
               value={symbolInput}
-              onChange={(e) => { setSymbolInput(e.target.value); setSymbolDirty(true); }}
+              onValueChange={(next) => { setSymbolInput(next); setSymbolDirty(true); }}
+              onSymbolSubmit={(next) => { setSymbolInput(next); setSymbolDirty(true); }}
               placeholder="2330.TW"
-              className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white outline-none focus:border-(--color-term-accent)"
+              inputClassName="bg-black/40 border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white outline-none focus:border-(--color-term-accent)"
             />
           </label>
 
