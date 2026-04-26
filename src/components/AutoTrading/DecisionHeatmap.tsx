@@ -3,6 +3,7 @@
  * AI 決策熱圖 — 支援特定標的過濾與動態氣泡動畫
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Activity, Thermometer } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { DecisionHeat } from './types';
@@ -13,9 +14,10 @@ interface Props {
 }
 
 export function DecisionHeatmap({ symbol, data }: Props) {
+  const { t } = useTranslation();
   if (!data) return (
     <div className="h-16 flex items-center justify-center border border-dashed border-white/5 rounded-sm">
-      <span className="text-[8px] text-white/20 uppercase font-mono animate-pulse">Waiting for Signal...</span>
+      <span className="text-[8px] text-white/20 uppercase font-mono animate-pulse">{t('autotrading.decisionHeat.waiting', 'Waiting for Signal...')}</span>
     </div>
   );
 
@@ -32,7 +34,7 @@ export function DecisionHeatmap({ symbol, data }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
            <Activity className={cn("h-3 w-3", Math.abs(data.score) > 50 ? "animate-pulse" : "opacity-30")} />
-           <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Decision Heat</span>
+           <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{t('autotrading.decisionHeat.title', 'Decision Heat')}</span>
         </div>
         <span className={cn("text-[10px] font-mono font-bold", getHeatColor(data.score))}>
           {data.score > 0 ? '+' : ''}{data.score}%

@@ -5,6 +5,7 @@
  * 資料源：GET /api/autotrading/performance?period=...
  */
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TrendingUp, TrendingDown, Award, ShieldAlert, BarChart3, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import * as api from '../../services/api';
@@ -40,6 +41,7 @@ const PERIODS: { key: Period; label: string }[] = [
 ];
 
 export function PerformanceDashboard() {
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<Period>('1m');
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,7 @@ export function PerformanceDashboard() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="text-[10px] font-bold tracking-widest uppercase text-cyan-300">Performance Dashboard</span>
+          <span className="text-[10px] font-bold tracking-widest uppercase text-cyan-300">{t('autotrading.performance.title', 'Performance Dashboard')}</span>
         </div>
         <div className="flex items-center gap-1">
           {PERIODS.map(p => (
@@ -88,7 +90,7 @@ export function PerformanceDashboard() {
             type="button"
             onClick={load}
             className="ml-1 p-1 rounded text-(--color-term-muted) hover:text-white"
-            title="重新載入"
+            title={t('common.refresh', '重新載入')}
           >
             <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
           </button>
@@ -107,16 +109,16 @@ export function PerformanceDashboard() {
         <>
           {/* 4 main cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <MetricCard label="Win Rate" value={`${data.metrics.winRate.toFixed(1)}%`} sub={`${data.metrics.totalTrades} 筆`} positive={data.metrics.winRate >= 50} />
-            <MetricCard label="Total PnL" value={fmtTwd(data.metrics.totalPnL)} sub={`Avg ${fmtTwd(data.metrics.avgPnL)}`} positive={data.metrics.totalPnL >= 0} />
-            <MetricCard label="Sharpe" value={data.metrics.sharpe.toFixed(2)} sub={data.metrics.sharpe >= 1 ? '優於水準' : '待提升'} positive={data.metrics.sharpe >= 1} />
-            <MetricCard label="Max Drawdown" value={`${(data.metrics.maxDrawdown * 100).toFixed(2)}%`} sub={data.metrics.maxDrawdown > -0.1 ? '良好' : '警戒'} positive={data.metrics.maxDrawdown > -0.1} icon={<ShieldAlert className="h-3 w-3" />} />
+            <MetricCard label={t('autotrading.performance.winRate', 'Win Rate')} value={`${data.metrics.winRate.toFixed(1)}%`} sub={`${data.metrics.totalTrades} ${t('autotrading.performance.trades', '筆')}`} positive={data.metrics.winRate >= 50} />
+            <MetricCard label={t('autotrading.performance.totalPnl', 'Total PnL')} value={fmtTwd(data.metrics.totalPnL)} sub={`${t('autotrading.performance.avg', 'Avg')} ${fmtTwd(data.metrics.avgPnL)}`} positive={data.metrics.totalPnL >= 0} />
+            <MetricCard label={t('autotrading.performance.sharpe', 'Sharpe')} value={data.metrics.sharpe.toFixed(2)} sub={data.metrics.sharpe >= 1 ? t('autotrading.performance.sharpeGood', '優於水準') : t('autotrading.performance.sharpeWeak', '待提升')} positive={data.metrics.sharpe >= 1} />
+            <MetricCard label={t('autotrading.performance.maxDrawdown', 'Max Drawdown')} value={`${(data.metrics.maxDrawdown * 100).toFixed(2)}%`} sub={data.metrics.maxDrawdown > -0.1 ? t('autotrading.performance.drawdownGood', '良好') : t('autotrading.performance.drawdownWarn', '警戒')} positive={data.metrics.maxDrawdown > -0.1} icon={<ShieldAlert className="h-3 w-3" />} />
           </div>
 
           {/* Equity curve sparkline */}
           {data.equityCurve.length > 1 && (
             <div className="border border-(--color-term-border) rounded p-3">
-              <div className="text-[9px] text-(--color-term-muted) uppercase mb-2">Equity Curve</div>
+              <div className="text-[9px] text-(--color-term-muted) uppercase mb-2">{t('autotrading.performance.equityCurve', 'Equity Curve')}</div>
               <Sparkline points={data.equityCurve.map(p => p.equity)} color="#34d399" />
             </div>
           )}
@@ -124,7 +126,7 @@ export function PerformanceDashboard() {
           {/* Drawdown */}
           {data.drawdownCurve.length > 1 && (
             <div className="border border-(--color-term-border) rounded p-3">
-              <div className="text-[9px] text-(--color-term-muted) uppercase mb-2">Drawdown</div>
+              <div className="text-[9px] text-(--color-term-muted) uppercase mb-2">{t('autotrading.performance.drawdown', 'Drawdown')}</div>
               <Sparkline points={data.drawdownCurve.map(p => p.drawdown)} color="#f43f5e" fillBelow />
             </div>
           )}
@@ -133,7 +135,7 @@ export function PerformanceDashboard() {
           {Object.keys(data.attribution).length > 0 && (
             <div className="border border-(--color-term-border) rounded">
               <div className="px-3 py-2 text-[9px] text-(--color-term-muted) uppercase border-b border-(--color-term-border)">
-                Strategy Attribution
+                {t('autotrading.performance.strategyAttribution', 'Strategy Attribution')}
               </div>
               <div className="divide-y divide-(--color-term-border)">
                 {(Object.entries(data.attribution) as [string, { pnl: number; trades: number; winRate: number }][]).map(([key, v]) => (
@@ -180,7 +182,7 @@ export function PerformanceDashboard() {
 }
 
 function fmtTwd(n: number): string {
-  if (!Number.isFinite(n)) return 'N/A';
+  if (!Number.isFinite(n)) return '--';
   return new Intl.NumberFormat('zh-TW', { signDisplay: 'auto', maximumFractionDigits: 0 }).format(n);
 }
 

@@ -3,6 +3,7 @@
  * 策略選擇與參數配置 UI (升級版：支援權重與追蹤止損)
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Target, ShieldCheck, Clock, BarChart3, Layers } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { StrategyType, StrategyParams } from './types';
@@ -22,6 +23,19 @@ interface Props {
 }
 
 export function StrategySelector({ selected, params, onChange, disabled }: Props) {
+  const { t } = useTranslation();
+  const strategyNameKeys: Record<StrategyType, string> = {
+    RSI_REVERSION: 'autotrading.strategy.names.rsiReversion',
+    BOLLINGER_BREAKOUT: 'autotrading.strategy.names.bollingerBreakout',
+    MACD_CROSS: 'autotrading.strategy.names.macdMomentum',
+    AI_LLM: 'autotrading.strategy.names.neuralAiSignal',
+  };
+  const strategyDescKeys: Record<StrategyType, string> = {
+    RSI_REVERSION: 'autotrading.strategy.descs.rsiReversion',
+    BOLLINGER_BREAKOUT: 'autotrading.strategy.descs.bollingerBreakout',
+    MACD_CROSS: 'autotrading.strategy.descs.macdMomentum',
+    AI_LLM: 'autotrading.strategy.descs.neuralAiSignal',
+  };
   const toggleStrategy = (s: StrategyType) => {
     const nextSelected = selected.includes(s) 
       ? selected.filter(x => x !== s) 
@@ -57,7 +71,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
       <div className="flex items-center gap-2 px-1">
         <Target className="h-3 w-3 text-violet-400" />
         <span className="text-[10px] font-bold tracking-widest text-(--color-term-muted) uppercase">
-          AI Strategies & Weights
+          {t('autotrading.strategy.selector.title', 'AI Strategies & Weights')}
         </span>
       </div>
 
@@ -89,15 +103,15 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                   </div>
                   <div>
                     <div className={cn("text-[11px] font-bold", isActive ? "text-violet-300" : "text-(--color-term-text)")}>
-                      {STRATEGY_LABELS[s].name}
+                      {t(strategyNameKeys[s], STRATEGY_LABELS[s].name)}
                     </div>
-                    <div className="text-[9px] text-(--color-term-muted) mt-0.5">{STRATEGY_LABELS[s].desc}</div>
+                    <div className="text-[9px] text-(--color-term-muted) mt-0.5">{t(strategyDescKeys[s], STRATEGY_LABELS[s].desc)}</div>
                   </div>
                 </button>
 
                 {isActive && (
                   <div className="flex flex-col items-end gap-1">
-                    <label className="text-[7px] text-violet-400/70 uppercase">Weight</label>
+                    <label className="text-[7px] text-violet-400/70 uppercase">{t('autotrading.strategy.selector.weight', 'Weight')}</label>
                     <input 
                       type="number" 
                       step="0.1" 
@@ -118,7 +132,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                     if (field.type === 'range') {
                       return (
                         <div key={field.path} className={cn(field.fullWidth ? 'md:col-span-3' : '')}>
-                          <label className="text-[8px] text-violet-400/50 uppercase">{field.label}</label>
+                          <label className="text-[8px] text-violet-400/50 uppercase">{field.labelKey ? t(field.labelKey, field.label) : field.label}</label>
                           <input
                             type="range"
                             min={field.min}
@@ -138,7 +152,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                     }
                     return (
                       <div key={field.path}>
-                        <label className="text-[8px] text-violet-400/50 uppercase">{field.label}</label>
+                        <label className="text-[8px] text-violet-400/50 uppercase">{field.labelKey ? t(field.labelKey, field.label) : field.label}</label>
                         <input
                           type="number"
                           min={field.min}
@@ -154,8 +168,10 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                   {s === 'AI_LLM' && (
                     <div className="md:col-span-3 mt-1 pt-2 border-t border-violet-500/10 flex items-center justify-between">
                       <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-violet-300">Explainable AI (進場理由)</span>
-                        <span className="text-[7px] text-violet-400/50 uppercase italic">Show alpha reasoning in logs</span>
+                        <span className="text-[9px] font-bold text-violet-300">
+                          {t('autotrading.strategy.selector.explainableAi', 'Explainable AI (進場理由)')}
+                        </span>
+                        <span className="text-[7px] text-violet-400/50 uppercase italic">{t('autotrading.strategy.selector.showAlphaReasoning', 'Show alpha reasoning in logs')}</span>
                       </div>
                       <button
                         type="button"
@@ -184,7 +200,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-3 w-3 text-violet-400" />
-            <span className="text-[9px] font-bold tracking-widest text-violet-400 uppercase">Position Sizing (動態倉位)</span>
+            <span className="text-[9px] font-bold tracking-widest text-violet-400 uppercase">{t('autotrading.strategy.selector.positionSizing', 'Position Sizing (動態倉位)')}</span>
           </div>
           <div className="flex bg-black/40 p-0.5 rounded border border-white/5">
             <button
@@ -193,8 +209,8 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                 "px-2 py-0.5 text-[8px] rounded-sm transition-all",
                 (params.sizingMethod || 'fixed') === 'fixed' ? "bg-violet-500 text-white shadow-lg" : "text-white/40 hover:text-white/70"
               )}
-            >
-              FIXED
+              >
+              {t('autotrading.strategy.selector.fixed', 'FIXED')}
             </button>
             <button
               onClick={() => updateParam('sizingMethod', 'risk_base')}
@@ -202,8 +218,8 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                 "px-2 py-0.5 text-[8px] rounded-sm transition-all",
                 params.sizingMethod === 'risk_base' ? "bg-violet-500 text-white shadow-lg" : "text-white/40 hover:text-white/70"
               )}
-            >
-              RISK-BASED
+              >
+              {t('autotrading.strategy.selector.riskBased', 'RISK-BASED')}
             </button>
           </div>
         </div>
@@ -211,7 +227,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
         <div className="grid grid-cols-2 gap-3">
           {(params.sizingMethod || 'fixed') === 'fixed' ? (
             <div className="col-span-2">
-              <label className="text-[7px] text-violet-400/50 uppercase block mb-1">Max Allocation Per Trade</label>
+              <label className="text-[7px] text-violet-400/50 uppercase block mb-1">{t('autotrading.strategy.selector.maxAllocationPerTrade', 'Max Allocation Per Trade')}</label>
               <div className="flex items-center gap-2">
                 <input 
                   type="number" 
@@ -219,14 +235,14 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                   onChange={e => updateParam('maxAllocationPerTrade', Number(e.target.value))} 
                   className="flex-1 bg-black/40 border border-violet-500/20 rounded px-2 py-1 text-[10px] text-white font-mono" 
                 />
-                <span className="text-[9px] text-violet-400/60">TWD</span>
+                <span className="text-[9px] text-violet-400/60">{t('autotrading.common.twd', 'TWD')}</span>
               </div>
-              <p className="text-[7px] text-white/30 mt-1 italic">使用固定金額進行每一筆交易下單。</p>
+              <p className="text-[7px] text-white/30 mt-1 italic">{t('autotrading.strategy.selector.fixedHint', '使用固定金額進行每一筆交易下單。')}</p>
             </div>
           ) : (
             <>
               <div>
-                <label className="text-[7px] text-violet-400/50 uppercase block mb-1">Risk Per Trade (%)</label>
+                <label className="text-[7px] text-violet-400/50 uppercase block mb-1">{t('autotrading.strategy.selector.riskPerTradePct', 'Risk Per Trade (%)')}</label>
                 <div className="flex items-center gap-1">
                   <input 
                     type="number" 
@@ -237,10 +253,10 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                   />
                   <span className="text-[9px] text-violet-400/60">%</span>
                 </div>
-                <p className="text-[6px] text-white/30 mt-1">單筆預期損失佔總資產百分比。</p>
+                <p className="text-[6px] text-white/30 mt-1">{t('autotrading.strategy.selector.riskPerTradeHint', '單筆預期損失佔總資產百分比。')}</p>
               </div>
               <div>
-                <label className="text-[7px] text-violet-400/50 uppercase block mb-1">Max Position Size (%)</label>
+                <label className="text-[7px] text-violet-400/50 uppercase block mb-1">{t('autotrading.strategy.selector.maxPositionSizePct', 'Max Position Size (%)')}</label>
                 <div className="flex items-center gap-1">
                   <input 
                     type="number" 
@@ -250,7 +266,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                   />
                   <span className="text-[9px] text-violet-400/60">%</span>
                 </div>
-                <p className="text-[6px] text-white/30 mt-1">單筆最大持倉上限，避免集中風險。</p>
+                <p className="text-[6px] text-white/30 mt-1">{t('autotrading.strategy.selector.maxPositionHint', '單筆最大持倉上限，避免集中風險。')}</p>
               </div>
             </>
           )}
@@ -263,7 +279,8 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
           <div className="flex items-center gap-2">
             <Layers className={cn("h-3 w-3", params.enableMTF ? "text-blue-400" : "text-white/20")} />
             <span className={cn("text-[9px] font-bold tracking-widest uppercase", params.enableMTF ? "text-blue-400" : "text-white/20")}>
-              MTF Filter (多時區趨勢過濾)
+              {t('autotrading.strategy.selector.mtfFilter', 'MTF Filter (多時區趨勢過濾)')}
+              
             </span>
           </div>
           <button
@@ -275,41 +292,41 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
                 : "bg-white/5 border-white/10 text-white/30"
             )}
           >
-            {params.enableMTF ? 'ENABLED' : 'DISABLED'}
+            {params.enableMTF ? t('autotrading.strategy.selector.enabled', 'ENABLED') : t('autotrading.strategy.selector.disabled', 'DISABLED')}
           </button>
         </div>
 
         {params.enableMTF && (
           <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
             <div>
-              <label className="text-[7px] text-blue-400/50 uppercase block mb-1">Filter Timeframe</label>
+              <label className="text-[7px] text-blue-400/50 uppercase block mb-1">{t('autotrading.strategy.selector.filterTimeframe', 'Filter Timeframe')}</label>
               <select 
                 value={params.mtfTimeframe || '1h'} 
                 onChange={e => updateParam('mtfTimeframe', e.target.value)}
                 className="w-full bg-black/40 border border-blue-500/20 rounded px-2 py-1 text-[10px] text-white font-mono outline-none focus:border-blue-500/50"
               >
-                <option value="15m">15 Minutes</option>
-                <option value="1h">1 Hour</option>
-                <option value="4h">4 Hours</option>
-                <option value="1d">1 Day</option>
+                <option value="15m">{t('autotrading.strategy.selector.timeframe.15m', '15 Minutes')}</option>
+                <option value="1h">{t('autotrading.strategy.selector.timeframe.1h', '1 Hour')}</option>
+                <option value="4h">{t('autotrading.strategy.selector.timeframe.4h', '4 Hours')}</option>
+                <option value="1d">{t('autotrading.strategy.selector.timeframe.1d', '1 Day')}</option>
               </select>
             </div>
             <div>
-              <label className="text-[7px] text-blue-400/50 uppercase block mb-1">Trend Indicator</label>
+              <label className="text-[7px] text-blue-400/50 uppercase block mb-1">{t('autotrading.strategy.selector.trendIndicator', 'Trend Indicator')}</label>
               <select 
                 value={params.mtfTrendIndicator || 'EMA200'} 
                 onChange={e => updateParam('mtfTrendIndicator', e.target.value)}
                 className="w-full bg-black/40 border border-blue-500/20 rounded px-2 py-1 text-[10px] text-white font-mono outline-none focus:border-blue-500/50"
               >
-                <option value="EMA200">EMA 200 (Long Term)</option>
-                <option value="EMA50">EMA 50 (Mid Term)</option>
-                <option value="MACD">MACD Baseline</option>
-                <option value="PRICE_ACTION">Higher High/Low</option>
+                <option value="EMA200">{t('autotrading.strategy.selector.trendOption.ema200', 'EMA 200 (Long Term)')}</option>
+                <option value="EMA50">{t('autotrading.strategy.selector.trendOption.ema50', 'EMA 50 (Mid Term)')}</option>
+                <option value="MACD">{t('autotrading.strategy.selector.trendOption.macd', 'MACD Baseline')}</option>
+                <option value="PRICE_ACTION">{t('autotrading.strategy.selector.trendOption.priceAction', 'Higher High/Low')}</option>
               </select>
             </div>
             <div className="col-span-2">
               <p className="text-[7px] text-blue-300/40 italic">
-                ※ 僅在大時區趨勢與交易方向一致時才執行下單，有效過濾震盪與假突破。
+                {t('autotrading.strategy.selector.mtfHint', '※ 僅在大時區趨勢與交易方向一致時才執行下單，有效過濾震盪與假突破。')}
               </p>
             </div>
           </div>
@@ -321,14 +338,14 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-3 w-3 text-emerald-400" />
-            <span className="text-[9px] font-bold tracking-widest text-emerald-400 uppercase">Risk & Exit Control</span>
+            <span className="text-[9px] font-bold tracking-widest text-emerald-400 uppercase">{t('autotrading.strategy.selector.riskExitControl', 'Risk & Exit Control')}</span>
           </div>
         </div>
         
         <div className="grid grid-cols-3 gap-2">
           {RISK_EXIT_PARAM_SCHEMA.map((field) => (
             <div key={field.path}>
-              <label className="text-[7px] text-emerald-400/50 uppercase block mb-1">{field.label}</label>
+              <label className="text-[7px] text-emerald-400/50 uppercase block mb-1">{field.labelKey ? t(field.labelKey, field.label) : field.label}</label>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -350,7 +367,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
       <div className="p-3 border border-blue-500/20 bg-blue-500/5 rounded-sm flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className="h-3 w-3 text-blue-400" />
-          <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">Active Hours</span>
+          <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">{t('autotrading.strategy.selector.activeHours', 'Active Hours')}</span>
         </div>
         <div className="flex items-center gap-2">
           <input 
@@ -360,7 +377,7 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
             readOnly
             className="w-12 bg-transparent text-[10px] text-blue-300 font-mono text-center border-b border-blue-500/30" 
           />
-          <span className="text-[8px] text-blue-500/50">TO</span>
+          <span className="text-[8px] text-blue-500/50">{t('autotrading.common.to', 'TO')}</span>
           <input 
             type="text" 
             placeholder="13:30" 

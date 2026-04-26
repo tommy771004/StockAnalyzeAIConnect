@@ -7,6 +7,7 @@
  *  - 對 PENDING / PARTIAL 狀態提供「取消」按鈕
  */
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Activity, X, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { OrderLifecycleEvent } from './useAutotradingWS';
@@ -38,7 +39,22 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: 'text-rose-300 bg-rose-500/10 border-rose-500/30',
 };
 
+const SIDE_LABEL_KEYS: Record<string, string> = {
+  BUY: 'autotrading.orderBook.side.buy',
+  SELL: 'autotrading.orderBook.side.sell',
+  HOLD: 'autotrading.orderBook.side.hold',
+};
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  PENDING: 'autotrading.orderBook.status.pending',
+  PARTIAL: 'autotrading.orderBook.status.partial',
+  FILLED: 'autotrading.orderBook.status.filled',
+  CANCELLED: 'autotrading.orderBook.status.cancelled',
+  REJECTED: 'autotrading.orderBook.status.rejected',
+};
+
 export function OrderBookPanel({ events }: Props) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +106,9 @@ export function OrderBookPanel({ events }: Props) {
       <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border)">
         <div className="flex items-center gap-2">
           <Activity className="h-3 w-3 text-cyan-400" />
-          <span className="text-[10px] font-bold tracking-widest text-(--color-term-muted) uppercase">Order Lifecycle</span>
+          <span className="text-[10px] font-bold tracking-widest text-(--color-term-muted) uppercase">{t('autotrading.orderBook.title', 'Order Lifecycle')}</span>
         </div>
-        <button onClick={refresh} className="p-1 text-(--color-term-muted) hover:text-white" title="重新載入">
+        <button onClick={refresh} className="p-1 text-(--color-term-muted) hover:text-white" title={t('common.refresh', '重新載入')}>
           <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
         </button>
       </div>
@@ -100,7 +116,7 @@ export function OrderBookPanel({ events }: Props) {
       {error && <div className="px-3 py-2 text-[10px] text-rose-300">{error}</div>}
 
       {rows.length === 0 ? (
-        <div className="p-4 text-[10px] text-(--color-term-muted) text-center">{loading ? '載入中...' : '尚無訂單'}</div>
+        <div className="p-4 text-[10px] text-(--color-term-muted) text-center">{loading ? t('common.loading', '載入中...') : t('autotrading.orderBook.empty', '尚無訂單')}</div>
       ) : (
         <div className="overflow-y-auto max-h-72">
           <table className="w-full text-[10px] font-mono">
@@ -123,13 +139,15 @@ export function OrderBookPanel({ events }: Props) {
                   <tr key={r.id} className="border-b border-white/5">
                     <td className="px-2 py-1 text-(--color-term-muted)">{new Date(r.createdAt).toLocaleTimeString()}</td>
                     <td className="px-2 py-1 text-white">{r.symbol}</td>
-                    <td className={cn('px-2 py-1 text-right', r.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400')}>{r.side}</td>
+                    <td className={cn('px-2 py-1 text-right', r.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400')}>
+                      {t(SIDE_LABEL_KEYS[r.side] ?? 'autotrading.orderBook.side.unknown', r.side)}
+                    </td>
                     <td className="px-2 py-1 text-right text-white/80">{Number(r.filledQty)}/{Number(r.qty)}</td>
                     <td className="px-2 py-1 text-right text-white/80">{r.avgFillPrice ?? '-'}</td>
                     <td className="px-2 py-1 text-right text-(--color-term-muted)">{r.retryCount}</td>
                     <td className="px-2 py-1 text-center">
                       <span className={cn('px-1.5 py-0.5 rounded border text-[9px] font-bold', STATUS_COLORS[r.status] ?? '')}>
-                        {r.status}
+                        {t(STATUS_LABEL_KEYS[r.status] ?? 'autotrading.orderBook.status.unknown', r.status)}
                       </span>
                     </td>
                     <td className="px-2 py-1 text-right">
@@ -137,7 +155,7 @@ export function OrderBookPanel({ events }: Props) {
                         <button
                           onClick={() => handleCancel(r.id)}
                           className="text-rose-300 hover:text-rose-200 p-0.5"
-                          title="取消委託"
+                          title={t('autotrading.orderBook.cancelOrder', '取消委託')}
                         >
                           <X className="h-3 w-3" />
                         </button>

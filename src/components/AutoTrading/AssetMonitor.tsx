@@ -78,7 +78,7 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                         )} />
                         <span className="text-(--color-term-accent) font-bold">{symbol}</span>
                         {symbol.endsWith('.TW') && (
-                          <span className="text-[9px] text-(--color-term-muted)">TSE</span>
+                          <span className="text-[9px] text-(--color-term-muted)">{t('autotrading.asset.marketTse', 'TSE')}</span>
                         )}
                       </div>
                     </td>
@@ -96,7 +96,7 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                           isSell ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                    'bg-zinc-800/50 text-zinc-400 border-zinc-700'
                         )}>
-                          {conf}%{isSell ? ' (Sell)' : isBuy ? '' : ''}
+                          {conf}%{isSell ? ` ${t('autotrading.asset.sellTag', '(Sell)')}` : isBuy ? '' : ''}
                         </span>
                       ) : (
                         <span className="text-(--color-term-muted)">---</span>

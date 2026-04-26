@@ -9,6 +9,7 @@
  *  - 連線後給予 toast 與「最後測試時間」
  */
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Shield, Key, FileText, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { BROKER_OPTIONS } from './types';
@@ -25,6 +26,7 @@ interface ServerStatus {
 }
 
 export function BrokerSettings({ onConnect, disabled }: Props) {
+  const { t } = useTranslation();
   const [selectedBroker, setSelectedBroker] = useState<string>('simulated');
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -43,7 +45,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
           setSelectedBroker(data.config.brokerId);
           setAccountId(data.config.accountId ?? '');
           setBridgeUrl(data.bridgeUrl ?? '');
-          setStatus({ type: 'success', msg: `已從伺服器恢復設定: ${data.config.brokerId}` });
+          setStatus({ type: 'success', msg: t('autotrading.broker.restoreConfig', { broker: data.config.brokerId }) });
         }
       } catch {
         // ignore — 未登入或服務未就緒
@@ -56,7 +58,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
   const isStub = broker && !broker.available && selectedBroker !== 'sinopac';
 
   async function handleConnect() {
-    setStatus({ type: 'loading', msg: '正在嘗試建立連線...' });
+    setStatus({ type: 'loading', msg: t('autotrading.broker.connecting') });
     try {
       const res = await onConnect({
         brokerId: selectedBroker,
@@ -70,16 +72,29 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
       setLastTestedAt(new Date().toLocaleString());
       setStatus({ type: res.ok ? 'success' : 'error', msg: res.message });
     } catch (e) {
-      setStatus({ type: 'error', msg: (e as Error).message ?? '連線失敗' });
+      setStatus({ type: 'error', msg: (e as Error).message ?? t('autotrading.broker.connectFailed') });
     }
   }
+
+  const brokerNameKeys: Record<string, string> = {
+    simulated: 'autotrading.broker.brokers.simulated.name',
+    sinopac: 'autotrading.broker.brokers.sinopac.name',
+    fugle: 'autotrading.broker.brokers.fugle.name',
+    ib: 'autotrading.broker.brokers.ib.name',
+  };
+  const brokerNoteKeys: Record<string, string> = {
+    simulated: 'autotrading.broker.brokers.simulated.note',
+    sinopac: 'autotrading.broker.brokers.sinopac.note',
+    fugle: 'autotrading.broker.brokers.fugle.note',
+    ib: 'autotrading.broker.brokers.ib.note',
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 px-1">
         <Shield className="h-3 w-3 text-cyan-400" />
         <span className="text-[10px] font-bold tracking-widest text-(--color-term-muted) uppercase">
-          Broker Connectivity & API Setup
+          {t('autotrading.broker.title', 'Broker Connectivity & API Setup')}
         </span>
       </div>
 
@@ -106,20 +121,20 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <span className={cn("text-[11px] font-bold", selectedBroker === b.id ? "text-cyan-300" : "text-(--color-term-text)")}>
-                  {b.name}
+                  {t(brokerNameKeys[b.id] ?? '', b.name)}
                 </span>
                 {stub && (
                   <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold uppercase">
-                    Coming Soon
+                    {t('autotrading.broker.comingSoon', 'Coming Soon')}
                   </span>
                 )}
                 {!b.available && b.id === 'sinopac' && (
                   <span className="text-[8px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700 font-bold uppercase">
-                    Requires Bridge
+                    {t('autotrading.broker.requiresBridge', 'Requires Bridge')}
                   </span>
                 )}
               </div>
-              <div className="text-[9px] text-(--color-term-muted) mt-0.5">{b.note}</div>
+              <div className="text-[9px] text-(--color-term-muted) mt-0.5">{t(brokerNoteKeys[b.id] ?? '', b.note)}</div>
             </div>
           </button>
         );})}
@@ -131,7 +146,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
           {selectedBroker === 'sinopac' && (
             <div>
               <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
-                <Globe className="h-2.5 w-2.5" /> Python Bridge URL
+                <Globe className="h-2.5 w-2.5" /> {t('autotrading.broker.pythonBridgeUrl', 'Python Bridge URL')}
               </label>
               <input
                 type="text"
@@ -139,15 +154,15 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
                 onChange={e => setBridgeUrl(e.target.value)}
                 disabled={isStub}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-[11px] text-white font-mono focus:border-cyan-500/50 outline-none"
-                placeholder="http://localhost:8001"
+                placeholder={t('autotrading.broker.bridgePlaceholder', 'http://localhost:8001')}
               />
-              <div className="text-[9px] text-(--color-term-muted) mt-1">需先啟動 server/python/sinopac_bridge.py</div>
+              <div className="text-[9px] text-(--color-term-muted) mt-1">{t('autotrading.broker.bridgeHint', '需先啟動 server/python/sinopac_bridge.py')}</div>
             </div>
           )}
 
           <div>
             <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
-              <Key className="h-2.5 w-2.5" /> API Key
+              <Key className="h-2.5 w-2.5" /> {t('autotrading.broker.apiKey', 'API Key')}
             </label>
             <input
               type="password"
@@ -156,12 +171,12 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
               onChange={e => setApiKey(e.target.value)}
               disabled={isStub}
               className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-[11px] text-white font-mono focus:border-cyan-500/50 outline-none"
-              placeholder={isStub ? '此券商尚未支援' : ''}
+              placeholder={isStub ? t('autotrading.broker.unsupported', '此券商尚未支援') : ''}
             />
           </div>
           <div>
             <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
-              <Key className="h-2.5 w-2.5" /> API Secret / Token
+              <Key className="h-2.5 w-2.5" /> {t('autotrading.broker.apiSecret', 'API Secret / Token')}
             </label>
             <input
               type="password"
@@ -175,21 +190,21 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
           {selectedBroker === 'sinopac' && (
             <div>
               <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
-                <FileText className="h-2.5 w-2.5" /> 憑證路徑 (.pfx)
+                <FileText className="h-2.5 w-2.5" /> {t('autotrading.broker.certPath', '憑證路徑 (.pfx)')}
               </label>
               <input
                 type="text"
                 value={certPath}
                 onChange={e => setCertPath(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-[11px] text-white font-mono focus:border-cyan-500/50 outline-none"
-                placeholder="C:\Users\Name\AppData\...\cert.pfx"
+                placeholder={t('autotrading.broker.certPathPlaceholder', 'C:\\path\\to\\cert.pfx')}
               />
             </div>
           )}
           <div>
-            <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
-              <Globe className="h-2.5 w-2.5" /> 帳號 (Account ID)
-            </label>
+              <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
+                <Globe className="h-2.5 w-2.5" /> {t('autotrading.broker.accountId', '帳號 (Account ID)')}
+              </label>
             <input
               type="text"
               value={accountId}
@@ -205,11 +220,11 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
             disabled={disabled || isStub || status.type === 'loading'}
             className="w-full mt-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isStub ? '此券商尚未支援' : status.type === 'loading' ? '正在建立加密連線...' : '測試並儲存券商連線'}
+            {isStub ? t('autotrading.broker.unsupported', '此券商尚未支援') : status.type === 'loading' ? t('autotrading.broker.connecting', '正在嘗試建立連線...') : t('autotrading.broker.testAndSave', '測試並儲存券商連線')}
           </button>
 
           {lastTestedAt && (
-            <div className="text-[9px] text-(--color-term-muted) text-right">最後測試：{lastTestedAt}</div>
+            <div className="text-[9px] text-(--color-term-muted) text-right">{t('autotrading.broker.lastTested', { time: lastTestedAt })}</div>
           )}
         </div>
       )}

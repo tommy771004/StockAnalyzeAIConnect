@@ -431,7 +431,7 @@ export const releaseKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch
 export const getAutotradingDefaults = () => fetchJ<any>('/api/autotrading/defaults');
 export const getAutotradingRealtimeMeta = () => fetchJ<{
   provider: 'ably' | 'ws';
-  ably: { enabled: boolean; channel: string; authUrl: string };
+  ably: { enabled: boolean; channel: string; authUrl: string; reason?: string; keyName?: string };
   fallback: 'polling';
 }>('/api/autotrading/realtime/meta');
 export const getMarketSession = (symbols: string[]) =>

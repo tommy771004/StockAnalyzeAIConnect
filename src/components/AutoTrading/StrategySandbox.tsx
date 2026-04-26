@@ -131,19 +131,19 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
             {/* Params Preview/Editor */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <div className="text-[8px] text-white/30 uppercase">RSI Period</div>
+                <div className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.rsiPeriod', 'RSI Period')}</div>
                 <div className="text-[12px] font-mono text-cyan-300">{shadow.params?.RSI_REVERSION?.period || '--'}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-[8px] text-white/30 uppercase">Stop Loss</div>
+                <div className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.stopLoss', 'Stop Loss')}</div>
                 <div className="text-[12px] font-mono text-rose-300">{shadow.params?.stopLossPct}%</div>
               </div>
               <div className="space-y-1">
-                <div className="text-[8px] text-white/30 uppercase">Take Profit</div>
+                <div className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.takeProfit', 'Take Profit')}</div>
                 <div className="text-[12px] font-mono text-emerald-300">{shadow.params?.takeProfitPct}%</div>
               </div>
               <div className="space-y-1">
-                <div className="text-[8px] text-white/30 uppercase">AI Threshold</div>
+                <div className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.aiThreshold', 'AI Threshold')}</div>
                 <div className="text-[12px] font-mono text-violet-300">{shadow.params?.AI_LLM?.confidenceThreshold}%</div>
               </div>
             </div>
@@ -153,7 +153,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
               {editingName === name && (
                 <div className="grid grid-cols-2 gap-4 bg-white/2 p-3 rounded border border-white/5 animate-in slide-in-from-top-2">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] text-white/30 uppercase">RSI Period</label>
+                    <label className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.rsiPeriod', 'RSI Period')}</label>
                     <input 
                       type="number" 
                       value={shadow.params?.RSI_REVERSION?.period ?? 14} 
@@ -167,7 +167,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[8px] text-white/30 uppercase">Stop Loss (%)</label>
+                    <label className="text-[8px] text-white/30 uppercase">{t('autotrading.sandbox.field.stopLossPct', 'Stop Loss (%)')}</label>
                     <input 
                       type="number" 
                       step="0.1"

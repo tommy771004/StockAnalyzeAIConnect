@@ -15,6 +15,13 @@ const ABLY_TOKEN_TTL_MS = Math.max(60_000, Number(process.env.ABLY_TOKEN_TTL_MS 
 
 const KEY_NAME = ABLY_API_KEY.includes(':') ? ABLY_API_KEY.split(':')[0] : '';
 
+function getAblyDisabledReason(): string {
+  if (!ABLY_API_KEY) return 'ABLY_API_KEY is empty';
+  if (!ABLY_API_KEY.includes(':')) return 'ABLY_API_KEY format invalid (expected keyName:keySecret)';
+  if (!KEY_NAME) return 'ABLY_API_KEY keyName is empty';
+  return '';
+}
+
 function getBasicAuthHeader(): string {
   return `Basic ${Buffer.from(ABLY_API_KEY).toString('base64')}`;
 }
@@ -24,12 +31,15 @@ export function isAblyEnabled(): boolean {
 }
 
 export function getAutotradingRealtimeMeta() {
+  const reason = getAblyDisabledReason();
   return {
     provider: isAblyEnabled() ? 'ably' : 'ws',
     ably: {
       enabled: isAblyEnabled(),
       channel: ABLY_CHANNEL,
       authUrl: ABLY_AUTH_URL,
+      reason: reason || undefined,
+      keyName: KEY_NAME || undefined,
     },
     fallback: 'polling',
   };
@@ -103,4 +113,3 @@ export async function publishAutotradingEvent(data: unknown): Promise<void> {
     console.warn('[Ably] publish error:', (err as Error).message);
   }
 }
-

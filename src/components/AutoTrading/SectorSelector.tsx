@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { Layers } from 'lucide-react';
 
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function SectorSelector({ selectedSymbols, onSelectSymbols, disabled }: Props) {
+  const { t } = useTranslation();
   // If the selected symbols exactly match a sector, mark it as active
   const activeSector = SECTORS.find(s => 
     s.symbols.length === selectedSymbols.length && 
@@ -28,7 +30,7 @@ export function SectorSelector({ selectedSymbols, onSelectSymbols, disabled }: P
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Layers className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Sector Targeting (類股篩選)</span>
+          <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{t('autotrading.strategy.sectorTargeting', 'Sector Targeting (類股篩選)')}</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

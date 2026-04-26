@@ -32,6 +32,7 @@ const WS_DISABLED = ['1', 'true', 'yes', 'on'].includes(String(import.meta.env.V
 const ABLY_DISABLED = ['1', 'true', 'yes', 'on'].includes(String(import.meta.env.VITE_DISABLE_AUTOTRADING_ABLY ?? '').toLowerCase());
 const ABLY_SDK_URL = 'https://cdn.ably.com/lib/ably.min-2.js';
 const DEFAULT_POLLING_REASON = 'Realtime 未連線，已切換為輪詢模式。';
+const API_BASE_URL = String(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '');
 
 type RealtimeTransport = 'none' | 'ably' | 'ws' | 'polling';
 
@@ -42,6 +43,12 @@ declare global {
 }
 
 let ablySdkLoading: Promise<void> | null = null;
+
+function resolveApiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  if (!API_BASE_URL) return path;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
 
 function ensureAblySdk(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('window is unavailable'));
@@ -119,6 +126,7 @@ export function useAutotradingWS() {
   const connectedRef = useRef(false);
   const ablyClientRef = useRef<any>(null);
   const ablyChannelRef = useRef<any>(null);
+  const lastMetaReasonRef = useRef<string>('');
 
   useEffect(() => {
     connectedRef.current = state.connected;
@@ -236,18 +244,18 @@ export function useAutotradingWS() {
   const scheduleWsReconnect = useCallback((connectFn: () => void) => {
     if (unmounted.current) return;
     if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-      startPolling(DEFAULT_POLLING_REASON);
+      startPolling(lastMetaReasonRef.current || 'WebSocket 連線重試次數已達上限，改用輪詢。');
       return;
     }
     const delay = RECONNECT_DELAY_MS * (reconnectAttempts.current + 1);
     reconnectAttempts.current += 1;
     reconnectTimer.current = setTimeout(connectFn, delay);
-    startPolling(DEFAULT_POLLING_REASON);
+    startPolling(lastMetaReasonRef.current || 'WebSocket 連線中斷，改用輪詢。');
   }, [startPolling]);
 
   const connectWs = useCallback(() => {
     if (unmounted.current || WS_DISABLED) {
-      startPolling(DEFAULT_POLLING_REASON);
+      startPolling('WebSocket 已被設定停用，改用輪詢。');
       return;
     }
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
@@ -257,7 +265,7 @@ export function useAutotradingWS() {
     try {
       ws = new WebSocket(`${protocol}//${window.location.host}${WS_PATH}`);
     } catch {
-      startPolling(DEFAULT_POLLING_REASON);
+      startPolling('WebSocket URL 建立失敗，改用輪詢。');
       return;
     }
     wsRef.current = ws;
@@ -288,20 +296,62 @@ export function useAutotradingWS() {
   }, [applyEvent, scheduleWsReconnect, startPolling, stopPolling]);
 
   const connectAbly = useCallback(async (): Promise<boolean> => {
-    if (ABLY_DISABLED || PROVIDER_HINT === 'ws') return false;
+    if (ABLY_DISABLED) {
+      lastMetaReasonRef.current = 'Ably 已被設定停用（VITE_DISABLE_AUTOTRADING_ABLY）。';
+      return false;
+    }
+    if (PROVIDER_HINT === 'ws') {
+      lastMetaReasonRef.current = '目前設定為 WebSocket 優先（VITE_AUTOTRADING_RT_PROVIDER=ws）。';
+      return false;
+    }
 
     try {
       const meta = await api.getAutotradingRealtimeMeta();
-      if (!meta?.ably?.enabled) return false;
+      if (!meta?.ably?.enabled) {
+        lastMetaReasonRef.current = meta?.ably?.reason || '伺服器未啟用 Ably（ABLY_API_KEY 未生效）。';
+        return false;
+      }
+      lastMetaReasonRef.current = '';
+      const authUrl = resolveApiUrl(meta.ably.authUrl);
+      const requestToken = async () => {
+        const response = await fetch(authUrl, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) {
+          let message = `Ably token endpoint failed (${response.status})`;
+          try {
+            const body = await response.json() as { error?: string };
+            if (body?.error) message = body.error;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+        return await response.json();
+      };
+
+      // Preflight to expose auth issues early (cookie/CORS/path/env mismatch).
+      await requestToken();
 
       await ensureAblySdk();
-      if (!window.Ably?.Realtime) return false;
+      if (!window.Ably?.Realtime) {
+        lastMetaReasonRef.current = 'Ably SDK 載入失敗（可能被網路或 CSP 擋下）。';
+        return false;
+      }
 
       const RealtimeCtor = window.Ably.Realtime.Promise ?? window.Ably.Realtime;
       const client = new RealtimeCtor({
-        authUrl: meta.ably.authUrl,
-        authMethod: 'GET',
         autoConnect: true,
+        authCallback: async (_tokenParams: unknown, callback: (err: unknown, tokenDetails: unknown) => void) => {
+          try {
+            const token = await requestToken();
+            callback(null, token);
+          } catch (err) {
+            callback(err, null);
+          }
+        },
       });
       ablyClientRef.current = client;
 
@@ -315,7 +365,8 @@ export function useAutotradingWS() {
           return;
         }
         if (current === 'failed' || current === 'suspended' || current === 'disconnected') {
-          startPolling(DEFAULT_POLLING_REASON);
+          const reason = stateChange?.reason?.message || `Ably 連線狀態：${current}`;
+          startPolling(`${reason}；已切換輪詢。`);
         }
       });
 
@@ -327,7 +378,9 @@ export function useAutotradingWS() {
       });
 
       return true;
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Ably 初始化失敗';
+      lastMetaReasonRef.current = msg;
       return false;
     }
   }, [applyEvent, pollSnapshot, startPolling, stopPolling]);
@@ -341,6 +394,9 @@ export function useAutotradingWS() {
         connectedViaAbly = await connectAbly();
       }
       if (!connectedViaAbly) {
+        if (lastMetaReasonRef.current) {
+          setState(prev => ({ ...prev, offlineReason: lastMetaReasonRef.current }));
+        }
         connectWs();
       }
     };
@@ -350,7 +406,7 @@ export function useAutotradingWS() {
     // Bootstrap fallback: avoid blank screen if all realtime handshakes stall.
     const bootstrapTimer = setTimeout(() => {
       if (connectedRef.current) return;
-      startPolling(DEFAULT_POLLING_REASON);
+      startPolling(lastMetaReasonRef.current || DEFAULT_POLLING_REASON);
     }, 4000);
 
     return () => {

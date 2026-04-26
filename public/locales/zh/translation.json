@@ -376,10 +376,60 @@
       "colConf": "AI 信心度 (Conf)",
       "colPos": "當前部位 (Pos)",
       "colPnl": "損益 (P/L)",
-      "noSymbols": "尚無監控標的"
+      "noSymbols": "尚無監控標的",
+      "marketTse": "上市",
+      "sellTag": "(賣出)"
     },
     "strategy": {
-      "tacticalConfig": "戰術配置 (Tactical Configuration)"
+      "tacticalConfig": "戰術配置 (Tactical Configuration)",
+      "names": {
+        "rsiReversion": "RSI 均值回歸",
+        "bollingerBreakout": "布林突破",
+        "macdMomentum": "MACD 動能",
+        "neuralAiSignal": "神經網路 AI 訊號"
+      },
+      "descs": {
+        "rsiReversion": "基於 RSI 的超買超賣反轉策略。",
+        "bollingerBreakout": "利用布林通道突破捕捉趨勢啟動。",
+        "macdMomentum": "以 MACD 動能交叉追蹤中期趨勢。",
+        "neuralAiSignal": "整合新聞、情緒與技術訊號的 AI 決策。"
+      },
+      "sectorTargeting": "產業板塊篩選",
+      "selector": {
+        "title": "AI 策略與權重",
+        "weight": "權重",
+        "explainableAi": "可解釋 AI（進場理由）",
+        "showAlphaReasoning": "在日誌顯示 alpha 推理",
+        "positionSizing": "倉位規模（動態）",
+        "fixed": "固定",
+        "riskBased": "風險基準",
+        "maxAllocationPerTrade": "每筆最大配置",
+        "fixedHint": "每筆交易使用固定資金下單。",
+        "riskPerTradePct": "單筆風險 (%)",
+        "riskPerTradeHint": "單筆預估虧損佔總資產比例。",
+        "maxPositionSizePct": "最大持倉比例 (%)",
+        "maxPositionHint": "限制單筆持倉上限，避免過度集中。",
+        "mtfFilter": "多週期濾網",
+        "enabled": "啟用",
+        "disabled": "停用",
+        "filterTimeframe": "過濾週期",
+        "trendIndicator": "趨勢指標",
+        "mtfHint": "僅在大週期趨勢與交易方向一致時下單，可降低震盪假突破。",
+        "riskExitControl": "風控與出場",
+        "activeHours": "啟用時段",
+        "timeframe": {
+          "15m": "15 分鐘",
+          "1h": "1 小時",
+          "4h": "4 小時",
+          "1d": "1 天"
+        },
+        "trendOption": {
+          "ema200": "EMA 200（長期）",
+          "ema50": "EMA 50（中期）",
+          "macd": "MACD 基準",
+          "priceAction": "高點/低點結構"
+        }
+      }
     },
     "commander": {
       "title": "戰略指揮官主控台",
@@ -427,7 +477,196 @@
       "closeSettings": "關閉實驗室設定",
       "modifyParams": "修改實驗參數",
       "empty": "實驗室目前是空的",
-      "emptyDesc": "點擊上方按鈕克隆目前的策略到實驗室，開始進行 A/B 測試。"
+      "emptyDesc": "點擊上方按鈕克隆目前的策略到實驗室，開始進行 A/B 測試。",
+      "field": {
+        "rsiPeriod": "RSI 週期",
+        "stopLoss": "停損",
+        "takeProfit": "停利",
+        "aiThreshold": "AI 門檻",
+        "stopLossPct": "停損 (%)"
+      }
+    },
+    "common": {
+      "to": "到",
+      "twd": "TWD"
+    },
+    "decisionHeat": {
+      "title": "決策熱度",
+      "waiting": "等待訊號中..."
+    },
+    "strategyFlow": {
+      "weight": "權重",
+      "globalIntelligenceHub": "全域情報中心",
+      "mtfFilter": "多週期濾網",
+      "bollingerBreak": "布林突破",
+      "neuralConsensusEngine": "神經共識引擎",
+      "match": "匹配度",
+      "confidenceThreshold": "信心門檻",
+      "positionSizing": "倉位規模",
+      "risk": "風險",
+      "fixedMode": "固定模式",
+      "executionAuthorized": "可執行",
+      "waitingForAlpha": "等待 alpha 訊號",
+      "alphaVersion": "Alpha v3.0",
+      "parallelLogicExecution": "平行邏輯執行",
+      "endToEndVisualized": "端到端可視化"
+    },
+    "broker": {
+      "title": "券商連線與 API 設定",
+      "restoreConfig": "已還原目前設定（{{broker}}）",
+      "connecting": "正在嘗試建立連線...",
+      "connectFailed": "券商連線失敗",
+      "comingSoon": "即將支援",
+      "requiresBridge": "需 Bridge",
+      "pythonBridgeUrl": "Python Bridge 位址",
+      "bridgePlaceholder": "http://localhost:8001",
+      "bridgeHint": "需先啟動 server/python/sinopac_bridge.py",
+      "apiKey": "API 金鑰",
+      "apiSecret": "API 密鑰 / Token",
+      "certPath": "憑證路徑 (.pfx)",
+      "certPathPlaceholder": "C:\\path\\to\\cert.pfx",
+      "accountId": "帳號 (Account ID)",
+      "unsupported": "此券商尚未支援",
+      "testAndSave": "測試並儲存券商連線",
+      "lastTested": "最後測試時間：{{time}}",
+      "brokers": {
+        "simulated": {
+          "name": "模擬券商（AI 模擬交易）",
+          "note": "內建高頻模擬引擎，支援台股交易稅與手續費模擬。"
+        },
+        "sinopac": {
+          "name": "永豐金（Shioaji）",
+          "note": "透過 Python Bridge 串接永豐 API，需安裝憑證。"
+        },
+        "fugle": {
+          "name": "Fugle（富果）",
+          "note": "使用 Fugle HTTP API 下單，支援即時庫存同步。"
+        },
+        "ib": {
+          "name": "Interactive Brokers（IB）",
+          "note": "全球市場交易介面，支援多資產類別。"
+        }
+      }
+    },
+    "optimizer": {
+      "title": "自動優化器",
+      "noNeed": "目前參數已接近最佳配置，暫無優化需求。",
+      "scanning": "掃描中...",
+      "scanForEvolution": "開始進化掃描",
+      "currentConfig": "目前配置",
+      "suggestedConfig": "建議配置",
+      "field": {
+        "rsi": "RSI",
+        "stopLoss": "停損",
+        "takeProfit": "停利"
+      }
+    },
+    "performance": {
+      "title": "績效儀表板",
+      "winRate": "勝率",
+      "trades": "筆",
+      "totalPnl": "總損益",
+      "avg": "平均",
+      "sharpe": "夏普值",
+      "sharpeGood": "優於水準",
+      "sharpeWeak": "待提升",
+      "maxDrawdown": "最大回撤",
+      "drawdownGood": "良好",
+      "drawdownWarn": "警戒",
+      "equityCurve": "資產曲線",
+      "drawdown": "回撤曲線",
+      "strategyAttribution": "策略歸因"
+    },
+    "orderBook": {
+      "title": "訂單生命週期",
+      "empty": "尚無訂單",
+      "cancelOrder": "取消委託",
+      "side": {
+        "buy": "買入",
+        "sell": "賣出",
+        "hold": "觀望",
+        "unknown": "未知"
+      },
+      "status": {
+        "pending": "等待中",
+        "partial": "部分成交",
+        "filled": "已成交",
+        "cancelled": "已取消",
+        "rejected": "已拒絕",
+        "unknown": "未知"
+      }
+    },
+    "alphaReport": {
+      "evolvingData": "報告演算中...",
+      "achievements": "成就",
+      "aiValueAdded": "AI 增益價值",
+      "neuralConfidenceEvolution": "神經信心演化",
+      "companionJournal": "AI 交易夥伴日誌",
+      "attributionMatrix": "歸因矩陣",
+      "growthStatusAdvancing": "成長狀態：持續進化",
+      "achievement": {
+        "criticalDefense": "關鍵防守",
+        "alphaCatcher": "超額捕手",
+        "winStreak": "連勝紀錄"
+      }
+    },
+    "copyTrading": {
+      "retrievingFollowers": "正在載入跟單帳戶...",
+      "masterEngine": "主策略引擎",
+      "followerNetwork": "跟單網路",
+      "mode": {
+        "shadow": "影子",
+        "live": "實盤"
+      },
+      "staggeredDelay": "階梯延遲",
+      "random": "隨機",
+      "multiplier": "倍率",
+      "status": "狀態",
+      "streaming": "同步中",
+      "offline": "離線",
+      "autoStoploss": "自動停損",
+      "testingPhaseNoExecution": "測試階段：不執行真實下單",
+      "balancePrefix": "餘額"
+    },
+    "notifications": {
+      "title": "通知通道",
+      "empty": "尚未設定任何通道",
+      "events": "事件",
+      "triggers": "觸發事件",
+      "addChannel": "新增通道",
+      "test": "測試",
+      "targetRequired": "target 必填",
+      "saveFailed": "儲存失敗",
+      "saved": "已儲存",
+      "testSent": "測試訊息已送出",
+      "channel": {
+        "telegram": {
+          "name": "Telegram",
+          "placeholder": "BOT_TOKEN:CHAT_ID",
+          "help": "從 @BotFather 取得 token，再用 @userinfobot 取得 chat id"
+        },
+        "discord": {
+          "name": "Discord",
+          "placeholder": "https://discord.com/api/webhooks/...",
+          "help": "在頻道 → 整合 → Webhook → 複製 URL"
+        },
+        "webhook": {
+          "name": "通用 Webhook",
+          "placeholder": "https://your-server.com/hook",
+          "help": "自訂 server，POST JSON"
+        },
+        "email": {
+          "name": "Email",
+          "placeholder": "you@example.com",
+          "help": "需設 RESEND_API_KEY 環境變數，否則只會寫入 log"
+        }
+      },
+      "trigger": {
+        "killSwitch": "Kill Switch 觸發",
+        "riskBlock": "訂單被風控攔截",
+        "fill": "訂單成交",
+        "dailyReport": "每日結算"
+      }
     }
   }
 }

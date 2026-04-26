@@ -375,10 +375,60 @@
       "colConf": "Conf",
       "colPos": "Pos",
       "colPnl": "P/L",
-      "noSymbols": "No monitored symbols"
+      "noSymbols": "No monitored symbols",
+      "marketTse": "TSE",
+      "sellTag": "(Sell)"
     },
     "strategy": {
-      "tacticalConfig": "Tactical Configuration"
+      "tacticalConfig": "Tactical Configuration",
+      "names": {
+        "rsiReversion": "RSI Reversion",
+        "bollingerBreakout": "Bollinger Breakout",
+        "macdMomentum": "MACD Momentum",
+        "neuralAiSignal": "Neural AI Signal"
+      },
+      "descs": {
+        "rsiReversion": "Mean-reversion strategy based on RSI overbought/oversold zones.",
+        "bollingerBreakout": "Capture trend ignition when price breaks Bollinger bands.",
+        "macdMomentum": "Follow medium-term trend through MACD momentum crossovers.",
+        "neuralAiSignal": "AI decision engine combining news, sentiment, and technical signals."
+      },
+      "sectorTargeting": "Sector Targeting",
+      "selector": {
+        "title": "AI Strategies & Weights",
+        "weight": "Weight",
+        "explainableAi": "Explainable AI (Entry Rationale)",
+        "showAlphaReasoning": "Show alpha reasoning in logs",
+        "positionSizing": "Position Sizing",
+        "fixed": "FIXED",
+        "riskBased": "RISK-BASED",
+        "maxAllocationPerTrade": "Max Allocation Per Trade",
+        "fixedHint": "Use a fixed amount for each order.",
+        "riskPerTradePct": "Risk Per Trade (%)",
+        "riskPerTradeHint": "Expected single-trade loss as percentage of total assets.",
+        "maxPositionSizePct": "Max Position Size (%)",
+        "maxPositionHint": "Cap single position size to avoid concentration risk.",
+        "mtfFilter": "MTF Filter",
+        "enabled": "ENABLED",
+        "disabled": "DISABLED",
+        "filterTimeframe": "Filter Timeframe",
+        "trendIndicator": "Trend Indicator",
+        "mtfHint": "Only trade when higher-timeframe trend aligns with direction to reduce noisy entries.",
+        "riskExitControl": "Risk & Exit Control",
+        "activeHours": "Active Hours",
+        "timeframe": {
+          "15m": "15 Minutes",
+          "1h": "1 Hour",
+          "4h": "4 Hours",
+          "1d": "1 Day"
+        },
+        "trendOption": {
+          "ema200": "EMA 200 (Long Term)",
+          "ema50": "EMA 50 (Mid Term)",
+          "macd": "MACD Baseline",
+          "priceAction": "Higher High/Low"
+        }
+      }
     },
     "commander": {
       "title": "Strategic Commander Console",
@@ -426,7 +476,196 @@
       "closeSettings": "CLOSE LAB SETTINGS",
       "modifyParams": "MODIFY LAB PARAMS",
       "empty": "Lab is Empty",
-      "emptyDesc": "Click the button above to clone current strategy to lab and start A/B testing."
+      "emptyDesc": "Click the button above to clone current strategy to lab and start A/B testing.",
+      "field": {
+        "rsiPeriod": "RSI Period",
+        "stopLoss": "Stop Loss",
+        "takeProfit": "Take Profit",
+        "aiThreshold": "AI Threshold",
+        "stopLossPct": "Stop Loss (%)"
+      }
+    },
+    "common": {
+      "to": "TO",
+      "twd": "TWD"
+    },
+    "decisionHeat": {
+      "title": "Decision Heat",
+      "waiting": "Waiting for Signal..."
+    },
+    "strategyFlow": {
+      "weight": "Weight",
+      "globalIntelligenceHub": "Global Intelligence Hub",
+      "mtfFilter": "MTF Filter",
+      "bollingerBreak": "Bollinger Break",
+      "neuralConsensusEngine": "Neural Consensus Engine",
+      "match": "Match",
+      "confidenceThreshold": "Confidence Threshold",
+      "positionSizing": "Position Sizing",
+      "risk": "Risk",
+      "fixedMode": "Fixed Mode",
+      "executionAuthorized": "EXECUTION_AUTHORIZED",
+      "waitingForAlpha": "WAITING_FOR_ALPHA",
+      "alphaVersion": "Alpha v3.0",
+      "parallelLogicExecution": "Parallel Logic Execution",
+      "endToEndVisualized": "End-to-End Visualized"
+    },
+    "broker": {
+      "title": "Broker Connectivity & API Setup",
+      "restoreConfig": "Restored current config ({{broker}})",
+      "connecting": "Trying to establish broker connection...",
+      "connectFailed": "Broker connection failed",
+      "comingSoon": "Coming Soon",
+      "requiresBridge": "Requires Bridge",
+      "pythonBridgeUrl": "Python Bridge URL",
+      "bridgePlaceholder": "http://localhost:8001",
+      "bridgeHint": "Start server/python/sinopac_bridge.py first",
+      "apiKey": "API Key",
+      "apiSecret": "API Secret / Token",
+      "certPath": "Certificate Path (.pfx)",
+      "certPathPlaceholder": "C:\\path\\to\\cert.pfx",
+      "accountId": "Account ID",
+      "unsupported": "This broker is not supported yet",
+      "testAndSave": "Test and Save Broker Connection",
+      "lastTested": "Last tested: {{time}}",
+      "brokers": {
+        "simulated": {
+          "name": "Simulated Broker (AI Paper Trading)",
+          "note": "Built-in simulation engine with Taiwan fee/tax modeling."
+        },
+        "sinopac": {
+          "name": "SinoPac (Shioaji)",
+          "note": "Connects to SinoPac via Python Bridge; certificate required."
+        },
+        "fugle": {
+          "name": "Fugle",
+          "note": "Uses Fugle HTTP API and supports real-time position sync."
+        },
+        "ib": {
+          "name": "Interactive Brokers (IB)",
+          "note": "Global market interface supporting multi-asset trading."
+        }
+      }
+    },
+    "optimizer": {
+      "title": "Auto-Optimizer",
+      "noNeed": "Current parameters are already near-optimal for this symbol.",
+      "scanning": "SCANNING...",
+      "scanForEvolution": "SCAN FOR EVOLUTION",
+      "currentConfig": "Current Config",
+      "suggestedConfig": "Suggested Config",
+      "field": {
+        "rsi": "RSI",
+        "stopLoss": "Stop Loss",
+        "takeProfit": "Take Profit"
+      }
+    },
+    "performance": {
+      "title": "Performance Dashboard",
+      "winRate": "Win Rate",
+      "trades": "trades",
+      "totalPnl": "Total PnL",
+      "avg": "Avg",
+      "sharpe": "Sharpe",
+      "sharpeGood": "Above baseline",
+      "sharpeWeak": "Needs improvement",
+      "maxDrawdown": "Max Drawdown",
+      "drawdownGood": "Healthy",
+      "drawdownWarn": "Warning",
+      "equityCurve": "Equity Curve",
+      "drawdown": "Drawdown",
+      "strategyAttribution": "Strategy Attribution"
+    },
+    "orderBook": {
+      "title": "Order Lifecycle",
+      "empty": "No orders yet",
+      "cancelOrder": "Cancel order",
+      "side": {
+        "buy": "BUY",
+        "sell": "SELL",
+        "hold": "HOLD",
+        "unknown": "UNKNOWN"
+      },
+      "status": {
+        "pending": "PENDING",
+        "partial": "PARTIAL",
+        "filled": "FILLED",
+        "cancelled": "CANCELLED",
+        "rejected": "REJECTED",
+        "unknown": "UNKNOWN"
+      }
+    },
+    "alphaReport": {
+      "evolvingData": "Evolving Report Data...",
+      "achievements": "Achievements",
+      "aiValueAdded": "AI Value Added",
+      "neuralConfidenceEvolution": "Neural Confidence Evolution",
+      "companionJournal": "Your AI Companion's Journal",
+      "attributionMatrix": "Attribution Matrix",
+      "growthStatusAdvancing": "Growth Status: Advancing",
+      "achievement": {
+        "criticalDefense": "CRITICAL_DEFENSE",
+        "alphaCatcher": "ALPHA_CATCHER",
+        "winStreak": "WIN_STREAK"
+      }
+    },
+    "copyTrading": {
+      "retrievingFollowers": "RETRIEVING_FOLLOWERS...",
+      "masterEngine": "Master Engine",
+      "followerNetwork": "Follower Network",
+      "mode": {
+        "shadow": "SHADOW",
+        "live": "LIVE"
+      },
+      "staggeredDelay": "Staggered Delay",
+      "random": "RANDOM",
+      "multiplier": "Multiplier",
+      "status": "Status",
+      "streaming": "Streaming",
+      "offline": "Offline",
+      "autoStoploss": "Auto-Stoploss",
+      "testingPhaseNoExecution": "TESTING_PHASE: NO_REAL_EXECUTION",
+      "balancePrefix": "BAL"
+    },
+    "notifications": {
+      "title": "Notification Channels",
+      "empty": "No channels configured",
+      "events": "events",
+      "triggers": "Triggers",
+      "addChannel": "Add Channel",
+      "test": "Test",
+      "targetRequired": "target is required",
+      "saveFailed": "Save failed",
+      "saved": "Saved",
+      "testSent": "Test message sent",
+      "channel": {
+        "telegram": {
+          "name": "Telegram",
+          "placeholder": "BOT_TOKEN:CHAT_ID",
+          "help": "Get token from @BotFather and chat id from @userinfobot"
+        },
+        "discord": {
+          "name": "Discord",
+          "placeholder": "https://discord.com/api/webhooks/...",
+          "help": "Channel -> Integrations -> Webhook -> Copy URL"
+        },
+        "webhook": {
+          "name": "Generic Webhook",
+          "placeholder": "https://your-server.com/hook",
+          "help": "Custom endpoint that accepts POST JSON"
+        },
+        "email": {
+          "name": "Email",
+          "placeholder": "you@example.com",
+          "help": "Requires RESEND_API_KEY; otherwise logs only"
+        }
+      },
+      "trigger": {
+        "killSwitch": "Kill Switch triggered",
+        "riskBlock": "Order blocked by risk control",
+        "fill": "Order filled",
+        "dailyReport": "Daily report"
+      }
     }
   }
 }

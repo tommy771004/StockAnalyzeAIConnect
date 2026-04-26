@@ -485,6 +485,12 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
+const rtMeta = getAutotradingRealtimeMeta();
+console.log(
+  `[AutoTrading Realtime] provider=${rtMeta.provider} ably.enabled=${rtMeta.ably.enabled} channel=${rtMeta.ably.channel}` +
+  (rtMeta.ably.reason ? ` reason=${rtMeta.ably.reason}` : '')
+);
+
 const lastPrices = new Map<string, number>();
 
 function isMarketOpen(symbol: string): boolean {

@@ -3,6 +3,7 @@
  * 最終進化版：具備多路徑分支與權重感知決策地圖
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Database, Zap, ShieldAlert, ShoppingCart, Cpu, Activity, TrendingUp, Compass, Target, BarChart3, Layers } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { StrategyParams } from './types';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props) {
+  const { t } = useTranslation();
   const updateParam = (key: keyof StrategyParams, value: any) => {
     onChange({ ...params, [key]: value });
   };
@@ -31,7 +33,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
         <div className={cn("p-1 rounded-sm", `bg-${color}-500/20`)}>
           <Icon className={cn("h-3.5 w-3.5", `text-${color}-400`)} />
         </div>
-        <div className="text-[8px] font-mono text-white/40 uppercase">Weight: {(weight * 100).toFixed(0)}%</div>
+        <div className="text-[8px] font-mono text-white/40 uppercase">{t('autotrading.strategyFlow.weight', 'Weight')}: {(weight * 100).toFixed(0)}%</div>
       </div>
       <div className="text-[10px] font-bold text-white mb-2 uppercase tracking-tighter">{title}</div>
       <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -63,11 +65,11 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
             )}>
               <Database className="h-4 w-4 text-blue-400" />
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-white uppercase tracking-widest">Global Intelligence Hub</span>
+                <span className="text-[11px] font-bold text-white uppercase tracking-widest">{t('autotrading.strategyFlow.globalIntelligenceHub', 'Global Intelligence Hub')}</span>
                 {params.enableMTF && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Layers className="h-2.5 w-2.5 text-blue-300" />
-                    <span className="text-[8px] text-blue-300 font-mono uppercase">MTF Filter: {params.mtfTimeframe} / {params.mtfTrendIndicator}</span>
+                    <span className="text-[8px] text-blue-300 font-mono uppercase">{t('autotrading.strategyFlow.mtfFilter', 'MTF Filter')}: {params.mtfTimeframe} / {params.mtfTrendIndicator}</span>
                   </div>
                 )}
               </div>
@@ -86,21 +88,21 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
           <div className="hidden md:block absolute top-[-20px] left-1/2 -translate-x-1/2 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           
           <StrategyNode 
-            title="RSI Reversion" 
+            title={t('autotrading.strategy.names.rsiReversion', 'RSI Reversion')} 
             icon={TrendingUp}
             weight={params.RSI_REVERSION?.weight || 0.2} 
             active={intensity > 20}
             color="cyan"
           />
           <StrategyNode 
-            title="Bollinger Break" 
+            title={t('autotrading.strategyFlow.bollingerBreak', 'Bollinger Break')} 
             icon={Compass}
             weight={params.BOLLINGER_BREAKOUT?.weight || 0.2} 
             active={intensity > 40}
             color="amber"
           />
           <StrategyNode 
-            title="MACD Momentum" 
+            title={t('autotrading.strategy.names.macdMomentum', 'MACD Momentum')} 
             icon={Target}
             weight={params.MACD_CROSS?.weight || 0.2} 
             active={intensity > 60}
@@ -118,15 +120,15 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Cpu className={cn("h-5 w-5", isFiring ? "text-violet-400 animate-spin" : "text-white/20")} />
-                <span className="text-[11px] font-bold text-white uppercase tracking-widest">Neural Consensus Engine</span>
+                <span className="text-[11px] font-bold text-white uppercase tracking-widest">{t('autotrading.strategyFlow.neuralConsensusEngine', 'Neural Consensus Engine')}</span>
               </div>
-              <div className="text-[10px] font-mono text-violet-400">{intensity}% Match</div>
+              <div className="text-[10px] font-mono text-violet-400">{intensity}% {t('autotrading.strategyFlow.match', 'Match')}</div>
             </div>
             
             {/* AI Threshold Slider Slider */}
             <div className="space-y-3">
               <div className="flex justify-between text-[9px] text-white/40 uppercase">
-                 <span>Confidence Threshold</span>
+                 <span>{t('autotrading.strategyFlow.confidenceThreshold', 'Confidence Threshold')}</span>
                  <span>{params.AI_LLM?.confidenceThreshold}%</span>
               </div>
               <input 
@@ -154,7 +156,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
                "text-[9px] font-bold uppercase tracking-widest",
                params.sizingMethod === 'risk_base' ? "text-violet-300" : "text-white/40"
              )}>
-               Position Sizing: {params.sizingMethod === 'risk_base' ? `Risk ${params.riskPerTradePct || 1}%` : 'Fixed Mode'}
+               {t('autotrading.strategyFlow.positionSizing', 'Position Sizing')}: {params.sizingMethod === 'risk_base' ? `${t('autotrading.strategyFlow.risk', 'Risk')} ${params.riskPerTradePct || 1}%` : t('autotrading.strategyFlow.fixedMode', 'Fixed Mode')}
              </span>
           </div>
         </div>
@@ -168,7 +170,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
           )}>
             <ShoppingCart className={cn("h-5 w-5", isFiring ? "text-emerald-400" : "text-white/10")} />
             <div className="text-[12px] font-bold text-white uppercase tracking-[0.2em]">
-              {isFiring ? "EXECUTION_AUTHORIZED" : "WAITING_FOR_ALPHA"}
+              {isFiring ? t('autotrading.strategyFlow.executionAuthorized', 'EXECUTION_AUTHORIZED') : t('autotrading.strategyFlow.waitingForAlpha', 'WAITING_FOR_ALPHA')}
             </div>
             <Zap className={cn("h-4 w-4", isFiring ? "text-emerald-400 animate-pulse" : "text-white/10")} />
           </div>
@@ -179,9 +181,9 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
       {/* 底部裝飾與說明 */}
       <div className="mt-8 pt-8 border-t border-white/5 flex justify-center">
         <div className="flex gap-8 text-[9px] font-bold text-white/20 uppercase tracking-widest">
-           <span>Alpha v3.0</span>
-           <span>Parallel Logic Execution</span>
-           <span>End-to-End Visualized</span>
+           <span>{t('autotrading.strategyFlow.alphaVersion', 'Alpha v3.0')}</span>
+           <span>{t('autotrading.strategyFlow.parallelLogicExecution', 'Parallel Logic Execution')}</span>
+           <span>{t('autotrading.strategyFlow.endToEndVisualized', 'End-to-End Visualized')}</span>
         </div>
       </div>
     </div>

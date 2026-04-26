@@ -33,13 +33,13 @@ export function AccountSummary({ balance }: Props) {
         <div>
           <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.account.totalAssets')}</div>
           <div className="text-sm font-bold font-mono text-(--color-term-text) mt-0.5">
-            TWD {balance ? fmt(balance.totalAssets) : '---'}
+            {t('autotrading.common.twd', 'TWD')} {balance ? fmt(balance.totalAssets) : '---'}
           </div>
         </div>
         <div>
           <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.account.availableMargin')}</div>
           <div className="text-sm font-bold font-mono text-(--color-term-accent) mt-0.5">
-            TWD {balance ? fmt(balance.availableMargin) : '---'}
+            {t('autotrading.common.twd', 'TWD')} {balance ? fmt(balance.availableMargin) : '---'}
           </div>
         </div>
 
@@ -66,7 +66,7 @@ export function AccountSummary({ balance }: Props) {
             'text-base font-bold font-mono mt-0.5',
             pnlPositive ? 'text-cyan-400' : 'text-rose-400'
           )}>
-            {pnlPositive ? '+' : ''}TWD {balance ? fmt(balance.dailyPnl) : '0'}
+            {pnlPositive ? '+' : ''}{t('autotrading.common.twd', 'TWD')} {balance ? fmt(balance.dailyPnl) : '0'}
           </div>
         </div>
       </div>
