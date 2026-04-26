@@ -44,6 +44,13 @@ export function AutoTradingPage() {
 
   // 監控標的優先序：WS 載入 > /defaults > 空陣列
   const currentSymbols = ws.config?.symbols ?? defaults?.config.symbols ?? [];
+  const connectionLabel = ws.connected
+    ? (ws.transport === 'ably'
+      ? t('autotrading.statusLabels.connectedViaAbly', '● Ably Realtime')
+      : t('autotrading.statusLabels.connected'))
+    : (ws.transport === 'polling'
+      ? t('autotrading.statusLabels.polling', '◐ 輪詢模式')
+      : t('autotrading.statusLabels.offline'));
 
   return (
     <div className="h-full flex flex-col gap-2 overflow-hidden font-mono">
@@ -80,7 +87,7 @@ export function AutoTradingPage() {
               ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
               : 'text-(--color-term-muted) border-(--color-term-border)'
           }`}>
-            {ws.connected ? t('autotrading.statusLabels.connected') : t('autotrading.statusLabels.offline')}
+            {connectionLabel}
           </span>
           <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border ${
             ws.status === 'running'
@@ -92,6 +99,13 @@ export function AutoTradingPage() {
         </div>
       </div>
 
+      {ws.transport === 'polling' && (
+        <div className="px-3 py-2 border border-amber-500/25 bg-amber-500/10 text-amber-200 rounded-sm text-[11px]">
+          {t('autotrading.statusLabels.fallbackPolling', 'Realtime 未連線，已切換為輪詢模式。')}
+          {ws.offlineReason ? ` ${ws.offlineReason}` : ''}
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
         {/* Left — Logs + Asset Monitor or Other Tabs */}
@@ -100,7 +114,14 @@ export function AutoTradingPage() {
             <>
               {/* Decision Log */}
               <div className="flex-1 border border-(--color-term-border) rounded-sm min-h-0 overflow-hidden">
-                <DecisionLog logs={ws.logs} />
+                <DecisionLog
+                  logs={ws.logs}
+                  connectionInfo={{
+                    connected: ws.connected,
+                    transport: ws.transport,
+                    reason: ws.offlineReason,
+                  }}
+                />
               </div>
               {/* Asset Monitor */}
               <div className="h-52 border border-(--color-term-border) rounded-sm overflow-hidden shrink-0">

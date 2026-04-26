@@ -56,23 +56,130 @@ const TPEX_INDUSTRY_BY_ID: Record<string, string> = {
   '^063': '金融保險業',
 };
 
+/**
+ * Unified industry code mapping (TWSE/TPEX) used to match sector constituents
+ * even when source payload only has numeric code (e.g. SecuritiesIndustryCode=24).
+ */
+const SECTOR_INDUSTRY_CODES: Record<string, string[]> = {
+  // TWSE sectors
+  '^011': ['01'], // 水泥
+  '^012': ['02'], // 食品
+  '^013': ['03'], // 塑膠
+  '^014': ['04'], // 紡織
+  '^015': ['05'], // 電機機械
+  '^016': ['06'], // 電器電纜
+  '^017': ['21'], // 化學
+  '^018': ['22'], // 生技醫療
+  '^019': ['08'], // 玻璃陶瓷
+  '^020': ['09'], // 造紙
+  '^021': ['10'], // 鋼鐵
+  '^022': ['11'], // 橡膠
+  '^023': ['12'], // 汽車
+  '^024': ['24'], // 半導體
+  '^025': ['25'], // 電腦及週邊
+  '^026': ['26'], // 光電
+  '^027': ['27'], // 通信網路
+  '^028': ['28'], // 電子零組件
+  '^029': ['29'], // 電子通路
+  '^030': ['30'], // 資訊服務
+  '^031': ['31'], // 其他電子
+  '^032': ['14'], // 建材營造
+  '^033': ['15'], // 航運
+  '^034': ['16'], // 觀光餐旅
+  '^035': ['17'], // 金融保險
+  '^036': ['18'], // 貿易百貨
+  '^037': ['23'], // 油電燃氣
+  '^038': ['20'], // 其他
+  // TPEX sectors
+  '^048': ['22'], // 生技醫療
+  '^052': ['24'], // 半導體
+  '^053': ['25'], // 電腦及週邊
+  '^054': ['26'], // 光電
+  '^055': ['27'], // 通信網路
+  '^056': ['28'], // 電子零組件
+  '^057': ['29'], // 電子通路
+  '^058': ['30'], // 資訊服務
+  '^059': ['31'], // 其他電子
+  '^063': ['17'], // 金融保險
+};
+
+const INDUSTRY_NAME_BY_CODE: Record<string, string> = {
+  '01': '水泥工業',
+  '02': '食品工業',
+  '03': '塑膠工業',
+  '04': '紡織纖維',
+  '05': '電機機械',
+  '06': '電器電纜',
+  '08': '玻璃陶瓷',
+  '09': '造紙工業',
+  '10': '鋼鐵工業',
+  '11': '橡膠工業',
+  '12': '汽車工業',
+  '14': '建材營造業',
+  '15': '航運業',
+  '16': '觀光餐旅',
+  '17': '金融保險業',
+  '18': '貿易百貨業',
+  '20': '其他業',
+  '21': '化學工業',
+  '22': '生技醫療業',
+  '23': '油電燃氣業',
+  '24': '半導體業',
+  '25': '電腦及週邊設備業',
+  '26': '光電業',
+  '27': '通信網路業',
+  '28': '電子零組件業',
+  '29': '電子通路業',
+  '30': '資訊服務業',
+  '31': '其他電子業',
+};
+
 interface IndustryStock {
   code: string;
   market: 'TWSE' | 'TPEX';
+  industryCode?: string;
+  industryName?: string;
+}
+
+interface IndustryDirectory {
+  byName: Map<string, IndustryStock[]>;
+  byCode: Map<string, IndustryStock[]>;
 }
 
 let _industryCache: IndustryStock[] | null = null;
 let _industryCacheTime = 0;
 const INDUSTRY_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
 let _industryByName = new Map<string, IndustryStock[]>();
+let _industryByCode = new Map<string, IndustryStock[]>();
 
-async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
+function normalizeIndustryCode(input: unknown): string | null {
+  if (input == null) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+  const direct = raw.match(/^\d{1,2}$/);
+  if (direct) return direct[0].padStart(2, '0');
+  const embedded = raw.match(/\b(\d{1,2})\b/);
+  if (embedded) return embedded[1].padStart(2, '0');
+  return null;
+}
+
+function indexByKey(map: Map<string, IndustryStock[]>, key: string | undefined, stock: IndustryStock) {
+  if (!key) return;
+  const k = key.trim();
+  if (!k) return;
+  const list = map.get(k) ?? [];
+  list.push(stock);
+  map.set(k, list);
+}
+
+async function fetchIndustryDirectory(): Promise<IndustryDirectory> {
   const now = Date.now();
   if (_industryCache && now - _industryCacheTime < INDUSTRY_CACHE_TTL) {
-    return _industryByName;
+    return { byName: _industryByName, byCode: _industryByCode };
   }
 
   const byName = new Map<string, IndustryStock[]>();
+  const byCode = new Map<string, IndustryStock[]>();
   const all: IndustryStock[] = [];
 
   // 1. TWSE 上市公司行業別
@@ -84,15 +191,19 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     if (r.ok) {
       const data = await r.json() as Array<Record<string, string>>;
       for (const item of data) {
-        // TWSE OpenAPI 真實欄位名稱：公司代號 / 產業別 (中文)；英文欄位 Code / Industry 為兼容
-        const code = item['公司代號'] ?? item['Code'] ?? item['SecuritiesCompanyCode'];
-        const industry = item['產業別'] ?? item['產業類別'] ?? item['Industry'];
-        if (!code || !industry) continue;
-        const stock: IndustryStock = { code, market: 'TWSE' };
+        const codeRaw = item['公司代號'] ?? item['Code'] ?? item['SecuritiesCompanyCode'];
+        const industryRaw = item['產業別'] ?? item['產業類別'] ?? item['Industry'] ?? item['SecuritiesIndustryCode'];
+        const code = String(codeRaw ?? '').trim();
+        if (!code) continue;
+        const industryCode = normalizeIndustryCode(industryRaw);
+        const industryNameRaw = String(industryRaw ?? '').trim();
+        const industryName = industryCode
+          ? (INDUSTRY_NAME_BY_CODE[industryCode] ?? (/[^\d]/.test(industryNameRaw) ? industryNameRaw : undefined))
+          : (industryNameRaw || undefined);
+        const stock: IndustryStock = { code, market: 'TWSE', industryCode: industryCode ?? undefined, industryName };
         all.push(stock);
-        const list = byName.get(industry) ?? [];
-        list.push(stock);
-        byName.set(industry, list);
+        indexByKey(byCode, industryCode ?? undefined, stock);
+        indexByKey(byName, industryName, stock);
       }
     }
   } catch (e) {
@@ -108,14 +219,19 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     if (r.ok) {
       const data = await r.json() as Array<Record<string, string>>;
       for (const item of data) {
-        const code = item['SecuritiesCompanyCode'] ?? item['公司代號'] ?? item['Code'];
-        const industry = item['Industry'] ?? item['產業別'] ?? item['產業類別'];
-        if (!code || !industry) continue;
-        const stock: IndustryStock = { code, market: 'TPEX' };
+        const codeRaw = item['SecuritiesCompanyCode'] ?? item['公司代號'] ?? item['Code'];
+        const industryRaw = item['SecuritiesIndustryCode'] ?? item['Industry'] ?? item['產業別'] ?? item['產業類別'];
+        const code = String(codeRaw ?? '').trim();
+        if (!code) continue;
+        const industryCode = normalizeIndustryCode(industryRaw);
+        const industryNameRaw = String(industryRaw ?? '').trim();
+        const industryName = industryCode
+          ? (INDUSTRY_NAME_BY_CODE[industryCode] ?? (/[^\d]/.test(industryNameRaw) ? industryNameRaw : undefined))
+          : (industryNameRaw || undefined);
+        const stock: IndustryStock = { code, market: 'TPEX', industryCode: industryCode ?? undefined, industryName };
         all.push(stock);
-        const list = byName.get(industry) ?? [];
-        list.push(stock);
-        byName.set(industry, list);
+        indexByKey(byCode, industryCode ?? undefined, stock);
+        indexByKey(byName, industryName, stock);
       }
     }
   } catch (e) {
@@ -131,13 +247,11 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     if (r.ok) {
       const data = await r.json() as Array<Record<string, string>>;
       for (const item of data) {
-        const code = item['Code'] ?? item['證券代號'];
+        const code = String(item['Code'] ?? item['證券代號'] ?? '').trim();
         if (!code || !/^00/.test(code)) continue; // ETF 代碼一律 00 開頭
         const stock: IndustryStock = { code, market: 'TWSE' };
         all.push(stock);
-        const list = byName.get('ETF') ?? [];
-        list.push(stock);
-        byName.set('ETF', list);
+        indexByKey(byName, 'ETF', stock);
       }
     }
   } catch (e) {
@@ -148,10 +262,11 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     _industryCache = all;
     _industryCacheTime = now;
     _industryByName = byName;
+    _industryByCode = byCode;
     console.log(`[SectorService] Industry directory cached: ${all.length} stocks across ${byName.size} categories`);
   }
 
-  return _industryByName;
+  return { byName: _industryByName, byCode: _industryByCode };
 }
 
 // ^264 (電子上市) 是合成類別，包含所有電子相關產業
@@ -166,8 +281,10 @@ const TWSE_ELECTRONICS_INDUSTRIES = [
   '其他電子業',
 ];
 
+const ELECTRONICS_INDUSTRY_CODES = ['24', '25', '26', '27', '28', '29', '30', '31'];
+
 async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
-  const byName = await fetchIndustryDirectory();
+  const { byName, byCode } = await fetchIndustryDirectory();
 
   // 特殊類別 1：ETF (^554) — 全部 00 開頭代號
   if (sectorId === '^554') {
@@ -178,9 +295,21 @@ async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
   // 特殊類別 2：電子 (上市) ^264 — 合成所有電子相關產業
   if (sectorId === '^264') {
     const codes = new Set<string>();
-    for (const ind of TWSE_ELECTRONICS_INDUSTRIES) {
-      for (const s of byName.get(ind) ?? []) {
+    for (const indCode of ELECTRONICS_INDUSTRY_CODES) {
+      for (const s of byCode.get(indCode) ?? []) {
         if (s.market === 'TWSE') codes.add(s.code);
+      }
+    }
+    if (codes.size === 0) {
+      // Fallback: if TWSE source is unavailable, still return cross-market symbols
+      for (const indCode of ELECTRONICS_INDUSTRY_CODES) {
+        for (const s of byCode.get(indCode) ?? []) codes.add(s.code);
+      }
+    }
+    if (codes.size === 0) {
+      // Last resort for legacy data source keyed by name
+      for (const ind of TWSE_ELECTRONICS_INDUSTRIES) {
+        for (const s of byName.get(ind) ?? []) codes.add(s.code);
       }
     }
     return [...codes];
@@ -188,14 +317,24 @@ async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
 
   const isTpex = sectorId in TPEX_INDUSTRY_BY_ID;
   const isTwse = sectorId in TWSE_INDUSTRY_BY_ID;
-  if (!isTpex && !isTwse) return [];
+  const targetCodes = SECTOR_INDUSTRY_CODES[sectorId] ?? [];
+  if (!isTpex && !isTwse && targetCodes.length === 0) return [];
 
   const targetIndustry = isTpex ? TPEX_INDUSTRY_BY_ID[sectorId] : TWSE_INDUSTRY_BY_ID[sectorId];
   const targetMarket: 'TWSE' | 'TPEX' = isTpex ? 'TPEX' : 'TWSE';
 
-  const matches = byName.get(targetIndustry) ?? [];
-  const filtered = matches.filter(m => m.market === targetMarket);
-  return filtered.map(m => m.code);
+  const codeMatches = targetCodes.flatMap(c => byCode.get(c) ?? []);
+  const nameMatches = byName.get(targetIndustry) ?? [];
+  const matches = codeMatches.length > 0 ? codeMatches : nameMatches;
+  if (matches.length === 0) return [];
+
+  const preferred = matches.filter(m => m.market === targetMarket);
+  if (preferred.length > 0) {
+    return Array.from(new Set(preferred.map(m => m.code)));
+  }
+
+  // Graceful fallback: source may currently only have one market dataset available.
+  return Array.from(new Set(matches.map(m => m.code)));
 }
 
 // Data source: WantGoo Industry Mapping

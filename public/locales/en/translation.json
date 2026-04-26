@@ -280,7 +280,10 @@
     },
     "statusLabels": {
       "connected": "● CONNECTED",
+      "connectedViaAbly": "● ABLY REALTIME",
       "offline": "○ OFFLINE",
+      "polling": "◐ POLLING MODE",
+      "fallbackPolling": "Realtime connection unavailable. Switched to polling mode.",
       "liveMode": "● LIVE_MODE",
       "simulated": "SIMULATED"
     },
@@ -296,7 +299,8 @@
     },
     "decisionLog": {
       "title": "AI Decision Log :: Real-Time Analysis",
-      "waiting": "Waiting for AI engine to start..."
+      "waiting": "Waiting for AI engine to start...",
+      "fallbackPolling": "Realtime connection unavailable. Switched to polling mode."
     },
     "account": {
       "title": "Account Summary",
@@ -327,6 +331,20 @@
       "range0_50": "Between 0-50 %"
     },
     "monitor": {
+      "quickstartTitle": "Quick Start Guide",
+      "quickstartSubtitle": "Select symbols → Choose strategy → Risk control → Start",
+      "steps": {
+        "selectSymbols": "Select monitored symbols",
+        "selectStrategies": "Choose strategies",
+        "configureRisk": "Configure risk controls",
+        "startEngine": "Start engine"
+      },
+      "checklist": {
+        "symbols": "Select at least one monitored symbol",
+        "strategies": "Enable at least one strategy",
+        "risk": "Complete risk controls (budget / max daily loss)"
+      },
+      "startBlocked": "Required before start",
       "marketMood": "Global Market Mood (AI)",
       "mood": {
         "optimistic": "OPTIMISTIC",
@@ -412,3 +430,4 @@
     }
   }
 }
+

@@ -5,10 +5,10 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
-import { Activity, Play, Square, MessageSquareCode, LineChart, TrendingUp } from 'lucide-react';
+import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { DecisionHeatmap } from './DecisionHeatmap';
-import type { DecisionHeat, EquitySnapshot } from './types';
+import type { AgentConfig, DecisionHeat, EquitySnapshot } from './types';
 
 interface Props {
   symbols: string[];
@@ -16,19 +16,85 @@ interface Props {
   decisionHeats: Record<string, DecisionHeat>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
+  config: AgentConfig | null;
+  onNavigateTab?: (tab: 'strategy' | 'broker') => void;
   onStart: () => void;
   onStop: () => void;
 }
 
-export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
+export function MonitorTab({
+  symbols,
+  isRunning,
+  decisionHeats,
+  globalSentiment,
+  equityHistory,
+  config,
+  onNavigateTab,
+  onStart,
+  onStop,
+}: Props) {
   const { t } = useTranslation();
   const heats = Object.values(decisionHeats).sort((a, b) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
   const latestHeat = heats[0];
+  const strategies = config?.strategies ?? [];
+  const hasSymbols = symbols.length > 0;
+  const hasStrategies = strategies.length > 0;
+  const hasRisk =
+    (config?.budgetLimitTWD ?? 0) > 0 &&
+    (config?.maxDailyLossTWD ?? 0) > 0;
+  const readyToStart = hasSymbols && hasStrategies && hasRisk;
+
+  const missingItems: string[] = [];
+  if (!hasSymbols) missingItems.push(t('autotrading.monitor.checklist.symbols'));
+  if (!hasStrategies) missingItems.push(t('autotrading.monitor.checklist.strategies'));
+  if (!hasRisk) missingItems.push(t('autotrading.monitor.checklist.risk'));
+
+  const steps = [
+    { id: 1, label: t('autotrading.monitor.steps.selectSymbols'), done: hasSymbols, action: () => onNavigateTab?.('strategy') },
+    { id: 2, label: t('autotrading.monitor.steps.selectStrategies'), done: hasStrategies, action: () => onNavigateTab?.('strategy') },
+    { id: 3, label: t('autotrading.monitor.steps.configureRisk'), done: hasRisk },
+    { id: 4, label: t('autotrading.monitor.steps.startEngine'), done: isRunning },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      {/* Quick Start Guide */}
+      <div className="bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-widest">
+            {t('autotrading.monitor.quickstartTitle', '首屏操作指引')}
+          </span>
+          <span className="text-[9px] text-cyan-100/70">
+            {t('autotrading.monitor.quickstartSubtitle', '先選標的 → 選策略 → 風控 → 啟動')}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {steps.map((step) => (
+            <button
+              key={step.id}
+              type="button"
+              onClick={step.action}
+              disabled={!step.action}
+              className={cn(
+                'text-left p-2 rounded border text-[11px] transition-colors flex items-center justify-between gap-2',
+                step.done
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border-cyan-400/20 bg-black/30 text-cyan-100/90',
+                !step.action && 'cursor-default'
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-cyan-300">#{step.id}</span>
+                <span>{step.label}</span>
+              </span>
+              {step.done ? <CheckCircle2 className="h-4 w-4" /> : (step.action ? <ArrowRight className="h-4 w-4 opacity-70" /> : <CircleAlert className="h-4 w-4 opacity-70" />)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Market Mood Gauge */}
       <div className="bg-white/2 border border-white/5 p-4 rounded-sm space-y-3">
         <div className="flex justify-between items-center">
@@ -166,6 +232,12 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
 
       {/* Control Action */}
       <div className="pt-6 border-t border-white/5">
+        {!isRunning && missingItems.length > 0 && (
+          <div className="mb-3 p-2 rounded border border-amber-500/25 bg-amber-500/10 text-[11px] text-amber-200">
+            <div className="font-bold mb-1">{t('autotrading.monitor.startBlocked', '啟動前需完成')}</div>
+            <div>{missingItems.join(' / ')}</div>
+          </div>
+        )}
         {isRunning ? (
           <button 
             onClick={onStop} 
@@ -175,8 +247,14 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
           </button>
         ) : (
           <button 
-            onClick={onStart} 
-            className="w-full py-3 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-cyan-500/30 transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+            onClick={onStart}
+            disabled={!readyToStart}
+            className={cn(
+              'w-full py-3 rounded font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2',
+              readyToStart
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
+                : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700 cursor-not-allowed'
+            )}
           >
             <Play className="h-4 w-4 fill-current" /> {t('autotrading.monitor.initiateEngine')}
           </button>

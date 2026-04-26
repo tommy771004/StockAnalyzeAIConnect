@@ -429,6 +429,11 @@ export const stopAutotrading = () => fetchJ<any>('/api/autotrading/stop', { meth
 export const triggerKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch', { method: 'POST' });
 export const releaseKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch/release', { method: 'POST' });
 export const getAutotradingDefaults = () => fetchJ<any>('/api/autotrading/defaults');
+export const getAutotradingRealtimeMeta = () => fetchJ<{
+  provider: 'ably' | 'ws';
+  ably: { enabled: boolean; channel: string; authUrl: string };
+  fallback: 'polling';
+}>('/api/autotrading/realtime/meta');
 export const getMarketSession = (symbols: string[]) =>
   fetchJ<any>(`/api/autotrading/session?symbols=${encodeURIComponent(symbols.join(','))}`);
 export const updateAutotradingConfig = (cfg: Record<string, unknown>) => fetchJ<any>('/api/autotrading/config', {
@@ -436,3 +441,7 @@ export const updateAutotradingConfig = (cfg: Record<string, unknown>) => fetchJ<
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(cfg),
 });
+export const getAutotradingLogs = (limit = 100) =>
+  fetchJ<any[]>(`/api/autotrading/logs?limit=${encodeURIComponent(String(limit))}`);
+export const getAutotradingPositions = () => fetchJ<any[]>('/api/autotrading/positions');
+export const getAutotradingBalance = () => fetchJ<any>('/api/autotrading/balance');

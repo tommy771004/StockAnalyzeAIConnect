@@ -142,6 +142,8 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
             decisionHeats={decisionHeats}
             globalSentiment={globalSentiment}
             equityHistory={equityHistory}
+            config={config}
+            onNavigateTab={(tab) => setActiveTab(tab)}
             onStart={() => onStart({ mode, strategies, params, symbols })} 
             onStop={onStop} 
           />

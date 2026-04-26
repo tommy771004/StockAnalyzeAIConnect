@@ -11,6 +11,11 @@ import { LOG_LEVEL_COLORS } from './types';
 interface Props {
   logs: AgentLog[];
   autoScroll?: boolean;
+  connectionInfo?: {
+    connected: boolean;
+    transport: 'none' | 'ably' | 'ws' | 'polling';
+    reason?: string;
+  };
 }
 
 function formatTs(iso: string): string {
@@ -22,7 +27,7 @@ function formatTs(iso: string): string {
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
-export function DecisionLog({ logs, autoScroll = true }: Props) {
+export function DecisionLog({ logs, autoScroll = true, connectionInfo }: Props) {
   const { t } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -44,8 +49,14 @@ export function DecisionLog({ logs, autoScroll = true }: Props) {
 
       <div className="flex-1 overflow-y-auto font-mono text-[11px] p-2 space-y-0.5">
         {logs.length === 0 ? (
-          <div className="text-(--color-term-muted) text-center py-8">
-            {t('autotrading.decisionLog.waiting')}
+          <div className="text-(--color-term-muted) text-center py-8 space-y-2">
+            <div>{t('autotrading.decisionLog.waiting')}</div>
+            {connectionInfo?.transport === 'polling' && (
+              <div className="inline-block px-2 py-1 text-[10px] rounded border border-amber-400/30 bg-amber-500/10 text-amber-200">
+                {t('autotrading.decisionLog.fallbackPolling', 'Realtime 未連線，已切換為輪詢模式。')}
+                {connectionInfo.reason ? ` ${connectionInfo.reason}` : ''}
+              </div>
+            )}
           </div>
         ) : (
           logs.map(log => (

@@ -41,6 +41,12 @@ import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
 import { generateWeeklyReport } from './server/services/reportService.js';
 import { copyTradingService } from './server/services/copyTradingService.js';
+import {
+  isAblyEnabled,
+  getAutotradingRealtimeMeta,
+  createAutotradingToken,
+  publishAutotradingEvent,
+} from './server/services/ablyRealtime.js';
 
 
 
@@ -538,6 +544,8 @@ setWsBroadcast((data: unknown) => {
   autotradingWsClients.forEach(ws => {
     if (ws.readyState === 1) ws.send(msg);
   });
+  // Managed realtime bridge (Ably) for environments where raw WS upgrades are limited.
+  void publishAutotradingEvent(data);
 });
 
 (app as any).ws('/ws/autotrading', (ws: any) => {
@@ -553,6 +561,23 @@ setWsBroadcast((data: unknown) => {
 });
 
 // ─── AutoTrading REST API ─────────────────────────────────────────────────────
+
+app.get('/api/autotrading/realtime/meta', authMiddleware, (_req, res) => {
+  res.json(getAutotradingRealtimeMeta());
+});
+
+app.get('/api/autotrading/ably/token', authMiddleware, async (req: AuthRequest, res) => {
+  if (!isAblyEnabled()) {
+    return res.status(501).json({ error: 'Ably is not configured on server' });
+  }
+  try {
+    const clientId = req.userId ? `user:${req.userId}` : undefined;
+    const token = await createAutotradingToken(clientId);
+    res.json(token);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
 
 app.get('/api/autotrading/status', authMiddleware, (_req, res) => {
   res.json({

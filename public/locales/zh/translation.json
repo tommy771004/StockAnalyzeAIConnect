@@ -281,7 +281,10 @@
     },
     "statusLabels": {
       "connected": "● 已連線",
+      "connectedViaAbly": "● Ably Realtime",
       "offline": "○ 離線",
+      "polling": "◐ 輪詢模式",
+      "fallbackPolling": "Realtime 未連線，已切換為輪詢模式。",
       "liveMode": "● 實盤模式",
       "simulated": "模擬模式"
     },
@@ -297,7 +300,8 @@
     },
     "decisionLog": {
       "title": "AI 決策日誌 :: 即時分析",
-      "waiting": "等待 AI 引擎啟動..."
+      "waiting": "等待 AI 引擎啟動...",
+      "fallbackPolling": "Realtime 未連線，已切換為輪詢模式。"
     },
     "account": {
       "title": "帳戶摘要",
@@ -328,6 +332,20 @@
       "range0_50": "介於 0-50 %"
     },
     "monitor": {
+      "quickstartTitle": "首屏操作指引",
+      "quickstartSubtitle": "先選標的 → 選策略 → 風控 → 啟動",
+      "steps": {
+        "selectSymbols": "選擇監控標的",
+        "selectStrategies": "設定策略",
+        "configureRisk": "完成風控設定",
+        "startEngine": "啟動引擎"
+      },
+      "checklist": {
+        "symbols": "至少選 1 檔監控標的",
+        "strategies": "至少啟用 1 個策略",
+        "risk": "完成風控參數（預算 / 單日虧損）"
+      },
+      "startBlocked": "啟動前需完成",
       "marketMood": "全球市場情緒 (AI)",
       "mood": {
         "optimistic": "樂觀",
@@ -413,3 +431,4 @@
     }
   }
 }
+
