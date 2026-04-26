@@ -3,6 +3,7 @@
  * 策略分頁組件：切換視覺化與列表視圖，並整合優化面板
  */
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Map as MapIcon, List, Settings2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { StrategyFlowBuilder } from './StrategyFlowBuilder';
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function StrategyTab({ strategies, params, onStrategiesChange, onParamsChange, isRunning, activeHeat }: Props) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 
   return (
@@ -28,7 +30,7 @@ export function StrategyTab({ strategies, params, onStrategiesChange, onParamsCh
       <div className="flex justify-between items-center bg-black/40 p-1.5 rounded border border-white/5">
         <div className="flex items-center gap-2 px-2">
            <Settings2 className="h-3 w-3 text-white/20" />
-           <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Tactical Configuration</span>
+           <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{t('autotrading.strategy.tacticalConfig')}</span>
         </div>
         <div className="flex gap-1">
           <button 

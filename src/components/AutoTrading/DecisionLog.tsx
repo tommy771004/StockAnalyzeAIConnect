@@ -3,6 +3,7 @@
  * AI 決策 Log 即時串流面板
  */
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { AgentLog } from './types';
 import { LOG_LEVEL_COLORS } from './types';
@@ -22,6 +23,7 @@ function formatTs(iso: string): string {
 }
 
 export function DecisionLog({ logs, autoScroll = true }: Props) {
+  const { t } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,14 +38,14 @@ export function DecisionLog({ logs, autoScroll = true }: Props) {
           <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
         </span>
         <span className="text-[10px] font-bold tracking-[0.2em] text-cyan-400 uppercase">
-          AI Decision Log :: Real-Time Analysis
+          {t('autotrading.decisionLog.title')}
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto font-mono text-[11px] p-2 space-y-0.5">
         {logs.length === 0 ? (
           <div className="text-(--color-term-muted) text-center py-8">
-            等待 AI 引擎啟動...
+            {t('autotrading.decisionLog.waiting')}
           </div>
         ) : (
           logs.map(log => (

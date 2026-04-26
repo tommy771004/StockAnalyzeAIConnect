@@ -3,6 +3,7 @@
  * 帳戶摘要面板
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { AccountBalance } from './types';
 
@@ -13,6 +14,7 @@ interface Props {
 const fmt = (n: number) => n.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
 
 export function AccountSummary({ balance }: Props) {
+  const { t } = useTranslation();
   const pnlPositive = (balance?.dailyPnl ?? 0) >= 0;
   const utilization = balance
     ? Math.round((balance.usedMargin / balance.totalAssets) * 100)
@@ -24,18 +26,18 @@ export function AccountSummary({ balance }: Props) {
         <span className="h-3 w-3 rounded-full bg-(--color-term-accent)/30 flex items-center justify-center">
           <span className="h-1.5 w-1.5 rounded-full bg-(--color-term-accent)" />
         </span>
-        Account Summary
+        {t('autotrading.account.title')}
       </h3>
 
       <div className="space-y-2">
         <div>
-          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">總資產 (Total Assets)</div>
+          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.account.totalAssets')}</div>
           <div className="text-sm font-bold font-mono text-(--color-term-text) mt-0.5">
             TWD {balance ? fmt(balance.totalAssets) : '---'}
           </div>
         </div>
         <div>
-          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">可用資金 (Available Margin)</div>
+          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.account.availableMargin')}</div>
           <div className="text-sm font-bold font-mono text-(--color-term-accent) mt-0.5">
             TWD {balance ? fmt(balance.availableMargin) : '---'}
           </div>
@@ -44,7 +46,7 @@ export function AccountSummary({ balance }: Props) {
         {/* Utilization bar */}
         <div>
           <div className="flex justify-between text-[9px] text-(--color-term-muted) mb-1">
-            <span>Utilization</span>
+            <span>{t('autotrading.account.utilization')}</span>
             <span>{utilization}%</span>
           </div>
           <div className="h-1 bg-(--color-term-border) rounded-full overflow-hidden">
@@ -59,7 +61,7 @@ export function AccountSummary({ balance }: Props) {
         </div>
 
         <div>
-          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">當日損益 (Daily P/L)</div>
+          <div className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.account.dailyPnl')}</div>
           <div className={cn(
             'text-base font-bold font-mono mt-0.5',
             pnlPositive ? 'text-cyan-400' : 'text-rose-400'

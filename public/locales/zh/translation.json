@@ -267,5 +267,149 @@
     "search": "搜尋",
     "refresh": "重新整理",
     "noData": "暫無資料"
+  },
+  "autotrading": {
+    "title": "自動化交易",
+    "status": "狀態",
+    "commanderCenter": "AI 指揮中心 v3.0",
+    "resetBreaker": "重置斷路器",
+    "tabs": {
+      "liveView": "即時監控",
+      "strategy": "策略配置",
+      "backtest": "回測模擬",
+      "simulation": "實驗沙盒"
+    },
+    "statusLabels": {
+      "connected": "● 已連線",
+      "offline": "○ 離線",
+      "liveMode": "● 實盤模式",
+      "simulated": "模擬模式"
+    },
+    "nav": {
+      "monitor": "監控",
+      "strategy": "策略",
+      "lab": "實驗室",
+      "accounts": "帳戶",
+      "journal": "日誌",
+      "backtest": "回測",
+      "chat": "對話",
+      "broker": "券商"
+    },
+    "decisionLog": {
+      "title": "AI 決策日誌 :: 即時分析",
+      "waiting": "等待 AI 引擎啟動..."
+    },
+    "account": {
+      "title": "帳戶摘要",
+      "totalAssets": "總資產 (Total Assets)",
+      "availableMargin": "可用資金 (Available Margin)",
+      "utilization": "資金利用率",
+      "dailyPnl": "當日損益 (Daily P/L)"
+    },
+    "risk": {
+      "title": "風控設定面板",
+      "killActive": "緊急停機啟動中",
+      "totalBudget": "總預算上限 (Total Budget)",
+      "maxDailyLoss": "單日最大虧損 (Max Daily Loss)",
+      "maxSinglePosition": "單筆部位上限 (Max Single Position)",
+      "maxPositionPct": "最大部位佔比 (Max Position %)",
+      "stopLossPct": "個股停損比例 (Stop Loss %)",
+      "saveParams": "儲存風控參數",
+      "todayLoss": "今日虧損",
+      "lossStreak": "連損計數 (Loss Streak)",
+      "releaseKill": "解除緊急停機",
+      "killSwitch": "緊急平倉 (Kill Switch)",
+      "killConfirmDesc": "確認啟動緊急平倉？此動作會立即停止 AI 引擎並阻擋後續所有訂單。",
+      "saveSuccess": "風控參數已寫入",
+      "saveError": "儲存失敗",
+      "invalidValue": "必須為正數",
+      "tooLarge": "不可大於總預算",
+      "range0_100": "介於 0-100 %",
+      "range0_50": "介於 0-50 %"
+    },
+    "monitor": {
+      "marketMood": "全球市場情緒 (AI)",
+      "mood": {
+        "optimistic": "樂觀",
+        "pessimistic": "悲觀",
+        "neutral": "中立"
+      },
+      "livePerformance": "即時會話表現",
+      "collectingData": "正在收集績效數據...",
+      "alphaReasoning": "即時策略推理 (Alpha Reasoning)",
+      "bias": {
+        "bullish": "看多偏誤",
+        "bearish": "看空偏誤"
+      },
+      "confidence": {
+        "high": "高信心度",
+        "moderate": "中等信心度"
+      },
+      "waitingInsights": "等待 AI 洞察...",
+      "emergencyStop": "緊急停止 (EMERGENCY_STOP)",
+      "initiateEngine": "啟動引擎 (INITIATE_ENGINE)"
+    },
+    "asset": {
+      "title": "資產監控 :: 台股",
+      "filterActive": "過濾器已啟動",
+      "colSymbol": "標的 (Symbol)",
+      "colPrice": "最新價 (Price)",
+      "colChange": "漲跌 (Change)",
+      "colConf": "AI 信心度 (Conf)",
+      "colPos": "當前部位 (Pos)",
+      "colPnl": "損益 (P/L)",
+      "noSymbols": "尚無監控標的"
+    },
+    "strategy": {
+      "tacticalConfig": "戰術配置 (Tactical Configuration)"
+    },
+    "commander": {
+      "title": "戰略指揮官主控台",
+      "shadowActive": "影子渦流已啟動",
+      "ready": "系統就緒",
+      "waiting": "等待戰術指令...",
+      "example": "嘗試輸入: \"將 2330 止損設為 2%\" 或 \"開啟一個影子激進策略\"",
+      "success": "執行成功",
+      "failed": "執行失敗",
+      "parsing": "AI 指揮官正在解析戰術...",
+      "placeholder": "輸入戰術指令...",
+      "errorPrefix": "錯誤: "
+    },
+    "backtest": {
+      "title": "回測: {{symbol}}",
+      "desc": "使用目前策略配置與歷史數據進行模擬",
+      "periods": {
+        "30d": "過去 30 天",
+        "90d": "過去 90 天",
+        "180d": "過去 180 天",
+        "1y": "過去 1 年"
+      },
+      "run": "執行回測 (RUN TEST)",
+      "roi": "投資報酬率 (ROI)",
+      "winRate": "勝率 (WIN RATE)",
+      "maxDrawdown": "最大回撤 (MAX DRAWDOWN)",
+      "totalTrades": "總交易次數 (TOTAL TRADES)",
+      "history": "交易執行歷史",
+      "win": "勝",
+      "loss": "負",
+      "prompt": "點擊「執行回測」開始進行分析"
+    },
+    "sandbox": {
+      "title": "策略沙盒實驗室",
+      "desc": "進行 A/B 測試，在不冒險的情況下優化參數",
+      "researchTitle": "AI 研究助理",
+      "researchPlaceholder": "例如：幫我找最近關於動能策略在台股市場有效性的論文...",
+      "search": "搜尋 (SEARCH)",
+      "researchError": "執行研究時發生錯誤。",
+      "clone": "克隆目前配置到實驗室",
+      "shadowMode": "影子模式",
+      "promote": "升級為正式策略",
+      "delete": "刪除實驗",
+      "observing": "正在並行觀察中...",
+      "closeSettings": "關閉實驗室設定",
+      "modifyParams": "修改實驗參數",
+      "empty": "實驗室目前是空的",
+      "emptyDesc": "點擊上方按鈕克隆目前的策略到實驗室，開始進行 A/B 測試。"
+    }
   }
 }

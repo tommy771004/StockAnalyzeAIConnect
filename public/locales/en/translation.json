@@ -266,5 +266,149 @@
     "search": "Search",
     "refresh": "Refresh",
     "noData": "No data"
+  },
+  "autotrading": {
+    "title": "Autonomous Trading",
+    "status": "STATUS",
+    "commanderCenter": "AI Command Center v3.0",
+    "resetBreaker": "RESET_BREAKER",
+    "tabs": {
+      "liveView": "LIVE_VIEW",
+      "strategy": "STRATEGY",
+      "backtest": "BACKTEST",
+      "simulation": "SIMULATION"
+    },
+    "statusLabels": {
+      "connected": "● CONNECTED",
+      "offline": "○ OFFLINE",
+      "liveMode": "● LIVE_MODE",
+      "simulated": "SIMULATED"
+    },
+    "nav": {
+      "monitor": "Monitor",
+      "strategy": "Strategy",
+      "lab": "Lab",
+      "accounts": "Accounts",
+      "journal": "Journal",
+      "backtest": "Backtest",
+      "chat": "Chat",
+      "broker": "Broker"
+    },
+    "decisionLog": {
+      "title": "AI Decision Log :: Real-Time Analysis",
+      "waiting": "Waiting for AI engine to start..."
+    },
+    "account": {
+      "title": "Account Summary",
+      "totalAssets": "Total Assets",
+      "availableMargin": "Available Margin",
+      "utilization": "Utilization",
+      "dailyPnl": "Daily P/L"
+    },
+    "risk": {
+      "title": "Risk Control Panel",
+      "killActive": "KILL ACTIVE",
+      "totalBudget": "Total Budget",
+      "maxDailyLoss": "Max Daily Loss",
+      "maxSinglePosition": "Max Single Position",
+      "maxPositionPct": "Max Position %",
+      "stopLossPct": "Stop Loss %",
+      "saveParams": "Save Risk Parameters",
+      "todayLoss": "Today's Loss",
+      "lossStreak": "Loss Streak",
+      "releaseKill": "Release Kill Switch",
+      "killSwitch": "Kill Switch (Emergency Close)",
+      "killConfirmDesc": "Confirm activate emergency close? This will immediately stop AI engine and block all subsequent orders.",
+      "saveSuccess": "Risk parameters saved",
+      "saveError": "Save failed",
+      "invalidValue": "Must be a positive number",
+      "tooLarge": "Cannot exceed total budget",
+      "range0_100": "Between 0-100 %",
+      "range0_50": "Between 0-50 %"
+    },
+    "monitor": {
+      "marketMood": "Global Market Mood (AI)",
+      "mood": {
+        "optimistic": "OPTIMISTIC",
+        "pessimistic": "PESSIMISTIC",
+        "neutral": "NEUTRAL"
+      },
+      "livePerformance": "Live Session Performance",
+      "collectingData": "Collecting Performance Data...",
+      "alphaReasoning": "Live Alpha Reasoning",
+      "bias": {
+        "bullish": "Bullish Bias",
+        "bearish": "Bearish Bias"
+      },
+      "confidence": {
+        "high": "High Confidence",
+        "moderate": "Moderate Confidence"
+      },
+      "waitingInsights": "Waiting for AI Insights...",
+      "emergencyStop": "EMERGENCY_STOP",
+      "initiateEngine": "INITIATE_ENGINE"
+    },
+    "asset": {
+      "title": "Asset Monitor :: TW Stocks",
+      "filterActive": "FILTER_ACTIVE",
+      "colSymbol": "Symbol",
+      "colPrice": "Price",
+      "colChange": "Change",
+      "colConf": "Conf",
+      "colPos": "Pos",
+      "colPnl": "P/L",
+      "noSymbols": "No monitored symbols"
+    },
+    "strategy": {
+      "tacticalConfig": "Tactical Configuration"
+    },
+    "commander": {
+      "title": "Strategic Commander Console",
+      "shadowActive": "Shadow Vortex Active",
+      "ready": "System Ready",
+      "waiting": "Waiting for tactical command...",
+      "example": "Try: \"Set stop loss for 2330 to 2%\" or \"Start an aggressive shadow strategy\"",
+      "success": "Execution Success",
+      "failed": "Execution Failed",
+      "parsing": "AI Commander parsing tactics...",
+      "placeholder": "Enter tactical command...",
+      "errorPrefix": "Error: "
+    },
+    "backtest": {
+      "title": "Backtest: {{symbol}}",
+      "desc": "Simulate using current strategy and historical data",
+      "periods": {
+        "30d": "Last 30 Days",
+        "90d": "Last 90 Days",
+        "180d": "Last 180 Days",
+        "1y": "Last 1 Year"
+      },
+      "run": "RUN TEST",
+      "roi": "ROI",
+      "winRate": "WIN RATE",
+      "maxDrawdown": "MAX DRAWDOWN",
+      "totalTrades": "TOTAL TRADES",
+      "history": "Trade Execution History",
+      "win": "WIN",
+      "loss": "LOSS",
+      "prompt": "Click 'RUN TEST' to start analysis"
+    },
+    "sandbox": {
+      "title": "Strategy Sandbox Lab",
+      "desc": "Perform A/B testing and optimize parameters safely",
+      "researchTitle": "AI Research Assistant",
+      "researchPlaceholder": "e.g., Find recent papers on momentum strategy effectiveness in TW stocks...",
+      "search": "SEARCH",
+      "researchError": "Error performing research.",
+      "clone": "CLONE CURRENT TO LAB",
+      "shadowMode": "SHADOW MODE",
+      "promote": "Promote to LIVE",
+      "delete": "Delete Experiment",
+      "observing": "Observing in parallel...",
+      "closeSettings": "CLOSE LAB SETTINGS",
+      "modifyParams": "MODIFY LAB PARAMS",
+      "empty": "Lab is Empty",
+      "emptyDesc": "Click the button above to clone current strategy to lab and start A/B testing."
+    }
   }
 }

@@ -3,11 +3,13 @@
  * AI 指揮官終端：自然語言控制介面
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Terminal, Send, Zap, Bot, ShieldCheck, Ghost } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { CommanderLog } from './types';
 
 export function CommanderTerminal() {
+  const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [logs, setLogs] = useState<CommanderLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export function CommanderTerminal() {
       const newLog: CommanderLog = {
         id: Math.random().toString(36).substring(7),
         command: userCmd,
-        actionTaken: data.ok ? data.actionTaken : `錯誤: ${data.error}`,
+        actionTaken: data.ok ? data.actionTaken : `${t('autotrading.commander.errorPrefix')}${data.error}`,
         status: data.ok ? 'SUCCESS' : 'FAILED',
         timestamp: new Date().toISOString()
       };
@@ -54,16 +56,16 @@ export function CommanderTerminal() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border) bg-white/5">
         <div className="flex items-center gap-2">
           <Terminal className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">Strategic Commander Console</span>
+          <span className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">{t('autotrading.commander.title')}</span>
         </div>
         <div className="flex items-center gap-4">
            <div className="flex items-center gap-1">
              <Ghost className="h-3 w-3 text-violet-400" />
-             <span className="text-[8px] text-violet-400 uppercase">Shadow Vortex Active</span>
+             <span className="text-[8px] text-violet-400 uppercase">{t('autotrading.commander.shadowActive')}</span>
            </div>
            <div className="flex items-center gap-1">
              <ShieldCheck className="h-3 w-3 text-emerald-400" />
-             <span className="text-[8px] text-emerald-400 uppercase">System Ready</span>
+             <span className="text-[8px] text-emerald-400 uppercase">{t('autotrading.commander.ready')}</span>
            </div>
         </div>
       </div>
@@ -73,8 +75,8 @@ export function CommanderTerminal() {
         {logs.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
             <Bot className="h-10 w-10 mb-2" />
-            <div className="text-[10px] uppercase tracking-tighter">等待戰術指令...</div>
-            <div className="text-[8px] mt-1 max-w-[200px]">嘗試輸入: "將 2330 止損設為 2%" 或 "開啟一個影子激進策略"</div>
+            <div className="text-[10px] uppercase tracking-tighter">{t('autotrading.commander.waiting')}</div>
+            <div className="text-[8px] mt-1 max-w-[200px]">{t('autotrading.commander.example')}</div>
           </div>
         )}
         {logs.map((log) => (
@@ -89,7 +91,7 @@ export function CommanderTerminal() {
             )}>
               <div className="flex items-center gap-1.5 mb-1 opacity-50">
                 <Zap className="h-2.5 w-2.5" />
-                <span className="text-[8px] uppercase">{log.status === 'SUCCESS' ? 'Execution Success' : 'Execution Failed'}</span>
+                <span className="text-[8px] uppercase">{log.status === 'SUCCESS' ? t('autotrading.commander.success') : t('autotrading.commander.failed')}</span>
                 <span className="ml-auto text-[7px]">{new Date(log.timestamp).toLocaleTimeString()}</span>
               </div>
               {log.actionTaken}
@@ -99,7 +101,7 @@ export function CommanderTerminal() {
         {loading && (
           <div className="flex items-center gap-2 text-cyan-500/50 animate-pulse ml-4">
             <div className="h-1 w-1 bg-cyan-500 rounded-full" />
-            <span className="text-[9px]">AI 指揮官正在解析戰術...</span>
+            <span className="text-[9px]">{t('autotrading.commander.parsing')}</span>
           </div>
         )}
       </div>
@@ -111,7 +113,7 @@ export function CommanderTerminal() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendCommand()}
-          placeholder="輸入戰術指令..."
+          placeholder={t('autotrading.commander.placeholder')}
           className="flex-1 bg-transparent border-none text-[11px] text-white placeholder-white/20 focus:outline-none"
         />
         <button 

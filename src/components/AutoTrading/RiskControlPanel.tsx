@@ -9,6 +9,7 @@
  *  - 解除 Kill Switch 改為呼叫 /api/autotrading/kill-switch/release
  */
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Lock, Unlock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import * as api from '../../services/api';
@@ -35,6 +36,7 @@ interface FormErrors {
 }
 
 export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Props) {
+  const { t } = useTranslation();
   const [budgetLimit, setBudgetLimit] = useState<number>(riskStats?.config.budgetLimitTWD ?? 0);
   const [dailyLoss, setDailyLoss] = useState<number>(riskStats?.config.maxDailyLossTWD ?? 0);
   const [singlePosition, setSinglePosition] = useState<number>(riskStats?.config.maxSinglePositionTWD ?? 0);
@@ -58,13 +60,13 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
 
   function validate(): FormErrors {
     const e: FormErrors = {};
-    if (!(budgetLimit > 0)) e.budget = '必須為正數';
-    if (!(dailyLoss > 0)) e.daily = '必須為正數';
-    else if (dailyLoss > budgetLimit) e.daily = '不可大於總預算';
-    if (!(singlePosition > 0)) e.single = '必須為正數';
-    else if (singlePosition > budgetLimit) e.single = '不可大於總預算';
-    if (!(positionPct > 0 && positionPct <= 100)) e.positionPct = '介於 0-100 %';
-    if (!(stopLossPct > 0 && stopLossPct <= 50)) e.stopLoss = '介於 0-50 %';
+    if (!(budgetLimit > 0)) e.budget = t('autotrading.risk.invalidValue');
+    if (!(dailyLoss > 0)) e.daily = t('autotrading.risk.invalidValue');
+    else if (dailyLoss > budgetLimit) e.daily = t('autotrading.risk.tooLarge');
+    if (!(singlePosition > 0)) e.single = t('autotrading.risk.invalidValue');
+    else if (singlePosition > budgetLimit) e.single = t('autotrading.risk.tooLarge');
+    if (!(positionPct > 0 && positionPct <= 100)) e.positionPct = t('autotrading.risk.range0_100');
+    if (!(stopLossPct > 0 && stopLossPct <= 50)) e.stopLoss = t('autotrading.risk.range0_50');
     return e;
   }
 
@@ -72,7 +74,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length) {
-      setToast({ type: 'error', msg: '欄位錯誤，請修正後再試。' });
+      setToast({ type: 'error', msg: t('common.error') });
       return;
     }
     try {
@@ -83,9 +85,9 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
         maxPositionPct: positionPct / 100,
         stopLossPct: stopLossPct / 100,
       });
-      setToast({ type: 'success', msg: '風控參數已寫入' });
+      setToast({ type: 'success', msg: t('autotrading.risk.saveSuccess') });
     } catch (err) {
-      setToast({ type: 'error', msg: (err as Error).message ?? '儲存失敗' });
+      setToast({ type: 'error', msg: (err as Error).message ?? t('autotrading.risk.saveError') });
     }
   }
 
@@ -98,7 +100,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
   async function handleReleaseKill() {
     try {
       await api.releaseKillSwitch();
-      setToast({ type: 'success', msg: 'Kill Switch 已解除' });
+      setToast({ type: 'success', msg: t('autotrading.risk.releaseKill') });
     } catch (e) {
       setToast({ type: 'error', msg: (e as Error).message });
     }
@@ -111,37 +113,37 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
     )}>
       <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase flex items-center gap-2 text-rose-400">
         <AlertTriangle className="h-3 w-3" />
-        Risk Control Panel
+        {t('autotrading.risk.title')}
         {isKillActive && (
           <span className="ml-auto text-[9px] bg-rose-500/20 border border-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded animate-pulse">
-            KILL ACTIVE
+            {t('autotrading.risk.killActive')}
           </span>
         )}
       </h3>
 
       <NumberField
-        label="總預算上限 (Total Budget)"
+        label={t('autotrading.risk.totalBudget')}
         unit="TWD"
         value={budgetLimit}
         onChange={setBudgetLimit}
         error={errors.budget}
       />
       <NumberField
-        label="單日最大虧損 (Max Daily Loss)"
+        label={t('autotrading.risk.maxDailyLoss')}
         unit="TWD"
         value={dailyLoss}
         onChange={setDailyLoss}
         error={errors.daily}
       />
       <NumberField
-        label="單筆部位上限 (Max Single Position)"
+        label={t('autotrading.risk.maxSinglePosition')}
         unit="TWD"
         value={singlePosition}
         onChange={setSinglePosition}
         error={errors.single}
       />
       <NumberField
-        label="最大部位佔比 (Max Position %)"
+        label={t('autotrading.risk.maxPositionPct')}
         unit="%"
         value={positionPct}
         onChange={setPositionPct}
@@ -149,7 +151,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
         step={0.5}
       />
       <NumberField
-        label="個股停損比例 (Stop Loss %)"
+        label={t('autotrading.risk.stopLossPct')}
         unit="%"
         value={stopLossPct}
         onChange={setStopLossPct}
@@ -162,14 +164,14 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
         onClick={handleSave}
         className="w-full py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
       >
-        儲存風控參數
+        {t('autotrading.risk.saveParams')}
       </button>
 
       {/* Daily loss progress */}
       {riskStats && riskStats.dailyLoss > 0 && (
         <div>
           <div className="flex justify-between text-[9px] text-(--color-term-muted) mb-1">
-            <span>今日虧損</span>
+            <span>{t('autotrading.risk.todayLoss')}</span>
             <span>{((riskStats.dailyLoss / riskStats.config.maxDailyLossTWD) * 100).toFixed(1)}%</span>
           </div>
           <div className="h-1 bg-(--color-term-border) rounded-full overflow-hidden">
@@ -184,7 +186,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       {/* Loss Streak Badge */}
       {riskStats && (
         <div className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded">
-           <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">連損計數 (Loss Streak)</span>
+           <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.risk.lossStreak')}</span>
            <span className={cn(
              "text-[12px] font-bold font-mono",
              riskStats.lossStreakCount > 0 ? "text-amber-400" : "text-emerald-400"
@@ -207,25 +209,25 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
           )}
         >
           {isKillActive ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          {isKillActive ? '解除緊急停機' : '緊急平倉 (Kill Switch)'}
+          {isKillActive ? t('autotrading.risk.releaseKill') : t('autotrading.risk.killSwitch')}
         </button>
       ) : (
         <div className="space-y-2">
-          <p className="text-[10px] text-rose-300 text-center">確認啟動緊急平倉？此動作會立即停止 AI 引擎並阻擋後續所有訂單。</p>
+          <p className="text-[10px] text-rose-300 text-center">{t('autotrading.risk.killConfirmDesc')}</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setKillConfirm(false)}
               className="flex-1 py-2 rounded text-xs font-bold bg-(--color-term-surface) text-(--color-term-muted) border border-(--color-term-border) hover:bg-(--color-term-panel)"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               type="button"
               onClick={() => { setKillConfirm(false); onKillSwitch(); }}
               className="flex-1 py-2 rounded text-xs font-bold bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
             >
-              確認執行
+              {t('common.confirm')}
             </button>
           </div>
         </div>

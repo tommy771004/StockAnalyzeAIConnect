@@ -3,6 +3,7 @@
  * 多股資產監控表格
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { Position, AgentLog } from './types';
 
@@ -20,6 +21,7 @@ function getConfidenceFromLogs(logs: AgentLog[], symbol: string): { conf: number
 const fmt = (n: number, d = 2) => n.toLocaleString('zh-TW', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export function AssetMonitor({ positions, symbols, logs }: Props) {
+  const { t } = useTranslation();
   const posMap = new Map(positions.map(p => [p.symbol, p]));
 
   // Show all monitored symbols, with positions if any
@@ -33,10 +35,10 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border) shrink-0">
         <span className="text-[10px] font-bold tracking-[0.2em] text-(--color-term-muted) uppercase">
-          Asset Monitor :: TW Stocks
+          {t('autotrading.asset.title')}
         </span>
         <span className="text-[9px] text-(--color-term-muted) border border-(--color-term-border) px-2 py-0.5 rounded">
-          FILTER_ACTIVE
+          {t('autotrading.asset.filterActive')}
         </span>
       </div>
 
@@ -44,19 +46,19 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="border-b border-(--color-term-border) text-(--color-term-muted) text-[9px] uppercase tracking-wider">
-              <th className="text-left px-3 py-1.5">標的 (Symbol)</th>
-              <th className="text-right px-2 py-1.5">最新價 (Price)</th>
-              <th className="text-right px-2 py-1.5">漲跌 (Change)</th>
-              <th className="text-right px-2 py-1.5">AI信心度 (Conf)</th>
-              <th className="text-right px-2 py-1.5">當前部位 (Pos)</th>
-              <th className="text-right px-3 py-1.5">損益 (P/L)</th>
+              <th className="text-left px-3 py-1.5">{t('autotrading.asset.colSymbol')}</th>
+              <th className="text-right px-2 py-1.5">{t('autotrading.asset.colPrice')}</th>
+              <th className="text-right px-2 py-1.5">{t('autotrading.asset.colChange')}</th>
+              <th className="text-right px-2 py-1.5">{t('autotrading.asset.colConf')}</th>
+              <th className="text-right px-2 py-1.5">{t('autotrading.asset.colPos')}</th>
+              <th className="text-right px-3 py-1.5">{t('autotrading.asset.colPnl')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-8 text-(--color-term-muted)">
-                  尚無監控標的
+                  {t('autotrading.asset.noSymbols')}
                 </td>
               </tr>
             ) : (

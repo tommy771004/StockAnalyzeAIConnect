@@ -3,6 +3,7 @@
  * 主控制面板 (重構優化版) — 導航中心與核心狀態管理
  */
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   BarChart3, Settings2, Cpu, LayoutGrid, ShieldCheck, Activity, MessageSquareCode, 
   AlertTriangle, FlaskConical, BookOpen, Users 
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts'>('monitor');
   const [defaultsConfig, setDefaultsConfig] = useState<Partial<AgentConfig> | null>(null);
 
@@ -74,8 +76,8 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
               <Cpu className={cn("h-4 w-4", isRunning ? "text-emerald-400 animate-pulse" : "text-white/20")} />
            </div>
            <div>
-              <div className="text-[11px] font-bold text-white uppercase tracking-wider">AI_COMMAND_CENTER v3.0</div>
-              <div className="text-[9px] text-(--color-term-muted) font-mono">STATUS: {status.toUpperCase()}</div>
+              <div className="text-[11px] font-bold text-white uppercase tracking-wider">{t('autotrading.commanderCenter')}</div>
+              <div className="text-[9px] text-(--color-term-muted) font-mono">{t('autotrading.status')}: {status.toUpperCase()}</div>
            </div>
         </div>
 
@@ -84,7 +86,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
             onClick={() => api.resetCircuitBreaker()}
             className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold rounded animate-pulse"
           >
-            <AlertTriangle className="h-3 w-3" /> RESET_BREAKER
+            <AlertTriangle className="h-3 w-3" /> {t('autotrading.resetBreaker')}
           </button>
         )}
       </div>
@@ -92,14 +94,14 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
       {/* 2. Navigation Matrix */}
       <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide border-b border-white/5">
         {[
-          { id: 'monitor', icon: <Activity className="h-3.5 w-3.5" />, label: 'Monitor' },
-          { id: 'strategy', icon: <LayoutGrid className="h-3.5 w-3.5" />, label: 'Strategy' },
-          { id: 'lab', icon: <FlaskConical className="h-3.5 w-3.5" />, label: 'Lab' },
-          { id: 'accounts', icon: <Users className="h-3.5 w-3.5" />, label: 'Accounts' },
-          { id: 'journal', icon: <BookOpen className="h-3.5 w-3.5" />, label: 'Journal' },
-          { id: 'backtest', icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Backtest' },
-          { id: 'commander', icon: <MessageSquareCode className="h-3.5 w-3.5" />, label: 'Chat' },
-          { id: 'broker', icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Broker' },
+          { id: 'monitor', icon: <Activity className="h-3.5 w-3.5" />, label: t('autotrading.nav.monitor') },
+          { id: 'strategy', icon: <LayoutGrid className="h-3.5 w-3.5" />, label: t('autotrading.nav.strategy') },
+          { id: 'lab', icon: <FlaskConical className="h-3.5 w-3.5" />, label: t('autotrading.nav.lab') },
+          { id: 'accounts', icon: <Users className="h-3.5 w-3.5" />, label: t('autotrading.nav.accounts') },
+          { id: 'journal', icon: <BookOpen className="h-3.5 w-3.5" />, label: t('autotrading.nav.journal') },
+          { id: 'backtest', icon: <BarChart3 className="h-3.5 w-3.5" />, label: t('autotrading.nav.backtest') },
+          { id: 'commander', icon: <MessageSquareCode className="h-3.5 w-3.5" />, label: t('autotrading.nav.chat') },
+          { id: 'broker', icon: <ShieldCheck className="h-3.5 w-3.5" />, label: t('autotrading.nav.broker') },
         ].map(t => (
           <button
             key={t.id}

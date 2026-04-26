@@ -3,6 +3,7 @@
  * 策略沙盒實驗室：管理影子策略與進行 A/B 測試
  */
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlaskConical, Copy, ArrowUpCircle, Trash2, Zap, Sliders, Search, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { AgentConfig, StrategyParams } from './types';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }: Props) {
+  const { t } = useTranslation();
   const [editingName, setEditingName] = useState<string | null>(null);
   const [researchQuery, setResearchQuery] = useState('');
   const [researchResult, setResearchResult] = useState('');
@@ -41,7 +43,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
       }
     } catch (e) {
       console.error(e);
-      setResearchResult('Error performing research.');
+      setResearchResult(t('autotrading.sandbox.researchError'));
     } finally {
       setIsSearching(false);
     }
@@ -53,13 +55,13 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
       <div className="bg-white/5 border border-white/10 rounded-sm p-4">
         <div className="flex items-center gap-3 mb-3">
           <Search className="h-4 w-4 text-cyan-400" />
-          <div className="text-[11px] font-bold text-white uppercase">AI Research Assistant</div>
+          <div className="text-[11px] font-bold text-white uppercase">{t('autotrading.sandbox.researchTitle')}</div>
         </div>
         <div className="flex items-center gap-2">
           <input
             type="text"
             className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-1.5 text-[11px] text-white outline-none"
-            placeholder="例如：幫我找最近關於動能策略在台股市場有效性的論文..."
+            placeholder={t('autotrading.sandbox.researchPlaceholder')}
             value={researchQuery}
             onChange={e => setResearchQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleResearch()}
@@ -69,7 +71,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
             disabled={isSearching}
             className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-[10px] font-bold flex items-center transition-all"
           >
-            {isSearching ? <Loader2 className="h-3 w-3 animate-spin" /> : 'SEARCH'}
+            {isSearching ? <Loader2 className="h-3 w-3 animate-spin" /> : t('autotrading.sandbox.search')}
           </button>
         </div>
         {researchResult && (
@@ -84,15 +86,15 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
         <div className="flex items-center gap-3">
           <FlaskConical className="h-5 w-5 text-cyan-400 animate-pulse" />
           <div>
-            <div className="text-[11px] font-bold text-white uppercase tracking-widest">Strategy Sandbox Lab</div>
-            <div className="text-[9px] text-cyan-400/70">進行 A/B 測試，在不冒險的情況下優化參數</div>
+            <div className="text-[11px] font-bold text-white uppercase tracking-widest">{t('autotrading.sandbox.title')}</div>
+            <div className="text-[9px] text-cyan-400/70">{t('autotrading.sandbox.desc')}</div>
           </div>
         </div>
         <button
           onClick={cloneCurrent}
           className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded text-[10px] font-bold flex items-center gap-2 transition-all"
         >
-          <Copy className="h-3.5 w-3.5" /> CLONE CURRENT TO LAB
+          <Copy className="h-3.5 w-3.5" /> {t('autotrading.sandbox.clone')}
         </button>
       </div>
 
@@ -104,18 +106,18 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                 <span className="text-[12px] font-mono font-bold text-white uppercase">{name}</span>
-                <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40">SHADOW MODE</span>
+                <span className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40">{t('autotrading.sandbox.shadowMode')}</span>
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
                    onClick={() => onPromote(shadow.params!)}
-                   className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded" title="升級為正式策略"
+                   className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded" title={t('autotrading.sandbox.promote')}
                 >
                   <ArrowUpCircle className="h-4 w-4" />
                 </button>
                 <button 
                    onClick={() => onDelete(name)}
-                   className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded" title="刪除實驗"
+                   className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded" title={t('autotrading.sandbox.delete')}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -177,14 +179,14 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
                      <Zap className="h-3 w-3 text-cyan-400" />
-                     <span className="text-[10px] text-white/60">正在並行觀察中...</span>
+                     <span className="text-[10px] text-white/60">{t('autotrading.sandbox.observing')}</span>
                   </div>
                 </div>
                 <button 
                   className="text-[10px] text-cyan-400 flex items-center gap-1 hover:underline"
                   onClick={() => setEditingName(editingName === name ? null : name)}
                 >
-                  <Sliders className="h-3 w-3" /> {editingName === name ? 'CLOSE LAB SETTINGS' : 'MODIFY LAB PARAMS'}
+                  <Sliders className="h-3 w-3" /> {editingName === name ? t('autotrading.sandbox.closeSettings') : t('autotrading.sandbox.modifyParams')}
                 </button>
               </div>
             </div>
@@ -194,8 +196,8 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
         {(!config.shadowConfigs || Object.keys(config.shadowConfigs).length === 0) && (
           <div className="h-[150px] border border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center opacity-30">
              <FlaskConical className="h-6 w-6 mb-2" />
-             <div className="text-[10px] uppercase tracking-widest">Lab is Empty</div>
-             <div className="text-[8px] mt-1 text-center max-w-[200px]">點擊上方按鈕克隆目前的策略到實驗室，開始進行 A/B 測試。</div>
+             <div className="text-[10px] uppercase tracking-widest">{t('autotrading.sandbox.empty')}</div>
+             <div className="text-[8px] mt-1 text-center max-w-[200px]">{t('autotrading.sandbox.emptyDesc')}</div>
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@
  * 詳細回測介面：設定區間、執行回測、查看報表
  */
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Play, TrendingUp, History, BarChart3, ChevronRight, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function BacktestPanel({ symbol, config }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [period, setPeriod] = useState(180);
@@ -41,8 +43,8 @@ export function BacktestPanel({ symbol, config }: Props) {
         <div className="flex items-center gap-3">
           <History className="h-4 w-4 text-violet-400" />
           <div>
-            <div className="text-[11px] font-bold text-white">Backtest: {symbol}</div>
-            <div className="text-[9px] text-(--color-term-muted)">使用目前策略配置與歷史數據進行模擬</div>
+            <div className="text-[11px] font-bold text-white">{t('autotrading.backtest.title', { symbol })}</div>
+            <div className="text-[9px] text-(--color-term-muted)">{t('autotrading.backtest.desc')}</div>
           </div>
         </div>
         
@@ -52,10 +54,10 @@ export function BacktestPanel({ symbol, config }: Props) {
             onChange={(e) => setPeriod(Number(e.target.value))}
             className="bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white outline-none"
           >
-            <option value={30}>過去 30 天</option>
-            <option value={90}>過去 90 天</option>
-            <option value={180}>過去 180 天</option>
-            <option value={365}>過去 1 年</option>
+            <option value={30}>{t('autotrading.backtest.periods.30d')}</option>
+            <option value={90}>{t('autotrading.backtest.periods.90d')}</option>
+            <option value={180}>{t('autotrading.backtest.periods.180d')}</option>
+            <option value={365}>{t('autotrading.backtest.periods.1y')}</option>
           </select>
           
           <button
@@ -67,7 +69,7 @@ export function BacktestPanel({ symbol, config }: Props) {
             )}
           >
             {loading ? <Activity className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
-            RUN TEST
+            {t('autotrading.backtest.run')}
           </button>
         </div>
       </div>
@@ -77,10 +79,10 @@ export function BacktestPanel({ symbol, config }: Props) {
           {/* Metrics Grid */}
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: 'ROI', val: `${result.metrics.roi}%`, color: result.metrics.roi > 0 ? 'text-emerald-400' : 'text-rose-400' },
-              { label: 'WIN RATE', val: `${result.metrics.winRate.toFixed(1)}%`, color: 'text-violet-400' },
-              { label: 'MAX DRAWDOWN', val: `-${result.metrics.maxDrawdown}%`, color: 'text-rose-400' },
-              { label: 'TOTAL TRADES', val: result.metrics.totalTrades, color: 'text-blue-400' },
+              { label: t('autotrading.backtest.roi'), val: `${result.metrics.roi}%`, color: result.metrics.roi > 0 ? 'text-emerald-400' : 'text-rose-400' },
+              { label: t('autotrading.backtest.winRate'), val: `${result.metrics.winRate.toFixed(1)}%`, color: 'text-violet-400' },
+              { label: t('autotrading.backtest.maxDrawdown'), val: `-${result.metrics.maxDrawdown}%`, color: 'text-rose-400' },
+              { label: t('autotrading.backtest.totalTrades'), val: result.metrics.totalTrades, color: 'text-blue-400' },
             ].map((m, i) => (
               <div key={i} className="bg-white/2 border border-white/5 p-2 rounded-sm">
                 <div className="text-[8px] text-(--color-term-muted) uppercase tracking-wider">{m.label}</div>
@@ -116,14 +118,14 @@ export function BacktestPanel({ symbol, config }: Props) {
           <div className="bg-white/2 border border-white/5 rounded-sm overflow-hidden">
             <div className="p-2 border-b border-white/5 flex items-center gap-2">
               <BarChart3 className="h-3 w-3 text-violet-400" />
-              <span className="text-[9px] font-bold text-white uppercase tracking-widest">Trade Execution History</span>
+              <span className="text-[9px] font-bold text-white uppercase tracking-widest">{t('autotrading.backtest.history')}</span>
             </div>
             <div className="max-h-[200px] overflow-y-auto font-mono">
               {result.trades.map((t: any, i: number) => (
                 <div key={i} className="flex items-center justify-between p-2 border-b border-white/5 text-[9px] hover:bg-white/2">
                   <div className="flex items-center gap-3">
                     <span className={cn("w-8 text-center rounded-sm", t.pnl > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
-                      {t.pnl > 0 ? 'WIN' : 'LOSS'}
+                      {t.pnl > 0 ? t('autotrading.backtest.win') : t('autotrading.backtest.loss')}
                     </span>
                     <span className="text-white">{t.entryDate.split('T')[0]}</span>
                     <ChevronRight className="h-2 w-2 text-(--color-term-muted)" />
@@ -143,7 +145,7 @@ export function BacktestPanel({ symbol, config }: Props) {
       ) : (
         <div className="h-[300px] flex flex-col items-center justify-center border border-dashed border-white/10 rounded-sm bg-black/20">
           <TrendingUp className="h-8 w-8 text-white/10 mb-3" />
-          <div className="text-[10px] text-white/30">點擊「RUN TEST」開始進行回測</div>
+          <div className="text-[10px] text-white/30">{t('autotrading.backtest.prompt')}</div>
         </div>
       )}
     </div>

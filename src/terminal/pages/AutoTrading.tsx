@@ -3,6 +3,7 @@
  * AI 自動化交易主頁面
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAutotradingWS } from '../../components/AutoTrading/useAutotradingWS';
 import { AgentControlPanel } from '../../components/AutoTrading/AgentControlPanel';
 import { DecisionLog } from '../../components/AutoTrading/DecisionLog';
@@ -30,6 +31,7 @@ async function callApi(path: string, method = 'GET', body?: unknown) {
 }
 
 export function AutoTradingPage() {
+  const { t } = useTranslation();
   const ws = useAutotradingWS();
   const [mainTab, setMainTab] = React.useState('LIVE_VIEW');
   const [defaults, setDefaults] = React.useState<{ config: AgentConfig } | null>(null);
@@ -64,18 +66,23 @@ export function AutoTradingPage() {
         <div className="flex items-center gap-4">
           <span className="text-[11px] font-bold text-(--color-term-accent) tracking-[0.25em]">QUANTUM_CORE_V1</span>
           <nav className="flex gap-3">
-            {['LIVE_VIEW', 'STRATEGY', 'BACKTEST', 'SIMULATION'].map((tab) => (
+            {[
+              { id: 'LIVE_VIEW', label: t('autotrading.tabs.liveView') },
+              { id: 'STRATEGY', label: t('autotrading.tabs.strategy') },
+              { id: 'BACKTEST', label: t('autotrading.tabs.backtest') },
+              { id: 'SIMULATION', label: t('autotrading.tabs.simulation') }
+            ].map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                onClick={() => setMainTab(tab)}
+                onClick={() => setMainTab(tab.id)}
                 className={`text-[10px] uppercase tracking-widest pb-0.5 transition-colors ${
-                  mainTab === tab
+                  mainTab === tab.id
                     ? 'text-(--color-term-accent) border-b border-(--color-term-accent)'
                     : 'text-(--color-term-muted) hover:text-(--color-term-text)'
                 }`}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </nav>
@@ -87,14 +94,14 @@ export function AutoTradingPage() {
               ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
               : 'text-(--color-term-muted) border-(--color-term-border)'
           }`}>
-            {ws.connected ? '● CONNECTED' : '○ OFFLINE'}
+            {ws.connected ? t('autotrading.statusLabels.connected') : t('autotrading.statusLabels.offline')}
           </span>
           <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border ${
             ws.status === 'running'
               ? 'text-rose-300 border-rose-500/40 bg-rose-500/15 animate-pulse'
               : 'text-(--color-term-muted) border-(--color-term-border) bg-(--color-term-surface)'
           }`}>
-            {ws.status === 'running' ? '● LIVE_MODE' : 'SIMULATED'}
+            {ws.status === 'running' ? t('autotrading.statusLabels.liveMode') : t('autotrading.statusLabels.simulated')}
           </span>
         </div>
       </div>

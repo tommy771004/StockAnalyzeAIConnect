@@ -3,6 +3,7 @@
  * 監控分頁組件：展示標的狀態與啟停控制
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { Activity, Play, Square, MessageSquareCode, LineChart, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
+  const { t } = useTranslation();
   const heats = Object.values(decisionHeats).sort((a, b) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
@@ -30,12 +32,12 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
       {/* Market Mood Gauge */}
       <div className="bg-white/2 border border-white/5 p-4 rounded-sm space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Global Market Mood (AI)</span>
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('autotrading.monitor.marketMood')}</span>
           <span className={cn(
             "text-[12px] font-mono font-bold",
             globalSentiment > 60 ? "text-emerald-400" : globalSentiment < 40 ? "text-rose-400" : "text-amber-400"
           )}>
-            {globalSentiment > 60 ? 'OPTIMISTIC' : globalSentiment < 40 ? 'PESSIMISTIC' : 'NEUTRAL'} ({globalSentiment}%)
+            {globalSentiment > 60 ? t('autotrading.monitor.mood.optimistic') : globalSentiment < 40 ? t('autotrading.monitor.mood.pessimistic') : t('autotrading.monitor.mood.neutral')} ({globalSentiment}%)
           </span>
         </div>
         <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden flex gap-0.5">
@@ -59,7 +61,7 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
         <div className="flex items-center justify-between">
            <div className="flex items-center gap-2">
               <TrendingUp className="h-3 w-3 text-emerald-400" />
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Live Session Performance</span>
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('autotrading.monitor.livePerformance')}</span>
            </div>
            {equityHistory.length > 0 && (
              <span className={cn(
@@ -100,7 +102,7 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
           ) : (
             <div className="h-full flex flex-col items-center justify-center border border-dashed border-white/5 rounded">
                <LineChart className="h-4 w-4 text-white/10 mb-1" />
-               <span className="text-[8px] text-white/20 uppercase">Collecting Performance Data...</span>
+               <span className="text-[8px] text-white/20 uppercase">{t('autotrading.monitor.collectingData')}</span>
             </div>
           )}
         </div>
@@ -124,8 +126,7 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
       {/* Live Intelligence Feed */}
       <div className="bg-violet-500/5 border border-violet-500/10 rounded-sm p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <MessageSquareCode className="h-3.5 w-3.5 text-violet-400" />
-          <span className="text-[10px] font-bold text-violet-300 uppercase tracking-widest">Live Alpha Reasoning</span>
+          <span className="text-[10px] font-bold text-violet-300 uppercase tracking-widest">{t('autotrading.monitor.alphaReasoning')}</span>
         </div>
         
         <div className="space-y-2">
@@ -147,17 +148,17 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
                       "text-[8px] px-1.5 py-0.5 rounded",
                       latestHeat.score > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
                     )}>
-                      {latestHeat.score > 0 ? 'Bullish Bias' : 'Bearish Bias'}
+                      {latestHeat.score > 0 ? t('autotrading.monitor.bias.bullish') : t('autotrading.monitor.bias.bearish')}
                     </span>
                     <span className="text-[8px] bg-violet-500/10 text-violet-400 px-1.5 py-0.5 rounded">
-                      {Math.abs(latestHeat.score) > 60 ? 'High Confidence' : 'Moderate Confidence'}
+                      {Math.abs(latestHeat.score) > 60 ? t('autotrading.monitor.confidence.high') : t('autotrading.monitor.confidence.moderate')}
                     </span>
                  </div>
               </div>
             </div>
           ) : (
             <div className="py-4 text-center">
-              <span className="text-[9px] text-white/20 uppercase tracking-[0.2em]">Waiting for AI Insights...</span>
+              <span className="text-[9px] text-white/20 uppercase tracking-[0.2em]">{t('autotrading.monitor.waitingInsights')}</span>
             </div>
           )}
         </div>
@@ -170,14 +171,14 @@ export function MonitorTab({ symbols, isRunning, decisionHeats, globalSentiment,
             onClick={onStop} 
             className="w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 transition-all flex items-center justify-center gap-2"
           >
-            <Square className="h-4 w-4 fill-current" /> EMERGENCY_STOP
+            <Square className="h-4 w-4 fill-current" /> {t('autotrading.monitor.emergencyStop')}
           </button>
         ) : (
           <button 
             onClick={onStart} 
             className="w-full py-3 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-cyan-500/30 transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
           >
-            <Play className="h-4 w-4 fill-current" /> INITIATE_ENGINE
+            <Play className="h-4 w-4 fill-current" /> {t('autotrading.monitor.initiateEngine')}
           </button>
         )}
       </div>
