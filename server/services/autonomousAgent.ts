@@ -16,6 +16,9 @@ import type { AgentConfig, AgentStatus, AgentLog } from '../../src/components/Au
 import { riskManager } from './RiskManager.js';
 import { anyMarketOpen, isTradingSession } from './tradingSession.js';
 import { DEFAULT_AGENT_CONFIG } from './autotradingDefaults.js';
+import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
+import type { SignalObservation } from '../types/signal.js';
+import { getQuantumSignal } from '../utils/scienceService.js';
 
 import { autotradingConfigRepo } from '../repositories/autotradingConfigRepo.js';
 
@@ -111,6 +114,17 @@ async function syncStateToDb() {
   }
 }
 
+function parseInstitutionalFlowBias(flowText: string): number {
+  const values = Array.from(flowText.matchAll(/([+-]?\d+)\s*張/g))
+    .map((m) => Number(m[1]))
+    .filter(Number.isFinite);
+  if (values.length === 0) return 0;
+  const total = values.reduce((a, b) => a + b, 0);
+  // 粗略歸一化，避免單位差導致爆量分數
+  const normalized = Math.tanh(total / 15_000);
+  return Math.max(-1, Math.min(1, normalized));
+}
+
 // ── 分析邏輯 ──────────────────────────────────────────────────
 async function runAnalysis(config: AgentConfig, symbol: string) {
   const sParams = { ...config.params, ...(config.symbolConfigs?.[symbol] || {}) };
@@ -124,9 +138,10 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       Promise.all([getFreeModelByTier(1), getFreeModelByTier(2)])
     ]);
 
-    const rsiValue = indicators?.['RSI'] || 50;
-    const macdValue = indicators?.['MACD.macd'] || 0;
-    const macdSignal = indicators?.['MACD.signal'] || 0;
+    const rsiValue = Number(indicators?.['RSI'] || 50);
+    const macdValue = Number(indicators?.['MACD.macd'] || 0);
+    const macdSignal = Number(indicators?.['MACD.signal'] || 0);
+    const macdDiff = macdValue - macdSignal;
     const techSignal = `RSI: ${rsiValue}, MACD: ${macdValue > macdSignal ? 'Bullish' : 'Bearish'}`;
     
     // 情感分析 -> 升級為快速 LLM 評判 (P3)
@@ -200,27 +215,127 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       }
     }
     
-    // 發送決策熱圖數據到前端
-    const heatScore = (dec.confidence || 0) * (dec.action === 'SELL' ? -1 : 1);
+    const aiAction = (['BUY', 'SELL', 'HOLD'].includes(dec.action) ? dec.action : 'HOLD') as 'BUY' | 'SELL' | 'HOLD';
+    const aiConfidence = Math.max(0, Math.min(100, Number(dec.confidence || 0)));
+
+    const overbought = Number(sParams.RSI_REVERSION?.overbought ?? 70);
+    const oversold = Number(sParams.RSI_REVERSION?.oversold ?? 30);
+    let technicalAction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+    let technicalConfidence = 45;
+    if (rsiValue <= oversold) {
+      technicalAction = 'BUY';
+      technicalConfidence = Math.min(95, 60 + (oversold - rsiValue) * 1.5 + (macdDiff > 0 ? 10 : 0));
+    } else if (rsiValue >= overbought) {
+      technicalAction = 'SELL';
+      technicalConfidence = Math.min(95, 60 + (rsiValue - overbought) * 1.5 + (macdDiff < 0 ? 10 : 0));
+    } else if (Math.abs(macdDiff) > 0.8) {
+      technicalAction = macdDiff > 0 ? 'BUY' : 'SELL';
+      technicalConfidence = Math.min(85, 50 + Math.abs(macdDiff) * 10);
+    }
+
+    const macroBias = parseInstitutionalFlowBias(flow);
+    const macroAction: 'BUY' | 'SELL' | 'HOLD' = macroBias > 0.2 ? 'BUY' : macroBias < -0.2 ? 'SELL' : 'HOLD';
+    const macroConfidence = Math.round(Math.abs(macroBias) * 100);
+
+    const observations: SignalObservation[] = [
+      {
+        source: 'ai',
+        action: aiAction,
+        confidence: aiConfidence,
+        weight: Number(sParams.AI_LLM?.weight ?? 1),
+        reason: typeof dec.reasoning === 'string' ? dec.reasoning : 'LLM decision',
+      },
+      {
+        source: 'technical',
+        action: technicalAction,
+        confidence: technicalConfidence,
+        weight: Number(sParams.RSI_REVERSION?.weight ?? 0.8),
+        reason: `RSI=${rsiValue.toFixed(1)}, MACDΔ=${macdDiff.toFixed(3)}`,
+      },
+      {
+        source: 'macro',
+        action: macroAction,
+        confidence: macroConfidence,
+        weight: 0.5,
+        reason: 'Institutional flow bias',
+      },
+    ];
+
+    if (isQuantumSignalEnabled()) {
+      const quantumRes = await getQuantumSignal({
+        symbol,
+        features: {
+          rsi: rsiValue,
+          macd_diff: macdDiff,
+          flow_bias: macroBias,
+          ai_confidence: aiConfidence / 100,
+        },
+        shots: 256,
+      });
+      if (quantumRes.status === 'success' && quantumRes.data) {
+        const qa = String(quantumRes.data.action || 'HOLD').toUpperCase();
+        const quantumAction = (qa === 'BUY' || qa === 'SELL' || qa === 'HOLD' ? qa : 'HOLD') as 'BUY' | 'SELL' | 'HOLD';
+        observations.push({
+          source: 'quantum',
+          action: quantumAction,
+          confidence: Number(quantumRes.data.confidence ?? 45),
+          weight: 0.6,
+          score: Number(quantumRes.data.momentum_phase ?? 0),
+          reason: 'Quantum meta-signal',
+          sourceVersion: String(quantumRes.meta?.model || quantumRes.data.model || 'quantum-fallback'),
+        });
+      } else if (quantumRes.errors?.length) {
+        emitLog({ level: 'WARNING', source: 'QUANTUM', symbol, message: `Quantum signal fallback: ${quantumRes.errors[0]}` });
+      }
+    }
+
+    const fused = fuseSignals({
+      symbol,
+      observations,
+      minConfidence: Number(sParams.AI_LLM?.confidenceThreshold ?? 65),
+      preferSource: 'ai',
+      quantumEnabled: isQuantumSignalEnabled(),
+    });
+
+    wsBroadcast?.({
+      type: 'decision_fusion',
+      data: {
+        symbol,
+        action: fused.action,
+        confidence: fused.confidence,
+        score: fused.score,
+        reason: fused.reason,
+        components: fused.components.map((c) => ({
+          source: c.source,
+          action: c.action,
+          confidence: c.confidence,
+          weightedScore: c.weightedScore,
+        })),
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    // 發送決策熱圖數據到前端（改用融合決策）
+    const heatScore = fused.confidence * (fused.action === 'SELL' ? -1 : fused.action === 'BUY' ? 1 : 0);
     wsBroadcast?.({
       type: 'decision_heat',
       data: {
         symbol,
         score: heatScore,
-        reason: dec.reasoning,
+        reason: fused.reason,
         timestamp: new Date().toISOString(),
       }
     });
 
     // 把單一決策心情正規化到 0-100 推進整體情緒分數
-    const sentimentDelta = dec.action === 'BUY' ? 50 + heatScore / 2
-      : dec.action === 'SELL' ? 50 - Math.abs(heatScore) / 2
+    const sentimentDelta = fused.action === 'BUY' ? 50 + heatScore / 2
+      : fused.action === 'SELL' ? 50 - Math.abs(heatScore) / 2
       : 50;
     broadcastSentiment(sentimentDelta);
 
     return { 
-      action: dec.action || 'HOLD', 
-      confidence: dec.confidence || 0, 
+      action: fused.action || 'HOLD', 
+      confidence: fused.confidence || 0, 
       price: currentPrice 
     };
   } catch (e) { 

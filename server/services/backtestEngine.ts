@@ -2,7 +2,8 @@
  * server/services/backtestEngine.ts
  * 進階回測引擎：支援多策略權重、追蹤止損與績效統計
  */
-import { getRecentNews } from './marketData.js';
+import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
+import type { SignalObservation } from '../types/signal.js';
 
 interface BacktestResult {
   metrics: {
@@ -15,6 +16,47 @@ interface BacktestResult {
   };
   equityCurve: { date: string; portfolio: number; benchmark: number }[];
   trades: any[];
+}
+
+function calcEMA(p: number[], n = 12): number {
+  if (p.length === 0) return 0;
+  const k = 2 / (n + 1);
+  let ema = p[0];
+  for (let i = 1; i < p.length; i++) {
+    ema = p[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function buildQuantumProxyObservation(slice: number[]): SignalObservation {
+  if (slice.length < 5) {
+    return { source: 'quantum', action: 'HOLD', confidence: 20, weight: 0.4, score: 0, reason: 'insufficient_window' };
+  }
+  const recent = slice.slice(-10);
+  const start = recent[0] || 1;
+  const end = recent[recent.length - 1] || start;
+  const momentum = (end - start) / Math.max(Math.abs(start), 1e-6);
+  const rets: number[] = [];
+  for (let i = 1; i < recent.length; i++) {
+    const prev = recent[i - 1] || 1;
+    rets.push((recent[i] - prev) / Math.max(Math.abs(prev), 1e-6));
+  }
+  const mean = rets.reduce((a, b) => a + b, 0) / Math.max(1, rets.length);
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, rets.length);
+  const volatility = Math.sqrt(variance);
+
+  const score = Math.max(-1, Math.min(1, Math.tanh(momentum * 8)));
+  const action: 'BUY' | 'SELL' | 'HOLD' = score > 0.15 ? 'BUY' : score < -0.15 ? 'SELL' : 'HOLD';
+  const confidence = Math.max(25, Math.min(85, (1 - Math.min(1, volatility * 20)) * 100));
+
+  return {
+    source: 'quantum',
+    action,
+    confidence,
+    weight: 0.5,
+    score,
+    reason: 'quantum_proxy',
+  };
 }
 
 /**
@@ -86,21 +128,57 @@ export async function runAdvancedBacktest(
 
     // 2. 策略掃描 (簡化版技術指標)
     if (shares === 0) {
-      const signals: { action: string; weight: number; conf: number }[] = [];
+      const observations: SignalObservation[] = [];
       
       if (config.strategies.includes('RSI_REVERSION')) {
         const rsi = calcRSI(slice);
-        if (rsi < config.params.RSI_REVERSION.oversold) 
-          signals.push({ action: 'BUY', weight: config.params.RSI_REVERSION.weight, conf: 80 });
-        else if (rsi > config.params.RSI_REVERSION.overbought)
-          signals.push({ action: 'SELL', weight: config.params.RSI_REVERSION.weight, conf: 80 });
+        if (rsi < config.params.RSI_REVERSION.oversold) {
+          observations.push({
+            source: 'technical',
+            action: 'BUY',
+            weight: config.params.RSI_REVERSION.weight,
+            confidence: 80,
+            reason: `RSI(${rsi.toFixed(1)}) < oversold`,
+          });
+        } else if (rsi > config.params.RSI_REVERSION.overbought) {
+          observations.push({
+            source: 'technical',
+            action: 'SELL',
+            weight: config.params.RSI_REVERSION.weight,
+            confidence: 80,
+            reason: `RSI(${rsi.toFixed(1)}) > overbought`,
+          });
+        }
       }
 
-      // 權重投票
-      const buyScore = signals.filter(s => s.action === 'BUY').reduce((acc, s) => acc + s.conf * s.weight, 0);
-      const totalW = signals.reduce((acc, s) => acc + s.weight, 0);
-      
-      if (totalW > 0 && (buyScore / totalW) > 60) {
+      if (config.strategies.includes('MACD_CROSS')) {
+        const fast = calcEMA(slice, config.params?.MACD_CROSS?.fast ?? 12);
+        const slow = calcEMA(slice, config.params?.MACD_CROSS?.slow ?? 26);
+        const diff = fast - slow;
+        if (Math.abs(diff) > currentPrice * 0.002) {
+          observations.push({
+            source: 'technical',
+            action: diff > 0 ? 'BUY' : 'SELL',
+            weight: config.params?.MACD_CROSS?.weight ?? 0.8,
+            confidence: Math.min(90, 55 + Math.abs(diff / Math.max(1, currentPrice)) * 5000),
+            reason: 'EMA fast/slow spread',
+          });
+        }
+      }
+
+      if (isQuantumSignalEnabled()) {
+        observations.push(buildQuantumProxyObservation(slice));
+      }
+
+      const fused = fuseSignals({
+        symbol,
+        observations,
+        minConfidence: 60,
+        preferSource: 'technical',
+        quantumEnabled: isQuantumSignalEnabled(),
+      });
+
+      if (fused.action === 'BUY' && fused.confidence >= 60) {
         const targetInvest = balance * 0.9;
         // 先計算預估股數
         let estShares = Math.floor(targetInvest / currentPrice);

@@ -9,3 +9,8 @@ polars>=1.6.0
 arxiv>=2.1.0
 beautifulsoup4>=4.12.3
 aiohttp>=3.9.5
+
+# Optional accelerators (service will auto-fallback if unavailable)
+# timesfm>=1.2.0
+# qiskit>=1.2.0
+# qiskit-aer>=0.15.0
