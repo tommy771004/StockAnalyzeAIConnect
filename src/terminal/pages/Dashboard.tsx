@@ -192,7 +192,14 @@ export function WatchlistPanel({
                       isActive && 'border-l-2 border-(--color-term-accent) pl-2 -ml-2',
                     )}
                   >
-                    {row.symbol}
+                    <span className="flex flex-col leading-tight">
+                      <span>{row.symbol}</span>
+                      {row.name && /\.(TW|TWO)$/i.test(row.symbol) && (
+                        <span className="text-[10px] font-normal text-(--color-term-muted) tracking-normal">
+                          {row.name}
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </td>
                 <td className="px-3 py-3 text-right tabular-nums">
@@ -269,11 +276,16 @@ export function TopMoversPanel({
               <span className="flex items-center gap-2">
                 <span
                   className={cn(
-                    'h-1.5 w-1.5 rounded-full',
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
                     m.changePct >= 0 ? 'bg-(--color-term-positive)' : 'bg-(--color-term-negative)',
                   )}
                 />
-                <span className="font-semibold tracking-wider group-hover/mover:text-(--color-term-accent) transition-colors">{m.symbol}</span>
+                <span className="flex flex-col leading-tight">
+                  <span className="font-semibold tracking-wider group-hover/mover:text-(--color-term-accent) transition-colors">{m.symbol}</span>
+                  {m.name && /\.(TW|TWO)$/i.test(m.symbol) && (
+                    <span className="text-[10px] font-normal text-(--color-term-muted) tracking-normal">{m.name}</span>
+                  )}
+                </span>
               </span>
               <span className={`${toneClass(m.changePct)} tabular-nums`}>
                 {formatPct(m.changePct, 1)}
@@ -423,6 +435,9 @@ export function SelectedChartPanel({
           <span className="text-[13px] font-bold tracking-widest text-(--color-term-accent)">
             {row.symbol}
           </span>
+          {row.name && /\.(TW|TWO)$/i.test(row.symbol) && (
+            <span className="text-[11px] text-(--color-term-muted) tracking-normal">{row.name}</span>
+          )}
           {isLive && (
             <span className="flex items-center gap-1 text-[9px] tracking-widest text-(--color-term-positive)">
               <span className="h-1 w-1 animate-pulse rounded-full bg-(--color-term-positive)" />

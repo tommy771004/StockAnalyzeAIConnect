@@ -74,6 +74,7 @@ function fmtVolume(v: number | undefined | null): string {
 function mapQuote(q: any, sym: string): WatchlistRow {
   return {
     symbol: sym,
+    name: q?.shortName ?? q?.longName,
     last: q?.regularMarketPrice ?? 0,
     changePct: q?.regularMarketChangePercent ?? 0,
     volume: fmtVolume(q?.regularMarketVolume),
@@ -149,8 +150,8 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
 
       // Derive top movers from live data (top 3 gainers / losers)
       const sorted = [...liveRows].sort((a, b) => b.changePct - a.changePct);
-      setGainers(sorted.slice(0, 3).map((r) => ({ symbol: r.symbol, changePct: r.changePct })));
-      setLosers([...sorted].reverse().slice(0, 3).map((r) => ({ symbol: r.symbol, changePct: r.changePct })));
+      setGainers(sorted.slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
+      setLosers([...sorted].reverse().slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
       setLastUpdated(new Date().toISOString());
 
       // ── 3. Chart history for selected symbol ─────────────────────────────────

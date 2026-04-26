@@ -19,6 +19,7 @@ export interface TickerSummary {
 
 export interface WatchlistRow {
   symbol: string;
+  name?: string;
   last: number;
   changePct: number;
   volume: string;
@@ -46,6 +47,7 @@ export interface DashboardNews {
 
 export interface Mover {
   symbol: string;
+  name?: string;
   changePct: number;
 }
 
