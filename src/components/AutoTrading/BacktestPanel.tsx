@@ -2,39 +2,76 @@
  * src/components/AutoTrading/BacktestPanel.tsx
  * 詳細回測介面：設定區間、執行回測、查看報表
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play, TrendingUp, History, BarChart3, ChevronRight, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { runBacktest as runGlobalBacktest } from '../../services/api';
+import { fetchJ } from '../../utils/api';
+import { DEFAULT_BACKTEST_METRICS, getDateRangeByPeriod, mapToBacktestStrategy, normalizeBacktestResult } from '../../utils/backtest';
+import type { BacktestResult } from '../../types';
+import type { AgentConfig } from './types';
 
 interface Props {
-  symbol: string;
-  config: any;
+  symbol?: string;
+  config?: Partial<AgentConfig>;
 }
 
 export function BacktestPanel({ symbol, config }: Props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<(BacktestResult & { strategy: string }) | null>(null);
   const [period, setPeriod] = useState(180);
+  const canRun = !!symbol?.trim();
+  const selectedStrategy = useMemo(
+    () => mapToBacktestStrategy(config?.strategies?.[0]),
+    [config?.strategies],
+  );
 
-  const runBacktest = async () => {
+  const runBacktest = async (): Promise<void> => {
+    if (!symbol?.trim()) return;
     setLoading(true);
+    setError('');
+
     try {
-      const res = await fetch('/api/autotrading/backtest', {
+      const data = await fetchJ<{ ok?: boolean; data?: unknown }>('/api/autotrading/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, period, config })
+        body: JSON.stringify({ symbol, period, config }),
       });
-      const data = await res.json();
-      if (data.ok) setResult(data.data);
-    } catch (e) {
-      console.error(e);
+
+      if (data.ok && data.data) {
+        setResult(normalizeBacktestResult(data.data, selectedStrategy));
+        return;
+      }
+
+      throw new Error('AutoTrading backtest payload invalid');
+    } catch (primaryError) {
+      try {
+        const { period1, period2 } = getDateRangeByPeriod(period);
+        const fallback = await runGlobalBacktest({
+          symbol: symbol.trim().toUpperCase(),
+          strategy: selectedStrategy,
+          initialCapital: 1_000_000,
+          period1,
+          period2,
+        });
+        setResult(normalizeBacktestResult(fallback, selectedStrategy));
+      } catch (fallbackError) {
+        const message = fallbackError instanceof Error ? fallbackError.message : 'Backtest failed';
+        setError(message);
+        console.error('[AutoTrading.BacktestPanel] backtest error:', primaryError, fallbackError);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const metrics = result?.metrics ?? DEFAULT_BACKTEST_METRICS;
+  const trades = result?.trades ?? [];
+  const equityCurve = result?.equityCurve ?? [];
 
   return (
     <div className="space-y-4">
@@ -62,10 +99,10 @@ export function BacktestPanel({ symbol, config }: Props) {
           
           <button
             onClick={runBacktest}
-            disabled={loading}
+            disabled={loading || !canRun}
             className={cn(
               "flex items-center gap-2 px-4 py-1 rounded text-[10px] font-bold transition-all",
-              loading ? "bg-white/10 text-white/50 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/20"
+              loading || !canRun ? "bg-white/10 text-white/50 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/20"
             )}
           >
             {loading ? <Activity className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
@@ -74,15 +111,21 @@ export function BacktestPanel({ symbol, config }: Props) {
         </div>
       </div>
 
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/30 p-3 rounded-sm text-[10px] text-rose-300">
+          {error}
+        </div>
+      )}
+
       {result ? (
         <div className="space-y-4">
           {/* Metrics Grid */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {[
-              { label: t('autotrading.backtest.roi'), val: `${result.metrics.roi}%`, color: result.metrics.roi > 0 ? 'text-emerald-400' : 'text-rose-400' },
-              { label: t('autotrading.backtest.winRate'), val: `${result.metrics.winRate.toFixed(1)}%`, color: 'text-violet-400' },
-              { label: t('autotrading.backtest.maxDrawdown'), val: `-${result.metrics.maxDrawdown}%`, color: 'text-rose-400' },
-              { label: t('autotrading.backtest.totalTrades'), val: result.metrics.totalTrades, color: 'text-blue-400' },
+              { label: t('autotrading.backtest.roi'), val: `${metrics.roi}%`, color: metrics.roi > 0 ? 'text-emerald-400' : 'text-rose-400' },
+              { label: t('autotrading.backtest.winRate'), val: `${metrics.winRate.toFixed(1)}%`, color: 'text-violet-400' },
+              { label: t('autotrading.backtest.maxDrawdown'), val: `-${metrics.maxDrawdown}%`, color: 'text-rose-400' },
+              { label: t('autotrading.backtest.totalTrades'), val: metrics.totalTrades, color: 'text-blue-400' },
             ].map((m, i) => (
               <div key={i} className="bg-white/2 border border-white/5 p-2 rounded-sm">
                 <div className="text-[8px] text-(--color-term-muted) uppercase tracking-wider">{m.label}</div>
@@ -94,7 +137,7 @@ export function BacktestPanel({ symbol, config }: Props) {
           {/* Equity Chart */}
           <div className="bg-black/20 border border-white/5 p-4 rounded-sm h-[200px]">
              <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={result.equityCurve}>
+              <AreaChart data={equityCurve}>
                 <defs>
                   <linearGradient id="colorP" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
@@ -121,20 +164,20 @@ export function BacktestPanel({ symbol, config }: Props) {
               <span className="text-[9px] font-bold text-white uppercase tracking-widest">{t('autotrading.backtest.history')}</span>
             </div>
             <div className="max-h-[200px] overflow-y-auto font-mono">
-              {result.trades.map((t: any, i: number) => (
-                <div key={i} className="flex items-center justify-between p-2 border-b border-white/5 text-[9px] hover:bg-white/2">
+              {trades.map((trade, i) => (
+                <div key={`${trade.entryTime || trade.entryDate || i}`} className="flex items-center justify-between p-2 border-b border-white/5 text-[9px] hover:bg-white/2">
                   <div className="flex items-center gap-3">
-                    <span className={cn("w-8 text-center rounded-sm", t.pnl > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
-                      {t.pnl > 0 ? t('autotrading.backtest.win') : t('autotrading.backtest.loss')}
+                    <span className={cn("w-8 text-center rounded-sm", (trade.pnl ?? 0) > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+                      {(trade.pnl ?? 0) > 0 ? t('autotrading.backtest.win') : t('autotrading.backtest.loss')}
                     </span>
-                    <span className="text-white">{t.entryDate.split('T')[0]}</span>
+                    <span className="text-white">{(trade.entryDate || trade.entryTime || '').split('T')[0]}</span>
                     <ChevronRight className="h-2 w-2 text-(--color-term-muted)" />
-                    <span className="text-white">{t.exitDate.split('T')[0]}</span>
+                    <span className="text-white">{(trade.exitDate || trade.exitTime || '').split('T')[0]}</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-(--color-term-muted)">{t.entryPrice.toFixed(2)} → {t.exitPrice.toFixed(2)}</span>
-                    <span className={cn("font-bold", t.pnl > 0 ? "text-emerald-400" : "text-rose-400")}>
-                      {t.pnl > 0 ? '+' : ''}{t.pnlPct.toFixed(2)}%
+                    <span className="text-(--color-term-muted)">{Number(trade.entryPrice ?? 0).toFixed(2)} → {Number(trade.exitPrice ?? 0).toFixed(2)}</span>
+                    <span className={cn("font-bold", (trade.pnl ?? 0) > 0 ? "text-emerald-400" : "text-rose-400")}>
+                      {(trade.pnl ?? 0) > 0 ? '+' : ''}{Number(trade.pnlPct ?? 0).toFixed(2)}%
                     </span>
                   </div>
                 </div>

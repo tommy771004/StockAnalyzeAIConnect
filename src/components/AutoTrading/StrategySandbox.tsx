@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import type { AgentConfig, StrategyParams } from './types';
 
 interface Props {
-  config: AgentConfig;
+  config: Partial<AgentConfig>;
   onUpdateShadow: (name: string, patch: Partial<AgentConfig>) => void;
   onPromote: (params: StrategyParams) => void;
   onDelete: (name: string) => void;
@@ -22,9 +22,13 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
   const [researchResult, setResearchResult] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
+  const safeParams = config.params ?? {};
+  const safeSymbols = config.symbols ?? [];
+  const shadowConfigs = config.shadowConfigs ?? {};
+
   const cloneCurrent = () => {
     const name = `Sandbox_${Math.floor(Math.random() * 1000)}`;
-    onUpdateShadow(name, { params: JSON.parse(JSON.stringify(config.params)), symbols: config.symbols });
+    onUpdateShadow(name, { params: JSON.parse(JSON.stringify(safeParams)), symbols: safeSymbols });
   };
 
   const handleResearch = async () => {
@@ -100,7 +104,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
 
       {/* Sandbox List */}
       <div className="grid grid-cols-1 gap-3">
-        {Object.entries(config.shadowConfigs || {}).map(([name, shadow]) => (
+        {Object.entries(shadowConfigs).map(([name, shadow]) => (
           <div key={name} className="bg-black/40 border border-white/5 rounded-sm p-4 hover:border-cyan-500/30 transition-colors group">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -110,7 +114,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
               </div>
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
-                   onClick={() => onPromote(shadow.params!)}
+                   onClick={() => shadow.params && onPromote(shadow.params)}
                    className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded" title={t('autotrading.sandbox.promote')}
                 >
                   <ArrowUpCircle className="h-4 w-4" />
@@ -193,7 +197,7 @@ export function StrategySandbox({ config, onUpdateShadow, onPromote, onDelete }:
           </div>
         ))}
 
-        {(!config.shadowConfigs || Object.keys(config.shadowConfigs).length === 0) && (
+        {(Object.keys(shadowConfigs).length === 0) && (
           <div className="h-[150px] border border-dashed border-white/5 rounded-sm flex flex-col items-center justify-center opacity-30">
              <FlaskConical className="h-6 w-6 mb-2" />
              <div className="text-[10px] uppercase tracking-widest">{t('autotrading.sandbox.empty')}</div>

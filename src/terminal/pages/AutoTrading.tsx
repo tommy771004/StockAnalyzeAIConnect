@@ -16,20 +16,6 @@ import { StrategySandbox } from '../../components/AutoTrading/StrategySandbox';
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
 
-async function callApi(path: string, method = 'GET', body?: unknown) {
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
 export function AutoTradingPage() {
   const { t } = useTranslation();
   const ws = useAutotradingWS();
@@ -41,19 +27,19 @@ export function AutoTradingPage() {
   }, []);
 
   const handleStart = async (cfg: Partial<AgentConfig>) => {
-    await callApi('/api/autotrading/start', 'POST', cfg);
+    await api.startAutotrading(cfg);
   };
 
   const handleStop = async () => {
-    await callApi('/api/autotrading/stop', 'POST');
+    await api.stopAutotrading();
   };
 
   const handleKillSwitch = async () => {
-    await callApi('/api/autotrading/kill-switch', 'POST');
+    await api.triggerKillSwitch();
   };
 
   const handleUpdateConfig = async (cfg: Record<string, unknown>) => {
-    return await callApi('/api/autotrading/config', 'PUT', cfg);
+    return await api.updateAutotradingConfig(cfg);
   };
 
   // 監控標的優先序：WS 載入 > /defaults > 空陣列
@@ -170,6 +156,7 @@ export function AutoTradingPage() {
             equityHistory={ws.equityHistory}
             onStart={handleStart}
             onStop={handleStop}
+            onUpdateConfig={handleUpdateConfig}
           />
           <AccountSummary balance={ws.balance} />
           <RiskControlPanel

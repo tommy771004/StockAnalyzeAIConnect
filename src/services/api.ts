@@ -426,6 +426,7 @@ export const startAutotrading = (config: any) => fetchJ<any>('/api/autotrading/s
   body: JSON.stringify(config)
 });
 export const stopAutotrading = () => fetchJ<any>('/api/autotrading/stop', { method: 'POST' });
+export const triggerKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch', { method: 'POST' });
 export const releaseKillSwitch = () => fetchJ<any>('/api/autotrading/kill-switch/release', { method: 'POST' });
 export const getAutotradingDefaults = () => fetchJ<any>('/api/autotrading/defaults');
 export const getMarketSession = (symbols: string[]) =>

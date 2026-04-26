@@ -12,3 +12,6 @@ skills-lock.json
 .windsurf/skills/*
 src/tests/*
 metadata.json
+docs/AGENTS.md
+docs/evo.md
+docs/SystemDesign.md

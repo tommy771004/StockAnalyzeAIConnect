@@ -31,9 +31,10 @@ interface Props {
   equityHistory: EquitySnapshot[];
   onStart: (cfg: Partial<AgentConfig>) => void;
   onStop: () => void;
+  onUpdateConfig: (cfg: Record<string, unknown>) => Promise<unknown>;
 }
 
-export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop }: Props) {
+export function AgentControlPanel({ status, config, decisionHeats, globalSentiment, equityHistory, onStart, onStop, onUpdateConfig }: Props) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'monitor' | 'strategy' | 'broker' | 'backtest' | 'commander' | 'lab' | 'journal' | 'accounts'>('monitor');
   const [defaultsConfig, setDefaultsConfig] = useState<Partial<AgentConfig> | null>(null);
@@ -64,7 +65,22 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   }, [config, defaultsConfig]);
 
   const updateConfig = (patch: Partial<AgentConfig>) => {
-    onStart({ mode, strategies, params, symbols, ...patch });
+    return onUpdateConfig({ mode, strategies, params, symbols, ...patch });
+  };
+
+  const handleSymbolsChange = (nextSymbols: string[]) => {
+    setSymbols(nextSymbols);
+    void updateConfig({ symbols: nextSymbols });
+  };
+
+  const handleStrategiesChange = (nextStrategies: StrategyType[]) => {
+    setStrategies(nextStrategies);
+    void updateConfig({ strategies: nextStrategies });
+  };
+
+  const handleParamsChange = (nextParams: StrategyParams) => {
+    setParams(nextParams);
+    void updateConfig({ params: nextParams });
   };
 
   return (
@@ -135,14 +151,14 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
           <div className="space-y-4">
             <SectorSelector 
               selectedSymbols={symbols} 
-              onSelectSymbols={setSymbols} 
+              onSelectSymbols={handleSymbolsChange} 
               disabled={isRunning} 
             />
             <StrategyTab 
               strategies={strategies} 
               params={params} 
-              onStrategiesChange={setStrategies} 
-              onParamsChange={setParams} 
+              onStrategiesChange={handleStrategiesChange} 
+              onParamsChange={handleParamsChange} 
               isRunning={isRunning}
               activeHeat={config?.decisionHeat?.score}
             />
@@ -151,7 +167,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
 
         {activeTab === 'lab' && (
           <StrategySandbox 
-            config={config!} 
+            config={config ?? { mode, strategies, params, symbols }} 
             onUpdateShadow={(n, p) => updateConfig({ shadowConfigs: { ...config?.shadowConfigs, [n]: p } })} 
             onPromote={p => updateConfig({ params: p })} 
             onDelete={n => { const next = { ...config?.shadowConfigs }; delete next[n]; updateConfig({ shadowConfigs: next }); }} 

@@ -350,29 +350,55 @@ function RSI(data: number[], p: number = 14) {
   return rsi;
 }
 
-function runBacktestLogic(quotes: HistoricalData[], strategy: string, initialCapital: number) {
+function runBacktestLogic(
+  quotes: HistoricalData[],
+  strategy: string,
+  initialCapital: number,
+  paramPack?: unknown,
+) {
   const closes = quotes.map(q => q.close);
   const dates = quotes.map(q => q.date.toISOString().split('T')[0]);
   const signals: (1 | -1 | 0)[] = new Array(quotes.length).fill(0);
+  const params = (() => {
+    if (typeof paramPack === 'string' && paramPack.trim()) {
+      try { return JSON.parse(paramPack); } catch { return {}; }
+    }
+    if (paramPack && typeof paramPack === 'object') return paramPack as Record<string, any>;
+    return {};
+  })();
+  const clampNum = (value: unknown, fallback: number, min: number, max: number) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+  };
 
   if (strategy === 'ma_crossover') {
-    const s10 = SMA(closes, 10);
-    const s30 = SMA(closes, 30);
+    const base = clampNum(params?.BOLLINGER_BREAKOUT?.period, 30, 10, 200);
+    const shortPeriod = clampNum(Math.round(base / 2), 10, 3, base - 1);
+    const longPeriod = clampNum(base, 30, shortPeriod + 1, 240);
+    const s10 = SMA(closes, shortPeriod);
+    const s30 = SMA(closes, longPeriod);
     for (let i = 1; i < quotes.length; i++) {
       if (s10[i - 1]! <= s30[i - 1]! && s10[i]! > s30[i]!) signals[i] = 1;
       else if (s10[i - 1]! >= s30[i - 1]! && s10[i]! < s30[i]!) signals[i] = -1;
     }
   } else if (strategy === 'rsi') {
-    const rsi = RSI(closes, 14);
+    const rsiPeriod = clampNum(params?.RSI_REVERSION?.period, 14, 2, 200);
+    const oversold = clampNum(params?.RSI_REVERSION?.oversold, 35, 1, 60);
+    const overbought = clampNum(params?.RSI_REVERSION?.overbought, 65, 40, 99);
+    const rsi = RSI(closes, rsiPeriod);
     for (let i = 1; i < quotes.length; i++) {
-      if (rsi[i - 1]! < 35 && rsi[i]! >= 35) signals[i] = 1;
-      else if (rsi[i - 1]! > 65 && rsi[i]! <= 65) signals[i] = -1;
+      if (rsi[i - 1]! < oversold && rsi[i]! >= oversold) signals[i] = 1;
+      else if (rsi[i - 1]! > overbought && rsi[i]! <= overbought) signals[i] = -1;
     }
   } else if (strategy === 'macd') {
-    const e12 = EMA(closes, 12);
-    const e26 = EMA(closes, 26);
+    const fast = clampNum(params?.MACD_CROSS?.fast, 12, 2, 80);
+    const slow = clampNum(params?.MACD_CROSS?.slow, 26, fast + 1, 240);
+    const signalPeriod = clampNum(params?.MACD_CROSS?.signal, 9, 2, 60);
+    const e12 = EMA(closes, fast);
+    const e26 = EMA(closes, slow);
     const macd = e12.map((v, i) => (v !== null && e26[i] !== null) ? v! - e26[i]! : null);
-    const signal = EMA(macd.filter(v => v !== null) as number[], 9);
+    const signal = EMA(macd.filter(v => v !== null) as number[], signalPeriod);
     const hist = macd.map((v, i) => {
       const sIdx = i - (macd.length - signal.length);
       return (v !== null && sIdx >= 0) ? v! - signal[sIdx]! : null;
@@ -1736,11 +1762,11 @@ app.get('/api/market/:symbol', authMiddleware, async (req: AuthRequest, res) => 
 });
 
 app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
-  const { symbol, period1, period2, initialCapital, strategy } = req.body;
+  const { symbol, period1, period2, initialCapital, strategy, paramPack } = req.body;
   try {
     const data = await NativeYahooApi.chart(symbol, { period1, period2 });
     if (data.quotes.length < 50) throw new Error('Insufficient data for backtest');
-    res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000));
+    res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000, paramPack));
   } catch (e) { handleApiError(res, e); }
 });
 
