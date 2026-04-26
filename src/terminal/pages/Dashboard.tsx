@@ -4,7 +4,7 @@ import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X, Microscope } from 'l
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
-import type { NewsCategory, WatchlistRow, CandlePoint, DashboardNews } from '../types';
+import type { NewsCategory, WatchlistRow, Mover, CandlePoint, DashboardNews } from '../types';
 import { useDashboardData, type ChartRange } from '../hooks/useDashboardData';
 import { executeTrade } from '../../services/api';
 import ChartWidget from '../../components/ChartWidget';
@@ -236,8 +236,8 @@ export function TopMoversPanel({
   loading,
   onSelect,
 }: {
-  gainers: { symbol: string; changePct: number }[];
-  losers:  { symbol: string; changePct: number }[];
+  gainers: Mover[];
+  losers:  Mover[];
   loading: boolean;
   onSelect: (s: string) => void;
 }) {
@@ -355,7 +355,7 @@ export function HeatCell({
   onSelect,
   size = 'md',
 }: {
-  cell: { symbol: string; changePct: number };
+  cell: Pick<WatchlistRow, 'symbol' | 'changePct'>;
   className?: string;
   onSelect: (s: string) => void;
   size?: 'md' | 'lg';

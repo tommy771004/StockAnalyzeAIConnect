@@ -218,29 +218,29 @@
     "password": "密碼",
     "name": "名稱",
     "operatorId": "操作員 ID (OPERATOR_ID)",
-    "accessCoord": "存取座標 (EMAIL)",
-    "securityKey": "安全金鑰 (PASSWORD)",
-    "loginTitle": "系統核心登入",
+    "accessCoord": "信箱 (EMAIL)",
+    "securityKey": "密碼 (PASSWORD)",
+    "loginTitle": "登入",
     "loginSubtitle": "自動化交易系統_v3",
     "loggingIn": "登入中...",
     "loginError": "帳號或密碼錯誤",
-    "establishUplink": "建立連線 (註冊)",
+    "establishUplink": "建立帳號(註冊)",
     "initiateHandshake": "啟動交握 (登入)",
     "switchToLogin": "切換至登入",
-    "requestAccess": "請求新存取權限 (註冊)",
+    "requestAccess": "註冊",
     "namePlaceholder": "輸入您的代號...",
     "emailPlaceholder": "sys.operator@fin.local",
     "requiredFields": "遺漏必填欄位",
     "authFailed": "驗證失敗",
-    "appTitle": "Quantum Core 控制台"
+    "appTitle": "控制台"
   },
   "agent": {
-    "title": "HERMES_AI",
+    "title": "量化分析師 AI",
     "inputPlaceholder": "等待指令...",
     "sysAgent": "SYS.AGENT",
     "operator": "操作員",
     "navigation": "導航選單",
-    "systemReady": "SYSTEM_READY... HERMES_AGENT_ONLINE.\n目前追蹤: {{symbol}}。請問有何交易策略需要協助？"
+    "systemReady": "SYSTEM_READY... AGENT_ONLINE.\n目前追蹤: {{symbol}}。請問有何交易策略需要協助？"
   },
   "sidebar": {
     "navigation": "導航選單",
