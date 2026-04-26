@@ -205,11 +205,11 @@ body {
 /* ── Color Role Tokens ─────────────────────────────────────────────── */
 @layer base {
   :root {
-    --color-action:       theme(colors.cyan.400);
-    --color-constructive: theme(colors.emerald.400);
-    --color-destructive:  theme(colors.rose.400);
-    --color-caution:      theme(colors.amber.400);
-    --color-feature:      theme(colors.violet.400);
+    --color-term-action:       theme(colors.cyan.400);
+    --color-term-constructive: theme(colors.emerald.400);
+    --color-term-destructive:  theme(colors.rose.400);
+    --color-term-caution:      theme(colors.amber.400);
+    --color-term-feature:      theme(colors.violet.400);
   }
 }
 
@@ -217,6 +217,6 @@ body {
 @layer utilities {
   .focus-ring:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgb(6 182 212), 0 0 0 3px #000;
+    box-shadow: 0 0 0 2px var(--color-term-action), 0 0 0 3px var(--color-term-bg);
   }
 }
