@@ -89,7 +89,7 @@ export function Panel({
               type="button"
               onClick={() => setIsOpen((v) => !v)}
               aria-expanded={isOpen}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-(--color-term-text)"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left motion-safe:transition-colors hover:text-(--color-term-text) focus-ring rounded"
             >
               {headerInner}
             </button>
