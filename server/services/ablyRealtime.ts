@@ -54,9 +54,13 @@ export async function createAutotradingToken(clientId?: string) {
     [ABLY_CHANNEL]: ['subscribe'],
   });
 
+  // Ably REST requestToken 需要 timestamp 做新鮮度檢查 (錯誤碼 40001)
+  // 即使使用 master key Basic auth，timestamp 也是必填欄位
   const body: Record<string, unknown> = {
+    keyName: KEY_NAME,
     ttl: ABLY_TOKEN_TTL_MS,
     capability,
+    timestamp: Date.now(),
   };
   if (clientId) body.clientId = clientId;
 
