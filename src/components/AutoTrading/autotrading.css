@@ -1,0 +1,137 @@
+/*
+ * src/components/AutoTrading/autotrading.css
+ *
+ * 對 AutoTrading 區域字體與對比度做整體可讀性優化。
+ * 透過 .autotrading-pane 範圍化避免影響其他頁面。
+ */
+
+.autotrading-pane {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  color: var(--color-term-text);
+}
+
+/* 等寬字型保留：用於數值、代號、log 等資訊密度高的區塊 */
+.autotrading-pane .font-mono,
+.autotrading-pane [class*="font-mono"] {
+  font-family: var(--font-mono);
+}
+
+/* ── Typography sizing ───────────────────────────────────────────── */
+/* 將 9~11px 的擁擠字體拉到符合 WCAG 易讀範圍 (12~14px) */
+.autotrading-pane .text-\[9px\] {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.autotrading-pane .text-\[10px\] {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.autotrading-pane .text-\[11px\] {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* 對 uppercase + tracking 的標題降低字距，避免放大後過於鬆散 */
+.autotrading-pane [class*="tracking-widest"],
+.autotrading-pane [class*="tracking-\[0.25em\]"],
+.autotrading-pane [class*="tracking-\[0.2em\]"] {
+  letter-spacing: 0.12em;
+}
+
+/* ── Contrast adjustments ────────────────────────────────────────── */
+/* 大幅提升白色透明度過低的文字對比 (深色背景下原 20~50% 太暗) */
+.autotrading-pane .text-white\/20 {
+  color: rgba(229, 231, 235, 0.6);
+}
+
+.autotrading-pane .text-white\/30 {
+  color: rgba(229, 231, 235, 0.7);
+}
+
+.autotrading-pane .text-white\/40 {
+  color: rgba(229, 231, 235, 0.78);
+}
+
+.autotrading-pane .text-white\/50 {
+  color: rgba(229, 231, 235, 0.84);
+}
+
+.autotrading-pane .text-white\/60 {
+  color: rgba(229, 231, 235, 0.88);
+}
+
+/* term-muted 默認 #5c6678 在深底下偏暗，對齊主要文字色階 */
+.autotrading-pane .text-\(--color-term-muted\) {
+  color: #8a93a4;
+}
+
+.autotrading-pane .text-\(--color-term-subtle\) {
+  color: #6e7889;
+}
+
+/* ── Form inputs ─────────────────────────────────────────────────── */
+/* 表單元件統一最小 13px，避免使用者瞇眼閱讀 */
+.autotrading-pane input,
+.autotrading-pane textarea,
+.autotrading-pane select {
+  font-size: 13px;
+}
+
+/* ── Splitter handle (可拖曳分隔線) ─────────────────────────────── */
+.autotrading-splitter {
+  position: relative;
+  flex: 0 0 auto;
+  width: 6px;
+  cursor: col-resize;
+  background: var(--color-term-border);
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.autotrading-splitter::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 1px;
+  transition: background-color 0.15s ease, height 0.15s ease;
+}
+
+.autotrading-splitter:hover,
+.autotrading-splitter[data-dragging="true"] {
+  background: var(--color-term-accent);
+}
+
+.autotrading-splitter:hover::before,
+.autotrading-splitter[data-dragging="true"]::before {
+  background: var(--color-term-bg);
+  height: 56px;
+}
+
+.autotrading-splitter:focus-visible {
+  outline: 2px solid var(--color-term-accent);
+  outline-offset: 2px;
+}
+
+body[data-autotrading-resizing="true"] {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* ── Responsive sidebar width ────────────────────────────────────── */
+.autotrading-sidebar {
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .autotrading-sidebar {
+    width: var(--autotrading-sidebar-width, 320px);
+  }
+}

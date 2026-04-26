@@ -127,6 +127,9 @@ export function useAutotradingWS() {
   const ablyClientRef = useRef<any>(null);
   const ablyChannelRef = useRef<any>(null);
   const lastMetaReasonRef = useRef<string>('');
+  // 當伺服器明確回報 provider=ably (例如部署在 Vercel 的 serverless 環境)，
+  // 即使 token 失敗也應略過原生 WebSocket 嘗試 — 否則只會額外塞滿 console error。
+  const skipWsRef = useRef<boolean>(false);
 
   useEffect(() => {
     connectedRef.current = state.connected;
@@ -307,6 +310,9 @@ export function useAutotradingWS() {
 
     try {
       const meta = await api.getAutotradingRealtimeMeta();
+      // 伺服器回報以 Ably 為主時，記錄此偏好；後續若 Ably 失敗就直接走 polling
+      // (在 Vercel 等 serverless 環境上原生 WS 也不會成功，避免無謂的錯誤訊息)。
+      skipWsRef.current = meta?.provider === 'ably';
       if (!meta?.ably?.enabled) {
         lastMetaReasonRef.current = meta?.ably?.reason || '伺服器未啟用 Ably（ABLY_API_KEY 未生效）。';
         return false;
@@ -396,6 +402,11 @@ export function useAutotradingWS() {
       if (!connectedViaAbly) {
         if (lastMetaReasonRef.current) {
           setState(prev => ({ ...prev, offlineReason: lastMetaReasonRef.current }));
+        }
+        // 後端聲明走 Ably (serverless 環境) → 略過原生 WS，直接 polling
+        if (skipWsRef.current) {
+          startPolling(lastMetaReasonRef.current || DEFAULT_POLLING_REASON);
+          return;
         }
         connectWs();
       }

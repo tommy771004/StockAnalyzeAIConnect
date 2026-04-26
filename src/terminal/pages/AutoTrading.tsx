@@ -13,17 +13,46 @@ import { RiskControlPanel } from '../../components/AutoTrading/RiskControlPanel'
 import { StrategyTab } from '../../components/AutoTrading/StrategyTab';
 import { BacktestPanel } from '../../components/AutoTrading/BacktestPanel';
 import { StrategySandbox } from '../../components/AutoTrading/StrategySandbox';
+import { Splitter } from '../../components/AutoTrading/Splitter';
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
+import '../../components/AutoTrading/autotrading.css';
+
+const SIDEBAR_WIDTH_KEY = 'autotrading.sidebarWidthPx';
+const SIDEBAR_MIN_PX = 260;
+const SIDEBAR_MAX_PX = 640;
+const SIDEBAR_DEFAULT_PX = 320;
+
+function clampSidebar(width: number): number {
+  if (!Number.isFinite(width)) return SIDEBAR_DEFAULT_PX;
+  return Math.max(SIDEBAR_MIN_PX, Math.min(SIDEBAR_MAX_PX, Math.round(width)));
+}
+
+function readStoredSidebarWidth(): number {
+  if (typeof window === 'undefined') return SIDEBAR_DEFAULT_PX;
+  const raw = window.localStorage.getItem(SIDEBAR_WIDTH_KEY);
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return clampSidebar(Number.isFinite(parsed) ? parsed : SIDEBAR_DEFAULT_PX);
+}
 
 export function AutoTradingPage() {
   const { t } = useTranslation();
   const ws = useAutotradingWS();
   const [mainTab, setMainTab] = React.useState('LIVE_VIEW');
   const [defaults, setDefaults] = React.useState<{ config: AgentConfig } | null>(null);
+  const [sidebarWidth, setSidebarWidth] = React.useState<number>(readStoredSidebarWidth);
 
   React.useEffect(() => {
     api.getAutotradingDefaults().then((d: any) => setDefaults(d)).catch(() => {/* 未登入時跳過 */});
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  const handleSplitterResize = React.useCallback((deltaX: number) => {
+    setSidebarWidth(prev => clampSidebar(prev - deltaX));
   }, []);
 
   const handleStart = async (cfg: Partial<AgentConfig>) => {
@@ -53,7 +82,7 @@ export function AutoTradingPage() {
       : t('autotrading.statusLabels.offline'));
 
   return (
-    <div className="h-full flex flex-col gap-2 overflow-hidden font-mono">
+    <div className="autotrading-pane h-full flex flex-col gap-2 overflow-hidden">
       {/* Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border border-(--color-term-border) rounded-sm shrink-0">
         <div className="flex items-center gap-4">
@@ -107,9 +136,9 @@ export function AutoTradingPage() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2">
         {/* Left — Logs + Asset Monitor or Other Tabs */}
-        <div className="flex flex-col gap-2 min-h-0">
+        <div className="flex flex-col gap-2 min-h-0 flex-1 min-w-0">
           {mainTab === 'LIVE_VIEW' && (
             <>
               {/* Decision Log */}
@@ -167,8 +196,16 @@ export function AutoTradingPage() {
           )}
         </div>
 
+        <Splitter
+          onResize={handleSplitterResize}
+          ariaLabel={t('autotrading.layout.resizeSidebar', '調整側欄寬度')}
+        />
+
         {/* Right sidebar */}
-        <div className="flex flex-col gap-2 overflow-y-auto">
+        <div
+          className="autotrading-sidebar flex flex-col gap-2 overflow-y-auto shrink-0"
+          style={{ ['--autotrading-sidebar-width' as string]: `${sidebarWidth}px` }}
+        >
           <AgentControlPanel
             status={ws.status}
             config={ws.config}
