@@ -84,8 +84,9 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     if (r.ok) {
       const data = await r.json() as Array<Record<string, string>>;
       for (const item of data) {
-        const code = item['公司代號'] || item.Code;
-        const industry = item['產業類別'] || item.Industry;
+        // TWSE OpenAPI 真實欄位名稱：公司代號 / 產業別 (中文)；英文欄位 Code / Industry 為兼容
+        const code = item['公司代號'] ?? item['Code'] ?? item['SecuritiesCompanyCode'];
+        const industry = item['產業別'] ?? item['產業類別'] ?? item['Industry'];
         if (!code || !industry) continue;
         const stock: IndustryStock = { code, market: 'TWSE' };
         all.push(stock);
@@ -107,8 +108,8 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     if (r.ok) {
       const data = await r.json() as Array<Record<string, string>>;
       for (const item of data) {
-        const code = item['公司代號'] || item.SecuritiesCompanyCode;
-        const industry = item['產業別'] || item['產業類別'] || item.Industry;
+        const code = item['SecuritiesCompanyCode'] ?? item['公司代號'] ?? item['Code'];
+        const industry = item['Industry'] ?? item['產業別'] ?? item['產業類別'];
         if (!code || !industry) continue;
         const stock: IndustryStock = { code, market: 'TPEX' };
         all.push(stock);
@@ -121,6 +122,28 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
     console.warn('[SectorService] TPEX industry directory failed:', (e as Error).message);
   }
 
+  // 3. ETF 列表 (上市) — t187ap03 不含 ETF，用 STOCK_DAY_ALL 過濾「00 開頭」代號
+  try {
+    const r = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL', {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const data = await r.json() as Array<Record<string, string>>;
+      for (const item of data) {
+        const code = item['Code'] ?? item['證券代號'];
+        if (!code || !/^00/.test(code)) continue; // ETF 代碼一律 00 開頭
+        const stock: IndustryStock = { code, market: 'TWSE' };
+        all.push(stock);
+        const list = byName.get('ETF') ?? [];
+        list.push(stock);
+        byName.set('ETF', list);
+      }
+    }
+  } catch (e) {
+    console.warn('[SectorService] TWSE ETF directory failed:', (e as Error).message);
+  }
+
   if (all.length > 0) {
     _industryCache = all;
     _industryCacheTime = now;
@@ -131,7 +154,38 @@ async function fetchIndustryDirectory(): Promise<Map<string, IndustryStock[]>> {
   return _industryByName;
 }
 
+// ^264 (電子上市) 是合成類別，包含所有電子相關產業
+const TWSE_ELECTRONICS_INDUSTRIES = [
+  '半導體業',
+  '電腦及週邊設備業',
+  '光電業',
+  '通信網路業',
+  '電子零組件業',
+  '電子通路業',
+  '資訊服務業',
+  '其他電子業',
+];
+
 async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
+  const byName = await fetchIndustryDirectory();
+
+  // 特殊類別 1：ETF (^554) — 全部 00 開頭代號
+  if (sectorId === '^554') {
+    const etfs = byName.get('ETF') ?? [];
+    return etfs.map(e => e.code);
+  }
+
+  // 特殊類別 2：電子 (上市) ^264 — 合成所有電子相關產業
+  if (sectorId === '^264') {
+    const codes = new Set<string>();
+    for (const ind of TWSE_ELECTRONICS_INDUSTRIES) {
+      for (const s of byName.get(ind) ?? []) {
+        if (s.market === 'TWSE') codes.add(s.code);
+      }
+    }
+    return [...codes];
+  }
+
   const isTpex = sectorId in TPEX_INDUSTRY_BY_ID;
   const isTwse = sectorId in TWSE_INDUSTRY_BY_ID;
   if (!isTpex && !isTwse) return [];
@@ -139,7 +193,6 @@ async function getSectorSymbolsViaOpenApi(sectorId: string): Promise<string[]> {
   const targetIndustry = isTpex ? TPEX_INDUSTRY_BY_ID[sectorId] : TWSE_INDUSTRY_BY_ID[sectorId];
   const targetMarket: 'TWSE' | 'TPEX' = isTpex ? 'TPEX' : 'TWSE';
 
-  const byName = await fetchIndustryDirectory();
   const matches = byName.get(targetIndustry) ?? [];
   const filtered = matches.filter(m => m.market === targetMarket);
   return filtered.map(m => m.code);
