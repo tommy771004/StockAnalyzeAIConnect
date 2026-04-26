@@ -57,8 +57,12 @@ function handleApiError(res: Response, e: unknown): void {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-/** Fix #1: hard cap on screener input — prevents DoS via 10 k-symbol batch */
-const MAX_SCREENER_SYMBOLS = 50;
+/** Hard cap on screener input. Allows ETF (~250 codes) + 行業類股 in single scan
+ *  while still preventing pathological 10k-symbol DoS attempts. */
+const MAX_SCREENER_SYMBOLS = 300;
+/** Process screener calls in chunks of N to avoid hammering Yahoo Finance and
+ *  exhausting the Node event loop with hundreds of parallel fetches. */
+const SCREENER_BATCH_SIZE = 15;
 
 // Lazy-load Neon DB
 let dbAvailable = false;
@@ -1560,18 +1564,20 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
   if (!Array.isArray(symbols) || symbols.length === 0) {
     return res.status(400).json({ error: 'symbols array required' });
   }
-  // Fix #1: cap symbols to prevent event-loop saturation
-  if (symbols.length > MAX_SCREENER_SYMBOLS) {
-    return res.status(400).json({
-      error: `Max ${MAX_SCREENER_SYMBOLS} symbols per request`,
-    });
+  // Hard cap to prevent obvious DoS — but allow ETF (~250 codes) + 行業類股 in single scan.
+  // Anything between SCREENER_BATCH_SIZE and MAX_SCREENER_SYMBOLS is processed in batches.
+  let workingSymbols: string[] = symbols;
+  if (workingSymbols.length > MAX_SCREENER_SYMBOLS) {
+    console.warn(`[Screener] Truncating ${workingSymbols.length} → ${MAX_SCREENER_SYMBOLS} symbols`);
+    workingSymbols = workingSymbols.slice(0, MAX_SCREENER_SYMBOLS);
   }
 
   // Fix #5: typed accumulator — no more results: any[]
   const results: ScreenerResultRow[] = [];
 
-  await Promise.allSettled(
-    symbols.map(async (sym: string) => {
+  // Process in chunks: avoids `Promise.all` over 300 fetches (event-loop saturation,
+  // Yahoo rate-limits) while still giving useful concurrency.
+  const scanOne = async (sym: string) => {
       try {
         const [quoteRaw, histRaw] = await Promise.allSettled([
           NativeYahooApi.quote(sym),
@@ -1681,10 +1687,14 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
       } catch (err) {
         console.warn(`[Screener] Skipping ${sym}:`, (err as Error).message);
       }
-    })
-  );
+  };
 
-  res.json({ results, scanned: symbols.length });
+  for (let i = 0; i < workingSymbols.length; i += SCREENER_BATCH_SIZE) {
+    const batch = workingSymbols.slice(i, i + SCREENER_BATCH_SIZE);
+    await Promise.allSettled(batch.map(scanOne));
+  }
+
+  res.json({ results, scanned: workingSymbols.length });
 });
 
 app.use('/api/agent', authMiddleware, agentRouter);
