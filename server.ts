@@ -883,8 +883,40 @@ app.get('/api/stock/:symbol', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 app.get('/api/stock/:symbol/history', authMiddleware, async (req: AuthRequest, res) => {
-  try { const q = await NativeYahooApi.chart(req.params.symbol as string, req.query); res.json(q.quotes); }
-  catch (e) { handleApiError(res, e); }
+  try {
+    const symbol = req.params.symbol as string;
+    const opts = req.query as Record<string, string>;
+    const interval = (opts.interval ?? '1d') as string;
+
+    let q = await NativeYahooApi.chart(symbol, opts);
+
+    // 對於台股 .TW / .TWO，Yahoo 的 1m 短線常 422，給定回退順序：1m → 5m → 1d
+    if ((!q.quotes || q.quotes.length === 0) && /\.(TW|TWO)$/i.test(symbol)) {
+      const fallbackChain: string[] = interval === '1m'
+        ? ['5m', '1d']
+        : interval === '5m' || interval === '15m'
+          ? ['1d']
+          : [];
+
+      for (const fb of fallbackChain) {
+        try {
+          // Use a wider lookback so daily/intraday fallbacks have data
+          const fallbackPeriod = fb === '1d'
+            ? String(Date.now() - 90 * 24 * 3600 * 1000)
+            : String(Date.now() - 5 * 24 * 3600 * 1000);
+          q = await NativeYahooApi.chart(symbol, { ...opts, interval: fb, period1: fallbackPeriod });
+          if (q.quotes && q.quotes.length > 0) {
+            console.warn(`[history] ${symbol}: ${interval} empty → falling back to ${fb}`);
+            break;
+          }
+        } catch (e) {
+          console.warn(`[history] ${symbol} fallback ${fb} failed:`, (e as Error).message);
+        }
+      }
+    }
+
+    res.json(q.quotes);
+  } catch (e) { handleApiError(res, e); }
 });
 
 app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
@@ -895,15 +927,12 @@ app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
   } catch (e) { handleApiError(res, e); }
 });
 
-app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
-  try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
-  catch (e) { handleApiError(res, e); }
-});
-
+// IMPORTANT: /api/news/feed must be declared BEFORE /api/news/:symbol,
+// otherwise Express routes "feed" as a `:symbol` and the feed endpoint is shadowed.
 app.get('/api/news/feed', authMiddleware, async (req, res) => {
   const category = (req.query.category as string) || '焦點';
   try {
-    // 1. 優先處理「美股」與「國際」— 這些類別 TradingView 資料更豐富
+    // 1. 美股 / 國際 → TradingView 全球新聞（英文素材最豐富）
     if (category === '美股' || category === '國際') {
       const tvNews = await TV.getGlobalNewsFeed(category);
       if (tvNews && tvNews.length > 0) {
@@ -918,26 +947,40 @@ app.get('/api/news/feed', authMiddleware, async (req, res) => {
       }
     }
 
-    // 2. 處理「台股」、「理財」、「焦點」— 使用 WantGoo (中文化內容)
-    const news = await News.getWantGooNews(category);
-    
-    // 3. Fallback: 如果 WantGoo 抓不到 (Cloudflare 阻擋)，試試 Yahoo 作為備援
+    // 2. 中文新聞優先序：cnyes (鉅亨網 公開 API) → WantGoo → Yahoo Search
+    let news = await News.getCnyesNews(category).catch(() => [] as News.NewsItem[]);
+
+    if (!news || news.length === 0) {
+      news = await News.getWantGooNews(category).catch(() => [] as News.NewsItem[]);
+    }
+
+    // 3. 最後備援：Yahoo Finance 搜尋 (要求 crumb auth，不一定能用)
     if (!news || news.length === 0) {
       let yahooQuery = 'Market';
       if (category === '台股') yahooQuery = '台灣股市 新聞';
       else if (category === '美股') yahooQuery = 'US Stock News';
       else if (category === '理財') yahooQuery = '個人理財 投資';
       else if (category === '國際') yahooQuery = 'International Business';
-      
-      const data = await NativeYahooApi.search(yahooQuery);
-      return res.json(data.news || []);
+
+      try {
+        const data = await NativeYahooApi.search(yahooQuery);
+        return res.json(data.news || []);
+      } catch (yErr) {
+        console.warn('[NewsFeed] Yahoo fallback failed:', (yErr as Error).message);
+        return res.json([]);
+      }
     }
-    
+
     res.json(news);
-  } catch (e) { 
+  } catch (e) {
     console.error('[NewsFeed] Error:', e);
-    handleApiError(res, e); 
+    handleApiError(res, e);
   }
+});
+
+app.get('/api/news/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try { const data = await NativeYahooApi.search(req.params.symbol as string); res.json(data.news || []); }
+  catch (e) { handleApiError(res, e); }
 });
 
 app.post('/api/ai/news-analyze', authMiddleware, async (req: AuthRequest, res) => {
@@ -1268,13 +1311,9 @@ app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
   try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
 
-app.get('/api/tv/overview/:symbol', async (req, res) => {
-  try {
-    const data = await TV.getOverview(req.params.symbol);
-    if (data === null) return res.status(503).json({ error: 'TV Service Down' });
-    res.json(data);
-  } catch (e) { handleApiError(res, e); }
-});
+// NOTE: a duplicate, *unauthenticated* /api/tv/overview/:symbol used to be defined
+// here, which shadowed the authenticated handler below and silently bypassed auth.
+// The authenticated handler further down handles this route.
 
 async function resolveQueryToYahooSymbol(query: string): Promise<string> {
   const q = query.trim().toUpperCase();
@@ -1330,26 +1369,35 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
     console.log(`[Research] Fetching data for: Raw=${rawInput}, Yahoo=${yahooSymbol}, TV=${tvSymbol} (Resolve: ${resolveTime}ms)`);
 
     const requestedTimeframe = (req.query.timeframe as string) || '1M';
-    
+
     let interval: '1m' | '5m' | '15m' | '1h' | '1d' = '1h';
     let periodDays = 30;
+    // TV scraper accepts: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1W' | '1M'
+    let tvIndicatorTf: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1W' | '1M' = '1d';
     switch (requestedTimeframe) {
-      case '1D': interval = '1m'; periodDays = 1; break;
-      case '5D': interval = '5m'; periodDays = 5; break;
-      case '1W': interval = '15m'; periodDays = 7; break;
-      case '1M': interval = '1h'; periodDays = 30; break;
-      case '6M': interval = '1d'; periodDays = 180; break;
-      case '1Y': interval = '1d'; periodDays = 365; break;
-      case 'YTD': interval = '1d'; periodDays = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); break;
-      default: interval = '1d'; periodDays = 90;
+      case '1D': interval = '1m'; periodDays = 1; tvIndicatorTf = '5m'; break;
+      case '5D': interval = '5m'; periodDays = 5; tvIndicatorTf = '15m'; break;
+      case '1W': interval = '15m'; periodDays = 7; tvIndicatorTf = '1h'; break;
+      case '1M': interval = '1h'; periodDays = 30; tvIndicatorTf = '1d'; break;
+      case '6M': interval = '1d'; periodDays = 180; tvIndicatorTf = '1d'; break;
+      case '1Y': interval = '1d'; periodDays = 365; tvIndicatorTf = '1W'; break;
+      case 'YTD': interval = '1d'; periodDays = Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)); tvIndicatorTf = '1d'; break;
+      default: interval = '1d'; periodDays = 90; tvIndicatorTf = '1d';
     }
     const period1 = String(Date.now() - periodDays * 24 * 3600 * 1000);
+
+    // 對於台股 .TW / .TWO，Yahoo 的 1m / 5m 短線資料常常 422，
+    // 退而求其次改抓較粗的線型，避免回傳空陣列讓前端 chart 一片空白。
+    const isTaiwanStock = /\.(TW|TWO)$/i.test(yahooSymbol);
+    if (isTaiwanStock) {
+      if (interval === '1m') interval = '5m';
+    }
 
     const startTime = Date.now();
     const [quote, tvOverview, tvIndicators, tvNews, history, holdersSummary, wantGooChip] = await Promise.allSettled([
       NativeYahooApi.quote(yahooSymbol as string).then(res => { console.log(`[Research] Yahoo Quote: ${Date.now() - startTime}ms`); return res; }),
       TV.getOverview(tvSymbol).then(res => { console.log(`[Research] TV Overview: ${Date.now() - startTime}ms`); return res; }),
-      TV.getIndicators(tvSymbol, requestedTimeframe.toLowerCase() === '1m' ? '1M' : '1d').then(res => { console.log(`[Research] TV Indicators: ${Date.now() - startTime}ms`); return res; }),
+      TV.getIndicators(tvSymbol, tvIndicatorTf).then(res => { console.log(`[Research] TV Indicators: ${Date.now() - startTime}ms`); return res; }),
       TV.getNewsHeadlines(tvSymbol).then(res => { console.log(`[Research] TV News: ${Date.now() - startTime}ms`); return res; }),
       NativeYahooApi.chart(yahooSymbol as string, { interval, period1 }).then(res => { console.log(`[Research] Yahoo Chart: ${Date.now() - startTime}ms`); return res; }),
       NativeYahooApi.quoteSummary(yahooSymbol as string, ['majorHoldersBreakdown']).then(res => { console.log(`[Research] Yahoo Summary: ${Date.now() - startTime}ms`); return res; }),
@@ -1396,13 +1444,29 @@ app.get('/api/insights/:symbol', authMiddleware, async (req: AuthRequest, res) =
       return Object.keys(out).length ? out : null;
     })();
 
+    let historyData: any[] = history.status === 'fulfilled' ? ((history.value as any).quotes ?? []) : [];
+
+    // Fallback: 短週期常因 Yahoo 422 / 流量限制回空陣列 → 退一階改抓日線，避免畫面空白。
+    if (historyData.length === 0 && interval !== '1d') {
+      try {
+        const fallbackPeriod = String(Date.now() - 90 * 24 * 3600 * 1000);
+        const retry = await NativeYahooApi.chart(yahooSymbol as string, { interval: '1d', period1: fallbackPeriod });
+        historyData = retry.quotes ?? [];
+        if (historyData.length > 0) {
+          console.warn(`[Research] history fallback: ${interval} → 1d (Yahoo returned empty for short interval)`);
+        }
+      } catch (fbErr) {
+        console.warn('[Research] history fallback failed:', (fbErr as Error).message);
+      }
+    }
+
     res.json({
       symbol: { input: rawInput, canonical: parseSymbol(tvSymbol), yahoo: yahooSymbol },
       quote: quoteVal,
       tvOverview: mergedOverview,
       tvIndicators: tvIndicators.status === 'fulfilled' ? (tvIndicators.value as any)?.data || tvIndicators.value : null,
       tvNews: tvNews.status === 'fulfilled' ? (tvNews.value as any)?.data || tvNews.value : null,
-      history: history.status === 'fulfilled' ? (history.value as any).quotes : [],
+      history: historyData,
       wantGooChip: wantGooChip.status === 'fulfilled' ? wantGooChip.value : null,
     });
   } catch (e) {

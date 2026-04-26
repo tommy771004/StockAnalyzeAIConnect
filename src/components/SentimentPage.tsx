@@ -122,13 +122,10 @@ export default function SentimentPage({ model, symbol: initSym }: Props) {
         api.getHistory(sym, {period1: getPastDateStr(365), interval:'1d'}).catch(e => { console.warn('[SentimentPage] getHistory 1d:', sym, e); return []; }),
         api.getHistory(sym, {period1: getPastDateStr(365 * 3), interval:'1wk'}).catch(e => { console.warn('[SentimentPage] getHistory 1wk:', sym, e); return []; }),
       ]);
+      const sysInstruction = typeof settings.systemInstruction === 'string' ? settings.systemInstruction : undefined;
       const [mtfResult, singleResult] = await Promise.all([
-        analyzeMTF(sym, (d1h??[]) as HistoricalData[], (d1d??[]) as HistoricalData[], (d1wk??[]) as HistoricalData[], model, settings.systemInstruction as string | undefined),
-        analyzeStock(sym, {regularMarketPrice:0}, ((d1d??[]) as HistoricalData[]).slice(-30), model, settings.systemInstruction as string | undefined),
-
-        analyzeMTF(sym, (d1h??[]) as HistoricalData[], (d1d??[]) as HistoricalData[], (d1wk??[]) as HistoricalData[], model, typeof settings.systemInstruction === 'string' ? settings.systemInstruction : undefined),
-        analyzeStock(sym, {regularMarketPrice:0}, ((d1d??[]) as HistoricalData[]).slice(-30), model, typeof settings.systemInstruction === 'string' ? settings.systemInstruction : undefined),
-
+        analyzeMTF(sym, (d1h??[]) as HistoricalData[], (d1d??[]) as HistoricalData[], (d1wk??[]) as HistoricalData[], model, sysInstruction),
+        analyzeStock(sym, {regularMarketPrice:0}, ((d1d??[]) as HistoricalData[]).slice(-30), model, sysInstruction),
       ]);
       setMtf(mtfResult);
       setSingleAI(singleResult);
