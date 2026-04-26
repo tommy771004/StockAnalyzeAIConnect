@@ -58,3 +58,13 @@ export const DEFAULT_RISK_CONFIG = {
   maxPositionPct: DEFAULT_MAX_POSITION_PCT,
   stopLossPct: DEFAULT_STOP_LOSS_PCT,
 };
+
+export const DEFAULT_MODEL_RISK_CONFIG = {
+  quantumEnabled: false,         // 預設關閉，透過 ENABLE_QUANTUM_SIGNAL env 控制
+  aiEnabled: true,
+  dataFreshnessThresholdMs: 5 * 60 * 1000, // 5 分鐘
+  maxModelDriftPct: 0.3,         // 模型輸出漂移超過 30% 則 fallback
+  rolloutStage: 'paper' as const,
+  rollbackDrawdownDays: 3,       // 連續 3 日超標回撤則觸發警告
+  maxDrawdownForRollback: 0.05,  // 5% 為回滾門檻
+};

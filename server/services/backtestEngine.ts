@@ -251,6 +251,18 @@ function calculateMDD(curve: any[]) {
 }
 
 /**
+ * Detect market regime from price series.
+ * >10% total return = bull, <-10% = bear, else sideways.
+ */
+export function detectRegime(prices: number[]): 'bull' | 'bear' | 'sideways' {
+  if (prices.length < 2) return 'sideways';
+  const ret = (prices[prices.length - 1] - prices[0]) / Math.max(Math.abs(prices[0]), 1e-6);
+  if (ret > 0.1) return 'bull';
+  if (ret < -0.1) return 'bear';
+  return 'sideways';
+}
+
+/**
  * 高效能並行回測 (使用 Python Polars 微服務)
  * 對於海量 Tick 數據或複雜因子運算，委派給 Python 處理
  */

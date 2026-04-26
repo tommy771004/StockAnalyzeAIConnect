@@ -10,7 +10,24 @@
  *  5. 最大槓桿倍數
  */
 
-import { DEFAULT_RISK_CONFIG as SHARED_DEFAULTS } from './autotradingDefaults.js';
+import { DEFAULT_RISK_CONFIG as SHARED_DEFAULTS, DEFAULT_MODEL_RISK_CONFIG } from './autotradingDefaults.js';
+
+export type RolloutStage = 'paper' | 'sandbox_live' | 'full_live';
+
+export interface ModelRiskConfig {
+  quantumEnabled: boolean;
+  aiEnabled: boolean;
+  /** Reject model output if data is older than this (ms) */
+  dataFreshnessThresholdMs: number;
+  /** Trigger model circuit-breaker if drift > this fraction */
+  maxModelDriftPct: number;
+  /** Current rollout stage */
+  rolloutStage: RolloutStage;
+  /** Consecutive drawdown-exceeded days before rollback */
+  rollbackDrawdownDays: number;
+  /** Max drawdown fraction allowed per rollout stage */
+  maxDrawdownForRollback: number;
+}
 
 export interface OrderRequest {
   symbol: string;
@@ -37,10 +54,12 @@ export interface RiskCheckResult {
 
 class RiskManager {
   private config: RiskConfig = { ...DEFAULT_RISK_CONFIG };
+  private modelRisk: ModelRiskConfig = { ...DEFAULT_MODEL_RISK_CONFIG };
   private currentDailyLoss = 0;
   private currentDailyTrade = 0;
   private killSwitchActive = false;
   private totalUsed = 0;
+  private consecutiveDrawdownDays = 0;
 
   updateConfig(cfg: Partial<RiskConfig>) {
     this.config = { ...this.config, ...cfg };
@@ -125,6 +144,76 @@ class RiskManager {
     this.currentDailyTrade += orderValue;
   }
 
+  // ── Model Risk Controls ────────────────────────────────────────────────────
+
+  updateModelRisk(cfg: Partial<ModelRiskConfig>) {
+    this.modelRisk = { ...this.modelRisk, ...cfg };
+  }
+
+  getModelRisk(): ModelRiskConfig { return { ...this.modelRisk }; }
+
+  setRolloutStage(stage: RolloutStage) {
+    this.modelRisk.rolloutStage = stage;
+    console.log(`[RiskManager] Rollout stage → ${stage}`);
+  }
+
+  getRolloutStage(): RolloutStage { return this.modelRisk.rolloutStage; }
+
+  /**
+   * Check model output validity: data freshness + drift detection.
+   * Returns BLOCK if model should be bypassed (caller falls back to technical only).
+   */
+  checkModelRisk(input: {
+    modelType: 'quantum' | 'ai';
+    dataAgeMs: number;
+    driftPct?: number;
+    hasError?: boolean;
+  }): RiskCheckResult {
+    if (input.modelType === 'quantum' && !this.modelRisk.quantumEnabled) {
+      return { allowed: false, reason: 'Quantum model disabled via switch', level: 'BLOCK' };
+    }
+    if (input.modelType === 'ai' && !this.modelRisk.aiEnabled) {
+      return { allowed: false, reason: 'AI model disabled via switch', level: 'BLOCK' };
+    }
+    if (input.hasError) {
+      return { allowed: false, reason: `${input.modelType} model returned error`, level: 'BLOCK' };
+    }
+    if (input.dataAgeMs > this.modelRisk.dataFreshnessThresholdMs) {
+      return {
+        allowed: false,
+        reason: `${input.modelType} data stale: ${Math.round(input.dataAgeMs / 1000)}s > ${Math.round(this.modelRisk.dataFreshnessThresholdMs / 1000)}s`,
+        level: 'BLOCK',
+      };
+    }
+    if (input.driftPct !== undefined && input.driftPct > this.modelRisk.maxModelDriftPct) {
+      return {
+        allowed: false,
+        reason: `${input.modelType} model drift ${(input.driftPct * 100).toFixed(1)}% exceeds limit`,
+        level: 'BLOCK',
+      };
+    }
+    return { allowed: true };
+  }
+
+  /**
+   * Record end-of-day drawdown result.
+   * Triggers rollback warning if consecutive days exceed threshold.
+   */
+  recordDailyDrawdown(drawdownPct: number): void {
+    if (drawdownPct > this.modelRisk.maxDrawdownForRollback) {
+      this.consecutiveDrawdownDays++;
+      if (this.consecutiveDrawdownDays >= this.modelRisk.rollbackDrawdownDays) {
+        console.warn(
+          `[RiskManager] ⚠️ Rollback condition met: ${this.consecutiveDrawdownDays} consecutive days exceeded drawdown limit. Current stage: ${this.modelRisk.rolloutStage}`,
+        );
+      }
+    } else {
+      this.consecutiveDrawdownDays = 0;
+    }
+  }
+
+  getConsecutiveDrawdownDays(): number { return this.consecutiveDrawdownDays; }
+
   getStats() {
     return {
       dailyLoss: this.currentDailyLoss,
@@ -132,6 +221,8 @@ class RiskManager {
       totalUsed: this.totalUsed,
       killSwitchActive: this.killSwitchActive,
       config: this.config,
+      modelRisk: this.modelRisk,
+      consecutiveDrawdownDays: this.consecutiveDrawdownDays,
     };
   }
 }

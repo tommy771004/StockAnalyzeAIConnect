@@ -573,7 +573,15 @@
         "rsi": "RSI",
         "stopLoss": "Stop Loss",
         "takeProfit": "Take Profit"
-      }
+      },
+      "riskAdjustedScore": "Risk-Adjusted Score"
+    },
+    "signalAttribution": {
+      "quantumDisabled": "Quantum signal disabled (ENABLE_QUANTUM_SIGNAL=false)",
+      "fallbackMode": "Science model offline — using fallback proxy signal",
+      "quantumGated": "Quantum uncertainty too high → forced HOLD",
+      "dominant": "dominant",
+      "leverage": "Leverage adj."
     },
     "performance": {
       "title": "Performance Dashboard",
@@ -590,6 +598,7 @@
       "equityCurve": "Equity Curve",
       "drawdown": "Drawdown",
       "strategyAttribution": "Strategy Attribution",
+      "ablation": "Ablation Comparison (Technical / AI / Quantum)",
       "loadFailed": "Load failed",
       "computing": "Computing...",
       "noData": "No data yet",

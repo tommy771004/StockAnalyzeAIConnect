@@ -574,7 +574,15 @@
         "rsi": "RSI",
         "stopLoss": "停損",
         "takeProfit": "停利"
-      }
+      },
+      "riskAdjustedScore": "風險調整後評分"
+    },
+    "signalAttribution": {
+      "quantumDisabled": "量子訊號已停用（ENABLE_QUANTUM_SIGNAL=false）",
+      "fallbackMode": "科學模型離線，使用 fallback 代理訊號",
+      "quantumGated": "量子不確定度過高 → 強制 HOLD",
+      "dominant": "主導",
+      "leverage": "槓桿調整"
     },
     "performance": {
       "title": "績效儀表板",
@@ -591,8 +599,9 @@
       "equityCurve": "資產曲線",
       "drawdown": "回撤曲線",
       "strategyAttribution": "策略歸因",
+      "ablation": "Ablation 比較（技術 / AI / 量子）",
       "loadFailed": "載入失敗",
-      "computing": "計算中...",
+      "computing": "計算中…",
       "noData": "尚無數據",
       "insufficientData": "資料不足"
     },

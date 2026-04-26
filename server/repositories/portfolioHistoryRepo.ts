@@ -1,6 +1,7 @@
 import { db } from '../../src/db/index.js';
 import { portfolioHistory } from '../../src/db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
+import { getAllSectorFeatures, type SectorFeatureAggregate } from '../services/analytics/featureStoreService.js';
 
 export interface HistoryRecord {
   userId: string;
@@ -15,6 +16,18 @@ export const getHistoryByUser = async (userId: string, limit = 30) => {
     .where(eq(portfolioHistory.userId, userId))
     .orderBy(desc(portfolioHistory.date))
     .limit(limit);
+};
+
+/** 取得歷史 NAV 並附加最新的產業聚合特徵（供前端 Screener 策略前置篩選使用）。 */
+export const getHistoryWithSectorFeatures = async (
+  userId: string,
+  limit = 30,
+): Promise<{ history: Awaited<ReturnType<typeof getHistoryByUser>>; sectorFeatures: SectorFeatureAggregate[] }> => {
+  const [history, sectorFeatures] = await Promise.all([
+    getHistoryByUser(userId, limit),
+    Promise.resolve(getAllSectorFeatures()),
+  ]);
+  return { history, sectorFeatures };
 };
 
 /** 紀錄快照 */

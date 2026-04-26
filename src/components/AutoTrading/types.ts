@@ -109,6 +109,13 @@ export const BROKER_OPTIONS = [
   { id: 'ib', name: 'Interactive Brokers (盈透證券)', available: false, note: '全球化交易接口，支持美股與台股複委託。' }
 ];
 
+export interface SignalComponentInfo {
+  source: 'technical' | 'ai' | 'quantum' | 'macro';
+  action: string;
+  score: number;
+  weight: number;
+}
+
 export interface AgentLog {
   id: string;
   timestamp: string;
@@ -119,6 +126,14 @@ export interface AgentLog {
   confidence?: number;
   action?: 'BUY' | 'SELL' | 'HOLD' | 'SYSTEM';
   reasoning?: string[];
+  signalAttribution?: {
+    components: SignalComponentInfo[];
+    dominantSource?: string;
+    quantumGated?: boolean;
+    leverageMultiplier?: number;
+    fallbackMode?: boolean;
+    preQuantumAction?: string;
+  };
 }
 
 export interface DecisionHeat {

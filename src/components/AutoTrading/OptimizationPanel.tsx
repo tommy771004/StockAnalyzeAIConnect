@@ -17,16 +17,18 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
   const { t } = useTranslation();
   const [scanning, setScanning] = useState(false);
   const [proposal, setProposal] = useState<any>(null);
+  const [noNeedMsg, setNoNeedMsg] = useState(false);
 
   const startScan = async () => {
     setScanning(true);
     setProposal(null);
+    setNoNeedMsg(false);
     try {
       const data = await api.optimizeAutotrading({ symbol, period: 90 });
       if (data.ok && data.proposal) {
         setProposal(data.proposal);
       } else {
-        alert(t('autotrading.optimizer.noNeed', '目前的參數已經是該標的最佳配置，無需優化。'));
+        setNoNeedMsg(true);
       }
     } catch (e) {
       console.error(e);
@@ -48,18 +50,25 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
         <button
           onClick={startScan}
           disabled={scanning}
+          aria-busy={scanning}
           className={cn(
-            "px-4 py-1.5 rounded text-[10px] font-bold transition-all flex items-center gap-2",
+            "px-4 py-1.5 rounded text-[10px] font-bold motion-safe:transition-[background-color,color] flex items-center gap-2",
             scanning ? "bg-white/5 text-white/20" : "bg-violet-600 text-white hover:bg-violet-500"
           )}
         >
-          {scanning ? <RefreshCw className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          <RefreshCw className={cn('h-3 w-3', scanning && 'animate-spin')} aria-hidden="true" />
           {scanning ? t('autotrading.optimizer.scanning', 'SCANNING...') : t('autotrading.optimizer.scanForEvolution', 'SCAN FOR EVOLUTION')}
         </button>
       </div>
 
+      {noNeedMsg && (
+        <div className="p-3 rounded border border-violet-500/20 bg-violet-500/5 text-[10px] text-violet-300" role="status">
+          {t('autotrading.optimizer.noNeed', '目前的參數已經是該標的最佳配置，無需優化。')}
+        </div>
+      )}
+
       {proposal ? (
-        <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-sm p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+        <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-sm p-4 space-y-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-400" />
             <span className="text-[11px] font-bold text-emerald-400 uppercase">{t('autotrading.optimizer.proposalFound', '進化提案發現！預期提升 {{pct}}% ROI', { pct: proposal.improvementPct })}</span>
@@ -91,6 +100,14 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
             " {proposal.reason} "
           </div>
 
+          {proposal.riskAdjustedScore !== undefined && (
+            <div className="flex items-center gap-2 text-[9px] text-emerald-400/70 px-1">
+              <span>{t('autotrading.optimizer.riskAdjustedScore', '風險調整後評分')}</span>
+              <span className="font-mono text-emerald-400">{proposal.riskAdjustedScore}</span>
+              <span className="text-white/30">= Sharpe × (1-MDD) × WinRate</span>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={() => onApply(proposal.betterParams)}
@@ -100,9 +117,10 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
             </button>
             <button
               onClick={() => setProposal(null)}
+              aria-label={t('common.dismiss', '關閉')}
               className="px-4 bg-white/5 hover:bg-white/10 text-white/50 text-[10px] py-2 rounded"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3 w-3" aria-hidden="true" />
             </button>
           </div>
         </div>

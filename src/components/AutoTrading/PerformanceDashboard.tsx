@@ -24,11 +24,20 @@ interface Metrics {
   worstTrade: { ticker: string; pnl: number } | null;
 }
 
+interface AblationVariantSummary {
+  variant: 'technical_only' | 'technical_plus_ai' | 'full';
+  roi: number;
+  sharpe: number;
+  maxDrawdown: number;
+  riskAdjustedScore: number;
+}
+
 interface PerformanceData {
   metrics: Metrics;
   equityCurve: { date: string; equity: number; pnl: number }[];
   drawdownCurve: { date: string; drawdown: number }[];
   attribution: Record<string, { pnl: number; trades: number; winRate: number }>;
+  ablation?: AblationVariantSummary[];
 }
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -76,6 +85,7 @@ export function PerformanceDashboard() {
               key={p.key}
               type="button"
               onClick={() => setPeriod(p.key)}
+              aria-pressed={period === p.key}
               className={cn(
                 'text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border',
                 period === p.key
@@ -89,10 +99,10 @@ export function PerformanceDashboard() {
           <button
             type="button"
             onClick={load}
+            aria-label={t('common.refresh', '重新載入')}
             className="ml-1 p-1 rounded text-(--color-term-muted) hover:text-white"
-            title={t('common.refresh', '重新載入')}
           >
-            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -102,7 +112,7 @@ export function PerformanceDashboard() {
       )}
 
       {!data && !error && (
-        <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{loading ? t('autotrading.performance.computing', '計算中...') : t('autotrading.performance.noData', '尚無數據')}</div>
+        <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{loading ? t('autotrading.performance.computing', '計算中…') : t('autotrading.performance.noData', '尚無數據')}</div>
       )}
 
       {data && (
@@ -148,6 +158,35 @@ export function PerformanceDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ablation comparison */}
+          {data.ablation && data.ablation.length > 0 && (
+            <div className="border border-(--color-term-border) rounded">
+              <div className="px-3 py-2 text-[9px] text-(--color-term-muted) uppercase border-b border-(--color-term-border)">
+                {t('autotrading.performance.ablation', 'Ablation 比較')}
+              </div>
+              <div className="divide-y divide-(--color-term-border)">
+                {data.ablation.map((v) => {
+                  const labels: Record<string, string> = {
+                    technical_only: 'Technical Only',
+                    technical_plus_ai: '+ AI/LLM',
+                    full: '+ Quantum',
+                  };
+                  return (
+                    <div key={v.variant} className="flex items-center justify-between px-3 py-2 text-[10px]">
+                      <span className="font-bold text-white/80 w-28">{labels[v.variant]}</span>
+                      <div className="flex items-center gap-4 font-mono text-[9px]">
+                        <span className={v.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}>ROI {v.roi.toFixed(1)}%</span>
+                        <span className="text-cyan-400">Sharpe {v.sharpe.toFixed(2)}</span>
+                        <span className="text-amber-400">MDD {v.maxDrawdown.toFixed(1)}%</span>
+                        <span className="text-violet-400">Score {v.riskAdjustedScore.toFixed(3)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -226,7 +265,7 @@ function Sparkline({ points, color, fillBelow }: SparklineProps) {
     return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20">
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" role="img" aria-label={fillBelow ? 'Drawdown chart' : 'Equity curve chart'}>
       {fillBelow && (
         <path d={`${path} L ${w},${h} L 0,${h} Z`} fill={color} fillOpacity={0.15} />
       )}

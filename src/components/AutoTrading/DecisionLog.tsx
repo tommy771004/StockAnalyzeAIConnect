@@ -7,10 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { AgentLog } from './types';
 import { LOG_LEVEL_COLORS } from './types';
+import { SignalAttributionPanel } from './SignalAttributionPanel';
 
 interface Props {
   logs: AgentLog[];
   autoScroll?: boolean;
+  quantumEnabled?: boolean;
   connectionInfo?: {
     connected: boolean;
     transport: 'none' | 'ably' | 'ws' | 'polling';
@@ -27,7 +29,7 @@ function formatTs(iso: string): string {
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
-export function DecisionLog({ logs, autoScroll = true, connectionInfo }: Props) {
+export function DecisionLog({ logs, autoScroll = true, quantumEnabled = false, connectionInfo }: Props) {
   const { t } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +91,14 @@ export function DecisionLog({ logs, autoScroll = true, connectionInfo }: Props) 
                     <span>{reason}</span>
                   </div>
                 ))}
+              </div>
+            )}
+            {log.signalAttribution && (
+              <div className="ml-8 mb-2 border-l border-white/5 pl-3">
+                <SignalAttributionPanel
+                  attribution={log.signalAttribution}
+                  quantumEnabled={quantumEnabled}
+                />
               </div>
             )}
           </React.Fragment>
