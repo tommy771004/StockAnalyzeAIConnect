@@ -932,30 +932,45 @@ app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
 app.get('/api/news/feed', authMiddleware, async (req, res) => {
   const category = (req.query.category as string) || '焦點';
   try {
-    // 1. 美股 / 國際 → TradingView 全球新聞（英文素材最豐富）
+    const collected: News.NewsItem[] = [];
+
+    // 1. 美股 / 國際 → 先試 TradingView 全球新聞 (英文素材豐富，但 scraper 可能下線)
     if (category === '美股' || category === '國際') {
-      const tvNews = await TV.getGlobalNewsFeed(category);
-      if (tvNews && tvNews.length > 0) {
-        return res.json(tvNews.map(item => ({
-          id: item.id || item.storyPath,
-          title: item.title,
-          source: item.source,
-          published: item.published,
-          link: item.storyPath ? `https://www.tradingview.com${item.storyPath}` : '',
-          providerPublishTime: item.published
-        })));
+      try {
+        const tvNews = await TV.getGlobalNewsFeed(category);
+        if (tvNews && tvNews.length > 0) {
+          return res.json(tvNews.map(item => ({
+            id: item.id || item.storyPath,
+            title: item.title,
+            source: item.source,
+            published: item.published,
+            link: item.storyPath ? `https://www.tradingview.com${item.storyPath}` : '',
+            providerPublishTime: item.published
+          })));
+        }
+      } catch (tvErr) {
+        // TV scraper 可能 503 / 服務未啟動，靜默退到下一個來源
+        console.warn('[NewsFeed] TV global feed failed, falling back to cnyes:', (tvErr as Error).message);
       }
     }
 
-    // 2. 中文新聞優先序：cnyes (鉅亨網 公開 API) → WantGoo → Yahoo Search
-    let news = await News.getCnyesNews(category).catch(() => [] as News.NewsItem[]);
+    // 2. 中文新聞優先序：cnyes (鉅亨網 公開 API) → WantGoo
+    const cnyesNews = await News.getCnyesNews(category).catch(err => {
+      console.warn('[NewsFeed] cnyes failed:', err?.message ?? err);
+      return [] as News.NewsItem[];
+    });
+    if (cnyesNews?.length) collected.push(...cnyesNews);
 
-    if (!news || news.length === 0) {
-      news = await News.getWantGooNews(category).catch(() => [] as News.NewsItem[]);
+    if (collected.length === 0) {
+      const wgNews = await News.getWantGooNews(category).catch(err => {
+        console.warn('[NewsFeed] WantGoo failed:', err?.message ?? err);
+        return [] as News.NewsItem[];
+      });
+      if (wgNews?.length) collected.push(...wgNews);
     }
 
     // 3. 最後備援：Yahoo Finance 搜尋 (要求 crumb auth，不一定能用)
-    if (!news || news.length === 0) {
+    if (collected.length === 0) {
       let yahooQuery = 'Market';
       if (category === '台股') yahooQuery = '台灣股市 新聞';
       else if (category === '美股') yahooQuery = 'US Stock News';
@@ -971,10 +986,11 @@ app.get('/api/news/feed', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json(news);
+    res.json(collected);
   } catch (e) {
-    console.error('[NewsFeed] Error:', e);
-    handleApiError(res, e);
+    console.error('[NewsFeed] Unhandled error:', e);
+    // 最壞情況：永遠不要回 500，否則前端的 News fetch 會直接拋錯。
+    res.json([]);
   }
 });
 
