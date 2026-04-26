@@ -574,14 +574,21 @@ app.get('/api/autotrading/realtime/meta', authMiddleware, (_req, res) => {
 
 app.get('/api/autotrading/ably/token', authMiddleware, async (req: AuthRequest, res) => {
   if (!isAblyEnabled()) {
-    return res.status(501).json({ error: 'Ably is not configured on server' });
+    const meta = getAutotradingRealtimeMeta();
+    return res.status(501).json({
+      error: meta.ably.reason || 'Ably is not configured on server',
+    });
   }
   try {
     const clientId = req.userId ? `user:${req.userId}` : undefined;
     const token = await createAutotradingToken(clientId);
     res.json(token);
   } catch (e) {
-    handleApiError(res, e);
+    // Surface upstream Ably error (config/permissions). The detail is not
+    // sensitive — it explains misconfiguration so the UI can guide the user.
+    const msg = e instanceof Error ? e.message : 'Ably token request failed';
+    console.warn('[AutoTrading Ably] token error:', msg);
+    res.status(502).json({ error: msg, hint: 'Check ABLY_API_KEY value/format on the server.' });
   }
 });
 
