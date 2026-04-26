@@ -446,6 +446,11 @@
     "backtest": {
       "title": "回測: {{symbol}}",
       "desc": "使用目前策略配置與歷史數據進行模擬",
+      "descConfigurable": "可在此修改回測標的與策略，不會影響 Strategy tab 的正式配置",
+      "symbolLabel": "標的 (Symbol)",
+      "strategyLabel": "策略 (Strategy)",
+      "periodLabel": "期間 (Period)",
+      "resetToConfig": "套用配置",
       "periods": {
         "30d": "過去 30 天",
         "90d": "過去 90 天",
