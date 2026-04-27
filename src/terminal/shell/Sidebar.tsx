@@ -38,7 +38,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
       {/* Mobile backdrop overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm md:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -49,7 +49,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
         className={cn(
           'flex flex-col items-center justify-between border-r border-(--color-term-border) bg-(--color-term-bg) py-4 shrink-0 transition-transform duration-200',
           'md:relative md:translate-x-0 md:w-12 md:z-auto',
-          'fixed top-0 left-0 h-full z-50 w-48',
+          'fixed top-0 left-0 h-full z-[70] w-48',
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
