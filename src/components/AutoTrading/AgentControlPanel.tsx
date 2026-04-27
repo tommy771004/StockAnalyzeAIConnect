@@ -116,9 +116,10 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
         </div>
 
         {status === 'cooldown' && (
-          <button 
+          <button
+            type="button"
             onClick={() => api.resetCircuitBreaker()}
-            className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold rounded animate-pulse"
+            className="focus-ring flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold rounded animate-pulse"
           >
             <AlertTriangle className="h-3 w-3" /> {t('autotrading.resetBreaker')}
           </button>
@@ -141,7 +142,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
             key={t.id}
             onClick={() => setActiveTab(t.id as any)}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-t-sm transition-all relative",
+              "focus-ring flex items-center gap-2 px-4 py-2 rounded-t-sm motion-safe:transition-all relative",
               activeTab === t.id ? "bg-white/5 text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-violet-500" : "text-white/30 hover:text-white"
             )}
           >

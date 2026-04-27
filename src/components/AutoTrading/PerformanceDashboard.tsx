@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { TrendingUp, TrendingDown, Award, ShieldAlert, BarChart3, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import * as api from '../../services/api';
+import { Skeleton } from '../ui';
 
 type Period = '1d' | '1w' | '1m' | '3m' | 'ytd' | 'all';
 
@@ -87,7 +88,7 @@ export function PerformanceDashboard() {
               onClick={() => setPeriod(p.key)}
               aria-pressed={period === p.key}
               className={cn(
-                'text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border',
+                'focus-ring text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border',
                 period === p.key
                   ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-200'
                   : 'border-(--color-term-border) text-(--color-term-muted) hover:text-white'
@@ -100,7 +101,7 @@ export function PerformanceDashboard() {
             type="button"
             onClick={load}
             aria-label={t('common.refresh', '重新載入')}
-            className="ml-1 p-1 rounded text-(--color-term-muted) hover:text-white"
+            className="ml-1 p-1 rounded text-(--color-term-muted) hover:text-white hover:bg-white/5 motion-safe:transition-colors focus-ring"
           >
             <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} aria-hidden="true" />
           </button>
@@ -112,7 +113,20 @@ export function PerformanceDashboard() {
       )}
 
       {!data && !error && (
-        <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{loading ? t('autotrading.performance.computing', '計算中…') : t('autotrading.performance.noData', '尚無數據')}</div>
+        loading ? (
+          <div className="space-y-3 p-2" role="status" aria-label={t('autotrading.performance.computing', '計算中…')}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : (
+          <div className="p-6 text-center text-[10px] text-(--color-term-muted)">{t('autotrading.performance.noData', '尚無數據')}</div>
+        )
       )}
 
       {data && (
