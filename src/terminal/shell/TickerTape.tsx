@@ -285,7 +285,7 @@ function TickerManager({
   };
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-px w-[340px] bg-(--color-term-panel) border border-(--color-term-border) shadow-2xl shadow-black/40">
+    <div className="absolute left-0 top-full z-[80] mt-px w-[340px] max-w-[calc(100vw-8px)] bg-(--color-term-panel) border border-(--color-term-border) shadow-2xl shadow-black/40">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border)">
         <span className="text-[11px] font-bold tracking-widest text-(--color-term-accent) uppercase">
