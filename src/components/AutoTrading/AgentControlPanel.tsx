@@ -29,7 +29,7 @@ interface Props {
   decisionHeats: Record<string, DecisionHeat>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
-  onStart: (cfg: Partial<AgentConfig>) => void;
+  onStart: (cfg: Partial<AgentConfig>) => Promise<void>;
   onStop: () => void;
   onUpdateConfig: (cfg: Record<string, unknown>) => Promise<unknown>;
 }
@@ -44,11 +44,24 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
     api.getAutotradingDefaults().then((d: any) => setDefaultsConfig(d?.config ?? null)).catch(() => {/* ignore */});
   }, []);
 
+  // Refresh defaults every 15 s so that RiskControlPanel saves are reflected in effectiveConfig
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      api.getAutotradingDefaults()
+        .then((d: any) => setDefaultsConfig(d?.config ?? null))
+        .catch(() => {});
+    }, 15_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [mode] = useState<TradingMode>(config?.mode ?? 'simulated');
   const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? defaultsConfig?.strategies ?? []);
   const [params, setParams] = useState<StrategyParams>(config?.params ?? defaultsConfig?.params ?? {});
   const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? defaultsConfig?.symbols ?? []);
   const isRunning = status === 'running';
+
+  // Merge live WS config with server defaults so pre-flight checks (hasRisk) work before first engine start
+  const effectiveConfig: AgentConfig | null = config ?? (defaultsConfig as AgentConfig | null);
 
   // Sync state with backend config when it changes
   React.useEffect(() => {
@@ -64,8 +77,13 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
     }
   }, [config, defaultsConfig]);
 
-  const updateConfig = (patch: Partial<AgentConfig>) => {
-    return onUpdateConfig({ mode, strategies, params, symbols, ...patch });
+  const updateConfig = async (patch: Partial<AgentConfig>) => {
+    const result = await onUpdateConfig({ mode, strategies, params, symbols, ...patch });
+    // Refresh defaults so effectiveConfig reflects the latest saved values
+    api.getAutotradingDefaults()
+      .then((d: any) => setDefaultsConfig(d?.config ?? null))
+      .catch(() => {});
+    return result;
   };
 
   const handleSymbolsChange = (nextSymbols: string[]) => {
@@ -136,16 +154,16 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
       {/* 3. Dynamic Tab Content */}
       <div className="min-h-[450px]">
         {activeTab === 'monitor' && (
-          <MonitorTab 
-            symbols={symbols} 
-            isRunning={isRunning} 
+          <MonitorTab
+            symbols={symbols}
+            isRunning={isRunning}
             decisionHeats={decisionHeats}
             globalSentiment={globalSentiment}
             equityHistory={equityHistory}
-            config={config}
+            config={effectiveConfig}
             onNavigateTab={(tab) => setActiveTab(tab)}
-            onStart={() => onStart({ mode, strategies, params, symbols })} 
-            onStop={onStop} 
+            onStart={() => onStart({ mode, strategies, params, symbols })}
+            onStop={onStop}
           />
         )}
 
