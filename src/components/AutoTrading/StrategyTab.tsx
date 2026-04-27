@@ -35,13 +35,13 @@ export function StrategyTab({ strategies, params, onStrategiesChange, onParamsCh
         <div className="flex gap-1">
           <button 
             onClick={() => setViewMode('map')} 
-            className={cn("p-1.5 rounded transition-all", viewMode === 'map' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
+            className={cn("focus-ring p-1.5 rounded motion-safe:transition-all", viewMode === 'map' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
           >
             <MapIcon className="h-3.5 w-3.5" />
           </button>
           <button 
             onClick={() => setViewMode('list')} 
-            className={cn("p-1.5 rounded transition-all", viewMode === 'list' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
+            className={cn("focus-ring p-1.5 rounded motion-safe:transition-all", viewMode === 'list' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
           >
             <List className="h-3.5 w-3.5" />
           </button>

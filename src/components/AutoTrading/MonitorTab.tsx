@@ -93,7 +93,7 @@ export function MonitorTab({
               onClick={step.action}
               disabled={!step.action}
               className={cn(
-                'text-left p-2 rounded border text-[11px] transition-colors flex items-center justify-between gap-2',
+                'focus-ring text-left p-2 rounded border text-[11px] motion-safe:transition-colors flex items-center justify-between gap-2',
                 step.done
                   ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                   : 'border-cyan-400/20 bg-black/30 text-cyan-100/90',
@@ -255,8 +255,9 @@ export function MonitorTab({
         )}
         {isRunning ? (
           <button
+            type="button"
             onClick={onStop}
-            className="w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 transition-all flex items-center justify-center gap-2"
+            className="focus-ring w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 motion-safe:transition-all flex items-center justify-center gap-2"
           >
             <Square className="h-4 w-4 fill-current" /> {t('autotrading.monitor.emergencyStop')}
           </button>
@@ -266,7 +267,7 @@ export function MonitorTab({
               onClick={handleStart}
               disabled={!readyToStart || isStarting}
               className={cn(
-                'w-full py-3 rounded font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2',
+                'focus-ring w-full py-3 rounded font-bold uppercase tracking-[0.2em] motion-safe:transition-all flex items-center justify-center gap-2',
                 readyToStart && !isStarting
                   ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
                   : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700 cursor-not-allowed'

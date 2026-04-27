@@ -108,7 +108,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
             onClick={() => { setSelectedBroker(b.id); setStatus({ type: 'idle', msg: '' }); }}
             disabled={disabled}
             className={cn(
-              "text-left p-3 border rounded-sm transition-all flex items-center gap-4",
+              "focus-ring text-left p-3 border rounded-sm motion-safe:transition-all flex items-center gap-4",
               selectedBroker === b.id ? "border-cyan-500/40 bg-cyan-500/5" : "border-(--color-term-border) bg-white/2 hover:bg-white/3"
             )}
           >
@@ -218,7 +218,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
             type="button"
             onClick={handleConnect}
             disabled={disabled || isStub || status.type === 'loading'}
-            className="w-full mt-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="focus-ring w-full mt-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 py-2 rounded text-[11px] font-bold uppercase tracking-widest motion-safe:transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isStub ? t('autotrading.broker.unsupported', '此券商尚未支援') : status.type === 'loading' ? t('autotrading.broker.connecting', '正在嘗試建立連線...') : t('autotrading.broker.testAndSave', '測試並儲存券商連線')}
           </button>

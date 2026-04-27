@@ -162,7 +162,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       <button
         type="button"
         onClick={handleSave}
-        className="w-full py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
+        className="focus-ring w-full py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 motion-safe:transition-colors"
       >
         {t('autotrading.risk.saveParams')}
       </button>
@@ -202,7 +202,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
           type="button"
           onClick={() => isKillActive ? handleReleaseKill() : setKillConfirm(true)}
           className={cn(
-            'w-full py-2.5 rounded text-sm font-bold uppercase tracking-widest border transition-all flex items-center justify-center gap-2',
+            'focus-ring w-full py-2.5 rounded text-sm font-bold uppercase tracking-widest border motion-safe:transition-all flex items-center justify-center gap-2',
             isKillActive
               ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
               : 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25'
@@ -218,14 +218,14 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
             <button
               type="button"
               onClick={() => setKillConfirm(false)}
-              className="flex-1 py-2 rounded text-xs font-bold bg-(--color-term-surface) text-(--color-term-muted) border border-(--color-term-border) hover:bg-(--color-term-panel)"
+              className="focus-ring flex-1 py-2 rounded text-xs font-bold bg-(--color-term-surface) text-(--color-term-muted) border border-(--color-term-border) hover:bg-(--color-term-panel) motion-safe:transition-colors"
             >
               {t('common.cancel')}
             </button>
             <button
               type="button"
               onClick={() => { setKillConfirm(false); onKillSwitch(); }}
-              className="flex-1 py-2 rounded text-xs font-bold bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
+              className="focus-ring flex-1 py-2 rounded text-xs font-bold bg-rose-500 text-white border-rose-500 hover:bg-rose-600 motion-safe:transition-colors"
             >
               {t('common.confirm')}
             </button>

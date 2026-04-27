@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play, TrendingUp, History, BarChart3, ChevronRight, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Button } from '../ui';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { runBacktest as runGlobalBacktest } from '../../services/api';
 import { fetchJ } from '../../utils/api';
@@ -149,7 +150,7 @@ export function BacktestPanel({ symbol, config }: Props) {
             <button
               type="button"
               onClick={resetToConfig}
-              className="text-[9px] uppercase tracking-widest text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors px-2 py-1 border border-(--color-term-border) rounded"
+              className="focus-ring text-[9px] uppercase tracking-widest text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors px-2 py-1 border border-(--color-term-border) rounded"
             >
               {t('autotrading.backtest.resetToConfig', '套用配置')}
             </button>
@@ -203,17 +204,17 @@ export function BacktestPanel({ symbol, config }: Props) {
             </select>
           </label>
 
-          <button
-            onClick={runBacktest}
+          <Button
+            variant="feature"
+            size="md"
+            loading={loading}
             disabled={!canRun}
-            className={cn(
-              'flex items-center gap-2 px-4 py-1.5 rounded text-[11px] font-bold transition-all self-end',
-              !canRun ? 'bg-white/10 text-white/50 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/20'
-            )}
+            onClick={runBacktest}
+            className="self-end"
+            leftIcon={<Play className="h-3 w-3 fill-current" />}
           >
-            {loading ? <Activity className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 fill-current" />}
             {t('autotrading.backtest.run')}
-          </button>
+          </Button>
         </div>
       </div>
 
