@@ -133,7 +133,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       getRecentNews(symbol, 3),
       getInstitutionalFlow(symbol),
       sParams.enableMTF ? getDailyContext(symbol) : Promise.resolve(null),
-      TVService.getIndicators(symbol, '15m'), // 使用 15 分鐘線作為決策依據
+      TVService.getIndicators(symbol, '15m').catch(() => null), // TV rejects non-US symbols (e.g. .TW); null = skip
       TWSeService.realtimeQuote(symbol),
       Promise.all([getFreeModelByTier(1), getFreeModelByTier(2)])
     ]);
@@ -515,7 +515,7 @@ export function startAgent(c?: any) {
   if (tickTimeout) clearTimeout(tickTimeout);
   
   if (c) {
-    const v = updateAgentConfig(c);
+    const v = updateAgentConfig(c, true); // silent=true: status broadcast happens after agentStatus = 'running'
     if (!v.ok) return v;
   }
   
@@ -535,12 +535,12 @@ export function stopAgent() {
   return { ok: true };
 }
 
-export function updateAgentConfig(patch: any) {
+export function updateAgentConfig(patch: any, silent = false) {
   const result = AgentConfigPatchSchema.safeParse(patch);
   if (!result.success) {
     return { ok: false, error: `Invalid configuration: ${result.error.message}` };
   }
-  
+
   agentConfig = { ...agentConfig, ...result.data };
 
   // 將風控相關欄位同步到 RiskManager 單例
@@ -558,6 +558,10 @@ export function updateAgentConfig(patch: any) {
   }
 
   emitLog({ level: 'INFO', source: 'SYSTEM', symbol: 'CONFIG', message: '系統配置已更新' });
+  // Push updated config to all realtime clients so the UI stays in sync without waiting for the next poll.
+  if (!silent) {
+    wsBroadcast?.({ type: 'status', data: { status: agentStatus, config: agentConfig } });
+  }
   return { ok: true };
 }
 
