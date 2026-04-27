@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, ArrowRight, Check, X, RefreshCw, TrendingUp } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { Button } from '../ui';
 import * as api from '../../services/api';
 
 interface Props {
@@ -47,18 +47,17 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
             <div className="text-[9px] text-violet-400/70 italic">{t('autotrading.optimizer.hint', '尋找能讓 {{symbol}} 獲利更高的參數組合', { symbol })}</div>
           </div>
         </div>
-        <button
+        <Button
+          variant="feature"
+          size="md"
+          loading={scanning}
           onClick={startScan}
           disabled={scanning}
           aria-busy={scanning}
-          className={cn(
-            "px-4 py-1.5 rounded text-[10px] font-bold motion-safe:transition-[background-color,color] flex items-center gap-2",
-            scanning ? "bg-white/5 text-white/20" : "bg-violet-600 text-white hover:bg-violet-500"
-          )}
+          leftIcon={<RefreshCw className="h-3 w-3" aria-hidden="true" />}
         >
-          <RefreshCw className={cn('h-3 w-3', scanning && 'animate-spin')} aria-hidden="true" />
           {scanning ? t('autotrading.optimizer.scanning', 'SCANNING...') : t('autotrading.optimizer.scanForEvolution', 'SCAN FOR EVOLUTION')}
-        </button>
+        </Button>
       </div>
 
       {noNeedMsg && (
@@ -109,19 +108,24 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
           )}
 
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="constructive"
+              size="md"
+              className="flex-1"
               onClick={() => onApply(proposal.betterParams)}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold py-2 rounded flex items-center justify-center gap-2"
+              leftIcon={<Check className="h-3 w-3" />}
             >
-              <Check className="h-3 w-3" /> {t('autotrading.optimizer.applyNow', '立即套用進化參數')}
-            </button>
-            <button
+              {t('autotrading.optimizer.applyNow', '立即套用進化參數')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
               onClick={() => setProposal(null)}
               aria-label={t('common.dismiss', '關閉')}
-              className="px-4 bg-white/5 hover:bg-white/10 text-white/50 text-[10px] py-2 rounded"
+              className="px-4"
             >
               <X className="h-3 w-3" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </div>
       ) : !scanning && (
