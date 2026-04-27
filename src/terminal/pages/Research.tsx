@@ -138,8 +138,8 @@ export function ResearchPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
       <div className="col-span-12 flex min-h-0 flex-col gap-3 lg:col-span-8">
-        <header className="flex items-center gap-4 border border-(--color-term-border) bg-(--color-term-panel) px-4 py-3">
-          <div className="relative flex-1">
+        <header className="flex flex-wrap items-center gap-2 border border-(--color-term-border) bg-(--color-term-panel) px-4 py-3">
+          <div className="relative flex-1 min-w-[160px]">
             <StockSymbolAutocomplete
               value={searchInput}
               onValueChange={setSearchInput}
