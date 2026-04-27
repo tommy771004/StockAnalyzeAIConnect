@@ -23,6 +23,38 @@ import { StrategySandbox } from './StrategySandbox';
 import { AlphaReport } from './AlphaReport';
 import { CopyTradingPanel } from './CopyTradingPanel';
 
+const TW_SYMBOL_RE = /(?:\.(TW|TWO)$)|^\d{4,6}$/i;
+const US_SYMBOL_RE = /^[A-Z]{1,5}(?:[.-][A-Z]{1,2})?$/;
+
+function normalizeSymbol(symbol: string): string {
+  return symbol.trim().toUpperCase();
+}
+
+function normalizeTwSymbol(symbol: string): string {
+  const normalized = normalizeSymbol(symbol);
+  if (/^\d{4,6}$/.test(normalized)) return `${normalized}.TW`;
+  return normalized;
+}
+
+function normalizeUsSymbol(symbol: string): string {
+  const normalized = normalizeSymbol(symbol);
+  const match = normalized.match(/^([A-Z]{1,5})(?:[.-]([A-Z]{1,2}))?$/);
+  if (!match) return normalized;
+  const [, root, suffix] = match;
+  return suffix ? `${root}.${suffix}` : root;
+}
+
+function normalizeManagedSymbol(symbol: string): string {
+  const normalized = normalizeSymbol(symbol);
+  if (TW_SYMBOL_RE.test(normalized)) return normalizeTwSymbol(normalized);
+  if (US_SYMBOL_RE.test(normalized)) return normalizeUsSymbol(normalized);
+  return normalized;
+}
+
+function normalizeSymbols(nextSymbols: string[]): string[] {
+  return Array.from(new Set(nextSymbols.map(normalizeManagedSymbol).filter(Boolean)));
+}
+
 interface Props {
   status: AgentStatus;
   config: AgentConfig | null;
@@ -87,8 +119,15 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   };
 
   const handleSymbolsChange = (nextSymbols: string[]) => {
-    setSymbols(nextSymbols);
-    void updateConfig({ symbols: nextSymbols });
+    const normalized = normalizeSymbols(nextSymbols);
+    setSymbols(normalized);
+    void updateConfig({ symbols: normalized });
+  };
+
+  const handleRemoveSymbol = (symbol: string) => {
+    if (isRunning) return;
+    const targetSymbol = normalizeManagedSymbol(symbol);
+    handleSymbolsChange(symbols.filter((item) => normalizeManagedSymbol(item) !== targetSymbol));
   };
 
   const handleStrategiesChange = (nextStrategies: StrategyType[]) => {
@@ -162,6 +201,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
             globalSentiment={globalSentiment}
             equityHistory={equityHistory}
             config={effectiveConfig}
+            onRemoveSymbol={handleRemoveSymbol}
             onNavigateTab={(tab) => setActiveTab(tab)}
             onStart={() => onStart({ mode, strategies, params, symbols })}
             onStop={onStop}

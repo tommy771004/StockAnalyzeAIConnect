@@ -15,8 +15,8 @@ export type MarketKind = 'TW' | 'US' | 'OTHER';
 
 export function classifySymbol(symbol: string): MarketKind {
   const s = symbol.toUpperCase();
-  if (s.endsWith('.TW') || s.endsWith('.TWO')) return 'TW';
-  if (/^[A-Z]{1,5}$/.test(s)) return 'US';
+  if (s.endsWith('.TW') || s.endsWith('.TWO') || /^\d{4,6}$/.test(s)) return 'TW';
+  if (/^[A-Z]{1,5}(?:[.-][A-Z]{1,2})?$/.test(s)) return 'US';
   return 'OTHER';
 }
 

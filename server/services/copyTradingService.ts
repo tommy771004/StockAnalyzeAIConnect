@@ -4,6 +4,10 @@
  */
 import { simulatedAdapter } from './brokers/SimulatedAdapter.js';
 
+function isTaiwanSymbol(symbol: string): boolean {
+  return /\.(TW|TWO)$/i.test(symbol);
+}
+
 export interface FollowerAccount {
   id: string;
   name: string;
@@ -35,7 +39,16 @@ class CopyTradingService {
       const delay = follower.staggeredDelayMs || (Math.random() * 2000 + 500);
       if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
 
-      const followerQty = Math.max(1, Math.floor(masterOrder.qty * follower.multiplier));
+      const twSymbol = isTaiwanSymbol(masterOrder.symbol);
+      const scaledQty = Number(masterOrder.qty) * follower.multiplier;
+      const followerQty = twSymbol
+        ? Math.floor(scaledQty / 1000) * 1000
+        : Math.floor(scaledQty * 1000) / 1000;
+
+      if (followerQty <= 0) {
+        logFn(`⚪ [跟單略過] ${follower.name}（數量不足最小下單單位）`);
+        return;
+      }
       
       if (follower.mode === 'shadow') {
         logFn(`👻 [影子跟單] ${follower.name} 同步完成`);
@@ -52,7 +65,7 @@ class CopyTradingService {
         side: masterOrder.side,
         orderType: 'MARKET',
         qty: followerQty,
-        marketType: masterOrder.symbol.endsWith('.TW') ? 'TW_STOCK' : 'US_STOCK'
+        marketType: twSymbol ? 'TW_STOCK' : 'US_STOCK'
       });
 
       const result = await Promise.race([orderPromise, timeoutPromise]) as any;

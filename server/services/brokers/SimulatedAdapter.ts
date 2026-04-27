@@ -80,9 +80,12 @@ export class SimulatedAdapter implements IBrokerAdapter {
     const orderValue = order.qty * fillPrice;
     const today = new Date().toISOString().slice(0, 10);
     const existingPos = this._positions.get(order.symbol);
-    const isDayTrade = order.side === 'SELL' && existingPos?.openedToday === true && existingPos.openDate === today;
-    const isETF = /^00\d+\.TW/.test(order.symbol); // 台股 ETF 代號規則：00xx
-    const { commission, tax } = computeTwStockFees(orderValue, { side: order.side, isDayTrade, isETF });
+    const isTwStock = order.marketType === 'TW_STOCK';
+    const isDayTrade = isTwStock && order.side === 'SELL' && existingPos?.openedToday === true && existingPos.openDate === today;
+    const isETF = isTwStock && /^00\d+\.TW/.test(order.symbol); // 台股 ETF 代號規則：00xx
+    const { commission, tax } = isTwStock
+      ? computeTwStockFees(orderValue, { side: order.side, isDayTrade, isETF })
+      : { commission: 0, tax: 0 };
     const totalCost = order.side === 'BUY' ? orderValue + commission : -(orderValue - commission - tax);
 
     // 餘額不足檢查

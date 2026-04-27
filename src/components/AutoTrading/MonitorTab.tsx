@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
-import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight } from 'lucide-react';
+import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { DecisionHeatmap } from './DecisionHeatmap';
 import type { AgentConfig, DecisionHeat, EquitySnapshot } from './types';
@@ -17,6 +17,7 @@ interface Props {
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
   config: AgentConfig | null;
+  onRemoveSymbol: (symbol: string) => void;
   onNavigateTab?: (tab: 'strategy' | 'broker') => void;
   onStart: () => Promise<void>;
   onStop: () => void;
@@ -29,6 +30,7 @@ export function MonitorTab({
   globalSentiment,
   equityHistory,
   config,
+  onRemoveSymbol,
   onNavigateTab,
   onStart,
   onStop,
@@ -196,7 +198,19 @@ export function MonitorTab({
             <div key={sym} className="p-3 bg-white/5 border border-white/10 rounded flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-bold font-mono text-white">{sym}</span>
-                <Activity className="h-3 w-3 text-cyan-400 opacity-50" />
+                <div className="flex items-center gap-1">
+                  <Activity className="h-3 w-3 text-cyan-400 opacity-50" />
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => onRemoveSymbol(sym)}
+                    aria-label={t('autotrading.monitor.removeSymbol', '移除監控標的')}
+                    title={t('autotrading.monitor.removeSymbol', '移除監控標的')}
+                    className="h-5 w-5 inline-flex items-center justify-center rounded border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
               <DecisionHeatmap symbol={sym} data={decisionHeats[sym]} />
             </div>

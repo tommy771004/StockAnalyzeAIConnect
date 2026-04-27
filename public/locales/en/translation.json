@@ -364,7 +364,8 @@
       },
       "waitingInsights": "Waiting for AI Insights...",
       "emergencyStop": "EMERGENCY_STOP",
-      "initiateEngine": "INITIATE_ENGINE"
+      "initiateEngine": "INITIATE_ENGINE",
+      "removeSymbol": "Remove monitored symbol"
     },
     "asset": {
       "title": "Asset Monitor :: TW Stocks",
@@ -399,6 +400,17 @@
       "sectorsLoadFailed": "Failed to load sectors",
       "sectorSymbolsLoadFailed": "Failed to load sector constituents",
       "loadingSymbols": "Loading...",
+      "marketTabs": {
+        "tw": "TW Stocks (Whole Lot)",
+        "us": "US Stocks (Fractional)"
+      },
+      "usInputLabel": "Add US symbol manually",
+      "usInputPlaceholder": "e.g. AAPL / TSLA / BRK.B",
+      "addUsSymbol": "Add to Watch",
+      "usInputHint": "You can add US tickers with fractional-share support, e.g. AAPL or BRK.B",
+      "usSymbolInvalid": "Invalid symbol format. Use values like AAPL or BRK.B",
+      "usSymbolExists": "This symbol is already in the watch list",
+      "removeUsSymbol": "Remove this US symbol",
       "selector": {
         "title": "AI Strategies & Weights",
         "weight": "Weight",

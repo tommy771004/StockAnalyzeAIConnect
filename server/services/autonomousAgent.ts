@@ -129,11 +129,12 @@ function parseInstitutionalFlowBias(flowText: string): number {
 async function runAnalysis(config: AgentConfig, symbol: string) {
   const sParams = { ...config.params, ...(config.symbolConfigs?.[symbol] || {}) };
   try {
-    const [news, flow, mtf, indicators, quote, models] = await Promise.all([
+    const [news, flow, mtf, indicators, overview, quote, models] = await Promise.all([
       getRecentNews(symbol, 3),
       getInstitutionalFlow(symbol),
       sParams.enableMTF ? getDailyContext(symbol) : Promise.resolve(null),
       TVService.getIndicators(symbol, '15m').catch(() => null), // TV rejects non-US symbols (e.g. .TW); null = skip
+      TVService.getOverview(symbol).catch(() => null),
       TWSeService.realtimeQuote(symbol),
       Promise.all([getFreeModelByTier(1), getFreeModelByTier(2)])
     ]);
@@ -177,7 +178,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
     });
 
     let dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
-    const currentPrice = quote?.price || 0;
+    const currentPrice = quote?.price || Number(overview?.close ?? 0) || 0;
     
     // 信心度過低時，觸發「深度研究任務」(Parallel-Web)
     if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65) {
@@ -384,18 +385,30 @@ async function agentTick() {
       
       if (agentStatus === 'running' && signal.action !== 'HOLD') {
         const threshold = agentConfig.params.AI_LLM?.confidenceThreshold || 65;
-        if (signal.confidence > threshold) {
+        const signalConfidence = Number(signal.confidence ?? 0);
+        const signalPrice = Number(signal.price ?? 0);
+        if (signalConfidence > threshold) {
           // 動態計算委託數量：預設每次投入可用資金的 10% 或配置的 maxAllocationPerTrade
           const allocation = agentConfig.params.maxAllocationPerTrade || 0.1;
           const tradeAmount = balance.availableMargin * allocation;
+          const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
           
-          // 台股以「張」為單位 (1000股)
-          const targetQty = signal.price > 0 ? Math.floor(tradeAmount / (signal.price * 1000)) * 1000 : 0; 
+          // 台股使用整張(1000股)；美股允許零股(小數股)
+          const targetQty = signalPrice > 0
+            ? (isTaiwanSymbol
+              ? Math.floor(tradeAmount / (signalPrice * 1000)) * 1000
+              : Math.floor((tradeAmount / signalPrice) * 1000) / 1000)
+            : 0;
           
           let finalQty = 0;
           if (signal.action === 'BUY') {
-            if (targetQty < 1000) {
-              emitLog({ level: 'WARNING', source: 'AGENT', symbol, message: `資金不足以購買一張股票 (需約 ${(signal.price * 1000).toFixed(0)} TWD)` });
+            if (targetQty <= 0) {
+              emitLog({ level: 'WARNING', source: 'AGENT', symbol, message: '資金不足或報價異常，無法建立有效下單數量' });
+              continue;
+            }
+
+            if (isTaiwanSymbol && targetQty < 1000) {
+              emitLog({ level: 'WARNING', source: 'AGENT', symbol, message: `資金不足以購買一張股票 (需約 ${(signalPrice * 1000).toFixed(0)} TWD)` });
               continue;
             }
             finalQty = targetQty;
@@ -411,7 +424,7 @@ async function agentTick() {
 
           // 訂單前置風控檢查
           const riskCheck = riskManager.validateOrder(
-            { symbol, side: signal.action as 'BUY' | 'SELL', quantity: finalQty, price: signal.price || 0 },
+            { symbol, side: signal.action as 'BUY' | 'SELL', quantity: finalQty, price: signalPrice },
             balance.totalAssets,
           );
           if (!riskCheck.allowed) {
@@ -426,7 +439,7 @@ async function agentTick() {
             symbol,
             side: signal.action as 'BUY' | 'SELL',
             qty: finalQty,
-            price: signal.price || 0,
+            price: signalPrice,
           });
           if (result && result.status === 'FILLED') {
             riskManager.recordTrade(result.filledQty * result.filledPrice);

@@ -6,6 +6,10 @@ import type { IBrokerAdapter } from './brokers/BrokerAdapter.js';
 import type { AgentConfig } from '../../src/components/AutoTrading/types.js';
 import { copyTradingService } from './copyTradingService.js';
 
+function isTaiwanSymbol(symbol: string): boolean {
+  return /\.(TW|TWO)$/i.test(symbol);
+}
+
 
 export class OrderExecutor {
   constructor(
@@ -23,7 +27,7 @@ export class OrderExecutor {
         side: trade.side,
         qty: trade.qty,
         orderType: 'MARKET',
-        marketType: trade.symbol.endsWith('.TW') ? 'TW_STOCK' : 'US_STOCK'
+        marketType: isTaiwanSymbol(trade.symbol) ? 'TW_STOCK' : 'US_STOCK'
       });
 
       if (!mainOrder) {
@@ -63,7 +67,7 @@ export class OrderExecutor {
         side: 'BUY', // 避險通常是買入反向標的
         qty: hedgeQty,
         orderType: 'MARKET',
-        marketType: hedgeSymbol!.endsWith('.TW') ? 'TW_STOCK' : 'US_STOCK'
+        marketType: isTaiwanSymbol(hedgeSymbol!) ? 'TW_STOCK' : 'US_STOCK'
       });
     } catch (e) {
       this.emitLog({ level: 'WARNING', source: 'HEDGE', symbol: hedgeSymbol, message: `⚠️ 對沖下單失敗：${(e as Error).message}，請手動檢查風險曝險！` });

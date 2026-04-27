@@ -15,3 +15,9 @@ metadata.json
 docs/AGENTS.md
 docs/evo.md
 docs/SystemDesign.md
+scratch/check_db.ts
+scratch/fix_db.ts
+scratch/fix_encoding.ps1
+scratch/fix_server_final.ps1
+scratch/fix_server_register.ps1
+scratch/fix_server.ps1

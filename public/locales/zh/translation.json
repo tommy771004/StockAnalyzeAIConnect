@@ -365,7 +365,8 @@
       },
       "waitingInsights": "等待 AI 洞察...",
       "emergencyStop": "緊急停止 (EMERGENCY_STOP)",
-      "initiateEngine": "啟動引擎 (INITIATE_ENGINE)"
+      "initiateEngine": "啟動引擎 (INITIATE_ENGINE)",
+      "removeSymbol": "移除監控標的"
     },
     "asset": {
       "title": "資產監控 :: 台股",
@@ -400,6 +401,17 @@
       "sectorsLoadFailed": "無法載入類股清單",
       "sectorSymbolsLoadFailed": "查詢類股成分失敗",
       "loadingSymbols": "載入中...",
+      "marketTabs": {
+        "tw": "台股（整股）",
+        "us": "美股（零股）"
+      },
+      "usInputLabel": "手動加入美股標的",
+      "usInputPlaceholder": "例如 AAPL / TSLA / BRK.B",
+      "addUsSymbol": "加入監控",
+      "usInputHint": "可輸入美股代號（支援零股），例如 AAPL 或 BRK.B",
+      "usSymbolInvalid": "代號格式錯誤，請輸入像 AAPL 或 BRK.B",
+      "usSymbolExists": "此標的已在監控清單中",
+      "removeUsSymbol": "移除此美股標的",
       "selector": {
         "title": "AI 策略與權重",
         "weight": "權重",
