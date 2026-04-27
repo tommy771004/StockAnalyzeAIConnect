@@ -80,7 +80,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
                 title={label}
                 onClick={() => handleNav(it.id)}
                 className={cn(
-                  'flex items-center gap-3 transition-colors group',
+                  'focus-ring flex items-center gap-3 motion-safe:transition-colors group',
                   'md:h-8 md:w-8 md:justify-center md:border',
                   'w-full h-10 px-3 md:px-0 rounded-sm md:rounded-none',
                   isActive
@@ -102,7 +102,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
             type="button"
             title={t('sidebar.help')}
             onClick={() => handleNav('settings')}
-            className="flex h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
+            className="flex h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-text) motion-safe:transition-colors focus-ring rounded"
           >
             <CircleHelp className="h-4 w-4" />
           </button>
@@ -112,7 +112,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
             onClick={() => {
               fetch('/api/auth/logout', { method: 'POST' }).then(() => window.location.reload());
             }}
-            className="flex h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-rose-400 transition-colors"
+            className="flex h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-rose-400 motion-safe:transition-colors focus-ring rounded"
           >
             <LogOut className="h-4 w-4" />
           </button>

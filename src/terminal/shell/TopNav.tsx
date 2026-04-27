@@ -124,7 +124,7 @@ export function TopNav({
       <button
         type="button"
         onClick={onToggleSidebar}
-        className="flex md:hidden h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors"
+        className="flex md:hidden h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors focus-ring rounded"
         aria-label="Toggle sidebar"
       >
         <Menu className="h-5 w-5" />
@@ -150,7 +150,7 @@ export function TopNav({
               type="button"
               onClick={() => onChange(tab.id)}
               className={cn(
-                'relative h-full px-3 pt-4 pb-2 text-[12px] tracking-wider transition-all whitespace-nowrap',
+                'focus-ring relative h-full px-3 pt-4 pb-2 text-[12px] tracking-wider motion-safe:transition-all whitespace-nowrap',
                 isActive
                   ? 'text-(--color-term-accent)'
                   : 'text-(--color-term-text)/60 hover:text-(--color-term-text)',
@@ -197,7 +197,7 @@ export function TopNav({
             <button
               type="button"
               onClick={() => { setQuery(''); setShowDropdown(false); inputRef.current?.focus(); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-(--color-term-muted) hover:text-(--color-term-text) motion-safe:transition-colors focus-ring rounded"
             >
               <X className="h-3 w-3" />
             </button>
@@ -293,7 +293,7 @@ export function TopNav({
         <button
           onClick={() => onChange('settings')}
           className={cn(
-            'hidden sm:flex items-center gap-2 px-2 py-1 border border-(--color-term-border) hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-all group',
+            'focus-ring hidden sm:flex items-center gap-2 px-2 py-1 border border-(--color-term-border) hover:border-(--color-term-accent) hover:text-(--color-term-accent) motion-safe:transition-all group',
             active === 'settings' && 'border-(--color-term-accent) text-(--color-term-accent) bg-(--color-term-accent)/5',
           )}
           style={{ WebkitAppRegion: 'no-drag' } as any}
@@ -339,7 +339,7 @@ function IconButton({
       onClick={onClick}
       title={title}
       className={cn(
-        'flex h-8 w-8 items-center justify-center border border-(--color-term-border) text-(--color-term-muted) hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-all',
+        'focus-ring flex h-8 w-8 items-center justify-center border border-(--color-term-border) text-(--color-term-muted) hover:border-(--color-term-accent) hover:text-(--color-term-accent) motion-safe:transition-all',
         className,
       )}
       style={{ WebkitAppRegion: 'no-drag' } as any}
