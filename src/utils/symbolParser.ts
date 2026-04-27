@@ -47,7 +47,7 @@ const YAHOO_SUFFIX_MAP: Record<string, Market> = {
 
 // ── Market → TradingView 預設交易所 ─────────────────────────────────────────
 const TV_EXCHANGE_BY_MARKET: Record<Market, string> = {
-  TW: 'TPE',        // TradingView 台灣上市
+  TW: 'TWSE',       // tradingview-scraper exchange code for TWSE-listed stocks
   TWO: 'TPEX',      // TradingView 上櫃
   US: 'NASDAQ',     // fallback，SymbolMarkets 可再解析
   HK: 'HKEX',
@@ -97,7 +97,7 @@ export function parseSymbol(input: string): CanonicalSymbol {
   if (tv) {
     const [, exchange, code] = tv;
     let market: Market = 'UNKNOWN';
-    if (exchange === 'TPE') market = 'TW';
+    if (exchange === 'TPE' || exchange === 'TWSE') market = 'TW';
     else if (exchange === 'TPEX') market = 'TWO';
     else if (US_EXCHANGES.has(exchange)) market = 'US';
     else if (exchange === 'HKEX') market = 'HK';
