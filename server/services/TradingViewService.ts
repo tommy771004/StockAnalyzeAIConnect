@@ -81,7 +81,11 @@ function toMetricPath(path: string): string {
 }
 
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */
-async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T | null> {
+async function call<T>(
+  path: string,
+  params: Record<string, string | number | undefined>,
+  symbol?: string,
+): Promise<T | null> {
   const qs = new URLSearchParams(
     Object.entries(params)
       .filter(([, v]) => v !== undefined && v !== '')
@@ -111,16 +115,16 @@ async function call<T>(path: string, params: Record<string, string | number | un
     // 服務未啟動 / DNS 解析失敗 / 逾時：視為「TV 不可用」
     if (transient) {
       const timedOut = /aborted|timeout/i.test(msg);
-      recordAutotradingDiagnostic(timedOut ? 'tv.timeout' : 'tv.transient_error');
-      recordAutotradingDiagnostic(`tv.${pathMetric}.${timedOut ? 'timeout' : 'transient_error'}`);
+      recordAutotradingDiagnostic(timedOut ? 'tv.timeout' : 'tv.transient_error', 1, Date.now(), symbol);
+      recordAutotradingDiagnostic(`tv.${pathMetric}.${timedOut ? 'timeout' : 'transient_error'}`, 1, Date.now(), symbol);
       if (process.env.NODE_ENV !== 'production') {
         console.warn(`[TV Service] ${path} transient failure:`, msg);
       }
       return null;
     }
 
-    recordAutotradingDiagnostic('tv.error');
-    recordAutotradingDiagnostic(`tv.${pathMetric}.error`);
+    recordAutotradingDiagnostic('tv.error', 1, Date.now(), symbol);
+    recordAutotradingDiagnostic(`tv.${pathMetric}.error`, 1, Date.now(), symbol);
     console.warn(`[TV Service] Failed to call ${path}:`, msg);
     throw e;
   } finally {
@@ -133,7 +137,8 @@ async function call<T>(path: string, params: Record<string, string | number | un
 export async function getOverview(sym: SymbolInput): Promise<TVOverviewRaw | null> {
   const canonical = typeof sym === 'string' ? parseSymbol(sym) : sym;
   const tvSymbol = toTradingView(canonical);
-  return call<TVOverviewRaw>('/overview', { symbol: tvSymbol });
+  const symbolCtx = typeof sym === 'string' ? sym : canonical.code;
+  return call<TVOverviewRaw>('/overview', { symbol: tvSymbol }, symbolCtx);
 }
 
 export async function getIndicators(
@@ -143,19 +148,22 @@ export async function getIndicators(
   const canonical = typeof sym === 'string' ? parseSymbol(sym) : sym;
   const { exchange, symbol } = toTVExchangeSymbol(canonical);
   if (!exchange) return null; // 沒有交易所無法查 TV 指標
-  return call<TVIndicatorsRaw>('/indicators', { exchange, symbol, timeframe });
+  const symbolCtx = typeof sym === 'string' ? sym : canonical.code;
+  return call<TVIndicatorsRaw>('/indicators', { exchange, symbol, timeframe }, symbolCtx);
 }
 
 export async function getNewsHeadlines(sym: SymbolInput): Promise<TVNewsHeadline[] | null> {
   const canonical = typeof sym === 'string' ? parseSymbol(sym) : sym;
   const { exchange, symbol } = toTVExchangeSymbol(canonical);
   if (!exchange) return null;
-  return call<TVNewsHeadline[]>('/news', { exchange, symbol });
+  const symbolCtx = typeof sym === 'string' ? sym : canonical.code;
+  return call<TVNewsHeadline[]>('/news', { exchange, symbol }, symbolCtx);
 }
 
 export async function getIdeas(sym: SymbolInput, sort: 'popular' | 'recent' = 'popular'): Promise<TVIdeaItem[] | null> {
   const canonical = typeof sym === 'string' ? parseSymbol(sym) : sym;
-  return call<TVIdeaItem[]>('/ideas', { symbol: canonical.code, sort });
+  const symbolCtx = typeof sym === 'string' ? sym : canonical.code;
+  return call<TVIdeaItem[]>('/ideas', { symbol: canonical.code, sort }, symbolCtx);
 }
 
 export async function getGlobalNewsFeed(category: string = 'all'): Promise<TVNewsHeadline[] | null> {

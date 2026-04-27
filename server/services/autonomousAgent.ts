@@ -170,6 +170,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
           systemPrompt: '你是一個專業的金融分析師。請根據以下新聞摘要，回傳該股票的短線情緒：Bullish, Bearish 或 Neutral。僅回傳單字。',
           prompt: `新聞摘要：\n${news}`,
           forceModel: secondaryModel,
+          symbol,
           userId: config.userId || 'default'
         });
         sentiment = sentimentText.trim().replace(/[^a-zA-Z]/g, '');
@@ -199,6 +200,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
         prompt: orchestratorPrompt,
         forceModel: primaryModel,
         jsonMode: true,
+        symbol,
         userId: config.userId || 'default',
       });
       dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
@@ -232,6 +234,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
              prompt: orchestratorPrompt + `\\n\\n[Deep Research Context]:\\n${deepContext}\\n\\n請重新評估並產出 JSON 決策。`,
              forceModel: primaryModel,
              jsonMode: true,
+             symbol,
              userId: config.userId || 'default'
            });
            const newDec = JSON.parse(newText.match(/\{[\s\S]*\}/)?.[0] || '{}');

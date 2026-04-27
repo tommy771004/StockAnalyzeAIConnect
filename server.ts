@@ -56,7 +56,7 @@ import {
   createAutotradingToken,
   publishAutotradingEvent,
 } from './server/services/ablyRealtime.js';
-import { getAutotradingDiagnostics } from './server/services/autotradingDiagnostics.js';
+import { getAutotradingDiagnostics, resetAutotradingDiagnostics } from './server/services/autotradingDiagnostics.js';
 
 
 
@@ -650,8 +650,14 @@ app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
 
 app.get('/api/autotrading/diagnostics', authMiddleware, (req: AuthRequest, res) => {
   const requestedWindow = Number(req.query.windowMinutes ?? 60);
-  const diagnostics = getAutotradingDiagnostics(requestedWindow);
+  const symbolFilter = typeof req.query.symbol === 'string' ? req.query.symbol : undefined;
+  const diagnostics = getAutotradingDiagnostics(requestedWindow, symbolFilter);
   res.json({ ok: true, diagnostics });
+});
+
+app.post('/api/autotrading/diagnostics/reset', authMiddleware, (_req, res) => {
+  const result = resetAutotradingDiagnostics();
+  res.json({ ok: true, result });
 });
 
 app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {

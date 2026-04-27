@@ -163,7 +163,7 @@ async function fetchTPEx(codes: string[]): Promise<TWSeQuote[]> {
 export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
   const parsed = parseTwSymbol(symbol);
   if (!parsed) {
-    recordAutotradingDiagnostic('twse.skipped_non_tw_symbol');
+    recordAutotradingDiagnostic('twse.skipped_non_tw_symbol', 1, Date.now(), symbol);
     return null;
   }
 
@@ -175,7 +175,7 @@ export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
     return results.find(q => q.symbol === code) ?? null;
   } catch (err) {
     const msg = (err as Error).message;
-    recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.timeout' : 'twse.error');
+    recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.timeout' : 'twse.error', 1, Date.now(), symbol);
     console.warn(`[TWSE] realtimeQuote(${symbol}) failed:`, msg);
     return null;
   }
