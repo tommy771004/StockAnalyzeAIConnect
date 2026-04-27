@@ -41,7 +41,7 @@ export function NewsPage() {
             key={cat}
             onClick={() => setActiveCategory(cat)}
             className={cn(
-              "px-4 h-8 rounded-sm text-[11px] font-bold tracking-widest transition-all whitespace-nowrap",
+              "focus-ring px-4 h-8 rounded-sm text-[11px] font-bold tracking-widest motion-safe:transition-all whitespace-nowrap",
               activeCategory === cat 
                 ? "bg-(--color-term-accent) text-black" 
                 : "bg-(--color-term-surface) text-(--color-term-muted) hover:text-(--color-term-text) border border-(--color-term-border)"
@@ -189,7 +189,7 @@ function ArticleReader({ item, t }: { item: any; t: any }) {
              const url = item.link || (item.storyPath ? `https://www.tradingview.com${item.storyPath}` : null);
              if (url) window.open(url, '_blank', 'noopener');
            }} 
-           className="flex items-center gap-1 text-(--color-term-accent) hover:underline"
+           className="focus-ring flex items-center gap-1 text-(--color-term-accent) hover:underline"
          >
             {t('news.source', '原始來源')} <ExternalLink className="h-3 w-3" />
          </button>

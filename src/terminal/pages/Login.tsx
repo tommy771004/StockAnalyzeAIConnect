@@ -138,7 +138,7 @@ export function LoginPage() {
             type="submit"
             disabled={loading}
             className={cn(
-              'mt-2 relative h-10 overflow-hidden border border-(--color-term-accent) bg-(--color-term-accent)/20 text-[12px] font-bold tracking-[0.2em] text-(--color-term-accent) transition-all hover:bg-(--color-term-accent)/30',
+              'focus-ring mt-2 relative h-10 overflow-hidden border border-(--color-term-accent) bg-(--color-term-accent)/20 text-[12px] font-bold tracking-[0.2em] text-(--color-term-accent) motion-safe:transition-all hover:bg-(--color-term-accent)/30',
               loading && 'opacity-50 cursor-not-allowed',
             )}
           >
@@ -156,7 +156,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => { setIsRegister(!isRegister); setError(''); }}
-              className="text-[10px] tracking-widest text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
+              className="focus-ring text-[10px] tracking-widest text-(--color-term-muted) hover:text-(--color-term-text) motion-safe:transition-colors"
             >
               [ {isRegister ? t('auth.switchToLogin', 'SWITCH_TO_LOGIN') : t('auth.requestAccess', 'REQUEST_NEW_ACCESS')} ]
             </button>

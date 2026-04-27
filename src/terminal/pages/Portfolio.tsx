@@ -150,15 +150,15 @@ export function PortfolioPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button 
+              <button
                 onClick={() => setIsAdding(false)}
-                className="px-4 h-11 min-w-[88px] text-sm text-(--color-term-muted) hover:text-(--color-term-text)"
+                className="focus-ring px-4 h-11 min-w-[88px] text-sm text-(--color-term-muted) hover:text-(--color-term-text)"
               >
                 取消
               </button>
-              <button 
+              <button
                 onClick={handleAdd}
-                className="bg-(--color-term-accent) text-black px-6 h-11 text-sm font-bold rounded-sm hover:opacity-90"
+                className="focus-ring bg-(--color-term-accent) text-black px-6 h-11 text-sm font-bold rounded-sm hover:opacity-90"
               >
                 確認新增
               </button>
@@ -226,7 +226,7 @@ export function EquityPanel({ history, currentEquity }: { history: any[], curren
               key={r}
               onClick={() => setRange(r)}
               className={cn(
-                'h-8 min-w-9 px-2 text-[10px] tracking-widest',
+                'focus-ring h-8 min-w-9 px-2 text-[10px] tracking-widest',
                 range === r ? 'text-(--color-term-accent) border border-(--color-term-accent)' : 'text-(--color-term-muted)'
               )}
             >
@@ -296,7 +296,7 @@ export function HoldingsPanel({
                 onClick={onRefresh}
                 disabled={loading}
                 title="立即刷新現價"
-                className="text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors p-2"
+                className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors p-2"
              >
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
              </button>
@@ -304,7 +304,7 @@ export function HoldingsPanel({
           </div>
           <button 
             onClick={onAdd}
-            className="flex items-center gap-1 bg-(--color-term-accent)/10 text-(--color-term-accent) border border-(--color-term-accent)/30 px-3 py-2 text-[11px] font-bold hover:bg-(--color-term-accent)/20 transition-all"
+            className="focus-ring flex items-center gap-1 bg-(--color-term-accent)/10 text-(--color-term-accent) border border-(--color-term-accent)/30 px-3 py-2 text-[11px] font-bold hover:bg-(--color-term-accent)/20 motion-safe:transition-all"
           >
             <Plus size={14} /> 新增持倉
           </button>
@@ -404,10 +404,10 @@ export function HoldingsPanel({
                   <div className="flex items-center justify-center gap-2">
                     {isEditing ? (
                       <>
-                        <button onClick={saveEdit} className="text-emerald-400 hover:text-emerald-300 p-2">
+                        <button onClick={saveEdit} className="focus-ring text-emerald-400 hover:text-emerald-300 p-2">
                           <Check size={16} />
                         </button>
-                        <button onClick={() => setEditingSym(null)} className="text-(--color-term-muted) hover:text-(--color-term-text) p-2">
+                        <button onClick={() => setEditingSym(null)} className="focus-ring text-(--color-term-muted) hover:text-(--color-term-text) p-2">
                           <X size={16} />
                         </button>
                       </>
@@ -415,13 +415,13 @@ export function HoldingsPanel({
                       <>
                         <button 
                           onClick={() => startEdit(h)}
-                          className="text-(--color-term-muted) hover:text-(--color-term-accent) opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all p-2"
+                          className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
                           <Edit2 size={15} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => { if(confirm(`確定刪除 ${h.symbol} 持倉？`)) onDelete(h.symbol); }}
-                          className="text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all p-2"
+                          className="focus-ring text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
                           <Trash2 size={15} />
                         </button>

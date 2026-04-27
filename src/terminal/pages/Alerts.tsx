@@ -173,7 +173,7 @@ export function AlertsPage() {
 
             <button
               disabled={addMutation.isPending}
-              className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-sm text-sm transition-opacity mt-2 disabled:opacity-50"
+              className="focus-ring w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-sm text-sm transition-opacity mt-2 disabled:opacity-50"
             >
               {addMutation.isPending ? <Loader2 className="animate-spin h-4 w-4 mx-auto" /> : t('alerts.submit')}
             </button>
@@ -210,7 +210,7 @@ export function AlertsPage() {
                       <button
                         type="button"
                         onClick={() => document.getElementById('alert-symbol')?.focus()}
-                        className="text-[11px] text-sky-400 hover:underline"
+                        className="focus-ring text-[11px] text-sky-400 hover:underline"
                       >
                         + {t('alerts.add')}
                       </button>
@@ -256,7 +256,7 @@ export function AlertsPage() {
                           setPendingDeleteId(a.id === pendingDeleteId ? null : a.id);
                           setDeleteError('');
                         }}
-                        className="text-zinc-600 hover:text-rose-400 transition-colors p-1"
+                        className="focus-ring text-zinc-600 hover:text-rose-400 motion-safe:transition-colors p-1"
                       >
                         <Trash2 className="size-4" aria-hidden="true" />
                       </button>
@@ -279,7 +279,7 @@ export function AlertsPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(null)}
-                              className="text-[11px] px-3 py-1 border border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
+                              className="focus-ring text-[11px] px-3 py-1 border border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) motion-safe:transition-colors"
                             >
                               {t('common.cancel')}
                             </button>
@@ -287,7 +287,7 @@ export function AlertsPage() {
                               type="button"
                               onClick={confirmDelete}
                               disabled={deleteMutation.isPending}
-                              className="text-[11px] px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white font-bold transition-opacity disabled:opacity-50"
+                              className="focus-ring text-[11px] px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white font-bold transition-opacity disabled:opacity-50"
                             >
                               {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3 inline mr-1" /> : null}
                               {t('common.delete')}

@@ -98,7 +98,7 @@ export function AutoTradingPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setMainTab(tab.id)}
-                className={`text-[10px] uppercase tracking-widest pb-0.5 transition-colors ${
+                className={`focus-ring text-[10px] uppercase tracking-widest pb-0.5 motion-safe:transition-colors ${
                   mainTab === tab.id
                     ? 'text-(--color-term-accent) border-b border-(--color-term-accent)'
                     : 'text-(--color-term-muted) hover:text-(--color-term-text)'

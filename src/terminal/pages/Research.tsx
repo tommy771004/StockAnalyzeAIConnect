@@ -121,7 +121,7 @@ export function ResearchPage() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="text-xs border border-(--color-term-border) px-3 py-1 rounded hover:border-(--color-term-accent) hover:text-(--color-term-accent) transition-colors"
+          className="focus-ring text-xs border border-(--color-term-border) px-3 py-1 rounded hover:border-(--color-term-accent) hover:text-(--color-term-accent) motion-safe:transition-colors"
         >
           重新載入
         </button>
@@ -159,7 +159,7 @@ export function ResearchPage() {
               type="button"
               onClick={() => setViewMode('standard')}
               className={cn(
-                'px-3 py-1 text-[11px] font-bold tracking-widest uppercase transition-colors rounded-sm',
+                'focus-ring px-3 py-1 text-[11px] font-bold tracking-widest uppercase motion-safe:transition-colors rounded-sm',
                 viewMode === 'standard' ? 'bg-(--color-term-accent) text-black' : 'text-(--color-term-muted) hover:text-(--color-term-text)'
               )}
             >
@@ -169,7 +169,7 @@ export function ResearchPage() {
               type="button"
               onClick={() => setViewMode('pro')}
               className={cn(
-                'px-3 py-1 text-[11px] font-bold tracking-widest uppercase transition-colors rounded-sm',
+                'focus-ring px-3 py-1 text-[11px] font-bold tracking-widest uppercase motion-safe:transition-colors rounded-sm',
                 viewMode === 'pro' ? 'bg-(--color-term-accent) text-black' : 'text-(--color-term-muted) hover:text-(--color-term-text)'
               )}
             >

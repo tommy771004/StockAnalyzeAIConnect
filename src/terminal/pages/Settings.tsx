@@ -74,7 +74,7 @@ export function SettingsPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-500/50 text-white px-4 py-2 rounded-sm text-sm transition-colors"
+          className="focus-ring flex items-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-500/50 text-white px-4 py-2 rounded-sm text-sm motion-safe:transition-colors"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t('settings.saveChanges')}
@@ -119,7 +119,7 @@ export function SettingsPage() {
                     }
                   }
                 }}
-                className="text-xs text-sky-400 hover:underline flex items-center gap-1"
+                className="focus-ring text-xs text-sky-400 hover:underline flex items-center gap-1"
               >
                 <Edit2 className="h-3 w-3" /> {t('settings.editProfile')}
               </button>
@@ -141,7 +141,7 @@ export function SettingsPage() {
             </p>
             <button
               onClick={() => window.location.href = `mailto:sales@antigravity.ai?subject=Enterprise%20Plan%20Inquiry%20-%20${user?.email}`}
-              className="w-full bg-sky-500 hover:bg-sky-600 py-2 text-xs transition-colors rounded-sm font-bold"
+              className="focus-ring w-full bg-sky-500 hover:bg-sky-600 py-2 text-xs motion-safe:transition-colors rounded-sm font-bold"
             >
               {t('settings.contactSales')}
             </button>

@@ -113,7 +113,7 @@ export function WatchlistPanel({
           <button
             type="button"
             onClick={() => setShowAdd(!showAdd)}
-            className={cn("transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
+            className={cn("focus-ring", "motion-safe:transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -135,7 +135,7 @@ export function WatchlistPanel({
             type="button"
             title="Refresh"
             onClick={onRefresh}
-            className="text-(--color-term-muted) hover:text-(--color-term-accent) transition-colors"
+            className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
           </button>
@@ -153,10 +153,10 @@ export function WatchlistPanel({
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
           />
-          <button type="submit" className="text-(--color-term-accent) px-2">
+          <button type="submit" className="focus-ring text-(--color-term-accent) px-2">
             <Plus className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => setShowAdd(false)} className="text-(--color-term-muted) px-2">
+          <button type="button" onClick={() => setShowAdd(false)} className="focus-ring text-(--color-term-muted) px-2">
             <X className="h-4 w-4" />
           </button>
         </form>
@@ -215,7 +215,7 @@ export function WatchlistPanel({
                       e.stopPropagation();
                       if (confirm(`Remove ${row.symbol}?`)) onDelete(row.symbol);
                     }}
-                    className="opacity-0 group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 transition-all p-1"
+                    className="focus-ring opacity-0 group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
                    >
                      <Trash2 className="h-3.5 w-3.5" />
                    </button>
@@ -253,7 +253,7 @@ export function TopMoversPanel({
             type="button"
             onClick={() => setTab(k)}
             className={cn(
-              'flex-1 py-3 uppercase transition-colors',
+              'focus-ring flex-1 py-3 uppercase motion-safe:transition-colors',
               tab === k
                 ? 'text-(--color-term-accent) border-b-2 border-(--color-term-accent)'
                 : 'text-(--color-term-muted) hover:text-(--color-term-text)',
@@ -450,7 +450,7 @@ export function SelectedChartPanel({
             sessionStorage.setItem('research-symbol', row.symbol);
             window.location.hash = 'research';
           }}
-          className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold tracking-widest text-(--color-term-accent) border border-(--color-term-accent)/40 rounded-sm hover:bg-(--color-term-accent)/10 transition-colors"
+          className="focus-ring flex items-center gap-1 px-2 py-1 text-[10px] font-bold tracking-widest text-(--color-term-accent) border border-(--color-term-accent)/40 rounded-sm hover:bg-(--color-term-accent)/10 motion-safe:transition-colors"
           title="深入研究"
         >
           <Microscope className="h-3 w-3" />
@@ -527,7 +527,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
         <button 
           onClick={cycleFilter}
           title="切換新聞類別"
-          className="p-1 hover:bg-white/10 rounded-sm transition-colors text-(--color-term-accent)"
+          className="focus-ring p-1 hover:bg-white/10 rounded-sm motion-safe:transition-colors text-(--color-term-accent)"
         >
           <Filter className="h-3.5 w-3.5" />
         </button>
@@ -567,7 +567,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
                           e.stopPropagation();
                           onSelect(t);
                         }}
-                        className="text-(--color-term-positive) hover:underline hover:text-(--color-term-accent)"
+                        className="focus-ring text-(--color-term-positive) hover:underline hover:text-(--color-term-accent)"
                       >
                         {t}
                       </button>
@@ -683,7 +683,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
             onClick={() => { setSide('buy'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'border border-sky-300/50 bg-sky-300/20 py-3 text-[12px] font-semibold tracking-widest text-sky-200 transition-colors',
+              'focus-ring border border-sky-300/50 bg-sky-300/20 py-3 text-[12px] font-semibold tracking-widest text-sky-200 motion-safe:transition-colors',
               status === 'submitting' && side === 'buy'
                 ? 'opacity-50 cursor-not-allowed'
                 : 'hover:bg-sky-300/30',
@@ -696,7 +696,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
             onClick={() => { setSide('sell'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'border border-rose-300/50 bg-rose-300/20 py-3 text-[12px] font-semibold tracking-widest text-rose-200 transition-colors',
+              'focus-ring border border-rose-300/50 bg-rose-300/20 py-3 text-[12px] font-semibold tracking-widest text-rose-200 motion-safe:transition-colors',
               status === 'submitting' && side === 'sell'
                 ? 'opacity-50 cursor-not-allowed'
                 : 'hover:bg-rose-300/30',

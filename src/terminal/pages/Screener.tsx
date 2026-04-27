@@ -278,7 +278,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           </div>
           <button type="button" onClick={() => runScan()}
             disabled={loading}
-            className="flex items-center justify-center gap-2 px-6 h-11 md:h-10 rounded-sm text-sm font-bold transition active:scale-95 disabled:opacity-50 uppercase tracking-widest bg-(--color-term-accent) text-black hover:opacity-90 w-full md:w-auto"
+            className="focus-ring flex items-center justify-center gap-2 px-6 h-11 md:h-10 rounded-sm text-sm font-bold transition active:scale-95 disabled:opacity-50 uppercase tracking-widest bg-(--color-term-accent) text-black hover:opacity-90 w-full md:w-auto"
           >
             {loading ? <Loader2Icon size={16} className="animate-spin" /> : <RefreshCwIcon size={16} />}
             {loading ? t('screener.scanningUpper') : t('screener.runScanUpper')}
@@ -290,7 +290,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           {TEMPLATES.map(tmpl => (
             <button type="button" key={tmpl.id} onClick={() => handleTemplate(tmpl)}
               className={cn(
-                "px-3 py-2 md:py-1.5 rounded-sm text-[11px] md:text-xs font-bold border transition active:scale-95 tracking-wider md:tracking-widest",
+                "focus-ring px-3 py-2 md:py-1.5 rounded-sm text-[11px] md:text-xs font-bold border transition active:scale-95 tracking-wider md:tracking-widest",
                 activeTemplate === tmpl.id
                   ? "bg-(--color-term-accent)/20 border-(--color-term-accent) text-(--color-term-accent)"
                   : "bg-(--color-term-panel) border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) hover:border-white/20"
@@ -308,7 +308,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
             type="button"
             onClick={() => setViewMode('list')}
             className={cn(
-              "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors",
+              "focus-ring px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm motion-safe:transition-colors",
               viewMode === 'list' ? "bg-(--color-term-accent) text-black" : "text-(--color-term-muted) hover:text-white"
             )}
           >
@@ -318,7 +318,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
             type="button"
             onClick={() => setViewMode('chart')}
             className={cn(
-              "px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors",
+              "focus-ring px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm motion-safe:transition-colors",
               viewMode === 'chart' ? "bg-(--color-term-accent) text-black" : "text-(--color-term-muted) hover:text-white"
             )}
           >
@@ -329,7 +329,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
         {/* Custom Filters Panel */}
         <div className="shrink-0 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden">
           <button type="button" onClick={() => setShowFilters(!showFilters)}
-            className="w-full flex items-center justify-between p-3 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-white/5 text-(--color-term-muted)"
+            className="focus-ring w-full flex items-center justify-between p-3 text-xs font-bold uppercase tracking-widest motion-safe:transition-colors hover:bg-white/5 text-(--color-term-muted)"
           >
             <div className="flex items-center gap-2">
               <FilterIcon size={14} />
@@ -422,12 +422,12 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                   </div>
                   <div className="sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row gap-3 mt-2">
                     <button type="button" onClick={() => { setActiveTemplate(null); runScan(); }}
-                      className="px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-accent) text-black hover:opacity-90 w-full sm:w-auto"
+                      className="focus-ring px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-accent) text-black hover:opacity-90 w-full sm:w-auto"
                     >
                       {t('screener.runCustomScan')}
                     </button>
                     <button type="button" onClick={() => { setCustomFilters({}); setActiveTemplate(null); setSelectedSectors([]); setCustomSymbols(''); }}
-                      className="px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-bg) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5 w-full sm:w-auto"
+                      className="focus-ring px-6 h-11 rounded-sm text-sm font-bold transition bg-(--color-term-bg) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5 w-full sm:w-auto"
                     >
                       {t('screener.clearFiltersBtn')}
                     </button>
@@ -556,7 +556,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
               {hasMoreResults && (
                 <div className="flex justify-center p-4 border-t border-(--color-term-border) bg-(--color-term-bg)">
                   <button type="button" onClick={() => setVisibleCount(v => v + 50)}
-                    className="px-6 py-2.5 text-xs font-bold rounded-sm transition-all border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
+                    className="focus-ring px-6 py-2.5 text-xs font-bold rounded-sm motion-safe:transition-all border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
                   >
                     {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
                   </button>
@@ -611,7 +611,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
               {hasMoreResults && (
                 <div className="flex justify-center p-6">
                   <button type="button" onClick={() => setVisibleCount(v => v + 50)}
-                    className="px-8 py-3 text-sm font-bold rounded-sm transition-all bg-(--color-term-panel) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
+                    className="focus-ring px-8 py-3 text-sm font-bold rounded-sm motion-safe:transition-all bg-(--color-term-panel) border border-(--color-term-border) text-(--color-term-text) hover:bg-white/5"
                   >
                     {t('screener.loadMoreCount', { visible: visibleCount, total: sorted.length })}
                   </button>
