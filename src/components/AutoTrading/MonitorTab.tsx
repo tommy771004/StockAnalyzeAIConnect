@@ -2,7 +2,7 @@
  * src/components/AutoTrading/MonitorTab.tsx
  * 監控分頁組件：展示標的狀態與啟停控制
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight } from 'lucide-react';
@@ -18,7 +18,7 @@ interface Props {
   equityHistory: EquitySnapshot[];
   config: AgentConfig | null;
   onNavigateTab?: (tab: 'strategy' | 'broker') => void;
-  onStart: () => void;
+  onStart: () => Promise<void>;
   onStop: () => void;
 }
 
@@ -34,7 +34,22 @@ export function MonitorTab({
   onStop,
 }: Props) {
   const { t } = useTranslation();
-  const heats = Object.values(decisionHeats).sort((a, b) => 
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  const handleStart = async () => {
+    setIsStarting(true);
+    setStartError(null);
+    try {
+      await onStart();
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : '啟動失敗，請稍後再試');
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const heats = Object.values(decisionHeats).sort((a, b) =>
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
   const latestHeat = heats[0];
@@ -239,25 +254,31 @@ export function MonitorTab({
           </div>
         )}
         {isRunning ? (
-          <button 
-            onClick={onStop} 
+          <button
+            onClick={onStop}
             className="w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 transition-all flex items-center justify-center gap-2"
           >
             <Square className="h-4 w-4 fill-current" /> {t('autotrading.monitor.emergencyStop')}
           </button>
         ) : (
-          <button 
-            onClick={onStart}
-            disabled={!readyToStart}
-            className={cn(
-              'w-full py-3 rounded font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2',
-              readyToStart
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
-                : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700 cursor-not-allowed'
+          <>
+            <button
+              onClick={handleStart}
+              disabled={!readyToStart || isStarting}
+              className={cn(
+                'w-full py-3 rounded font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2',
+                readyToStart && !isStarting
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]'
+                  : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700 cursor-not-allowed'
+              )}
+            >
+              <Play className="h-4 w-4 fill-current" />
+              {isStarting ? t('autotrading.monitor.starting', '啟動中…') : t('autotrading.monitor.initiateEngine')}
+            </button>
+            {startError && (
+              <p className="text-center text-[10px] text-rose-300 mt-2 px-2">{startError}</p>
             )}
-          >
-            <Play className="h-4 w-4 fill-current" /> {t('autotrading.monitor.initiateEngine')}
-          </button>
+          </>
         )}
       </div>
     </div>
