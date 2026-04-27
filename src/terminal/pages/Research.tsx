@@ -10,6 +10,8 @@ import { SecFilingsPanel } from '../ui/SecFilingsPanel';
 import { CongressTradesPanel } from '../ui/CongressTradesPanel';
 import { getFreeModels } from '../../services/aiService';
 import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
+import * as api from '../../services/api';
+import { isTaiwanTradingHours } from '../hooks/useDashboardData';
 
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
@@ -22,6 +24,7 @@ export function ResearchPage() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [timeRange, setTimeRange] = useState('1M');
   const { data, loading, error } = useResearchData(activeSymbol, timeRange);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
 
   // Pick up symbol navigated from Dashboard "深入研究" button
   useEffect(() => {
@@ -76,8 +79,37 @@ export function ResearchPage() {
     if (activeSymbol) fetchSummary();
   }, [activeSymbol, persona, selectedModel]);
 
-  // Partial loading is handled by individual panels for a better UX.
-  // We only show a skeleton if absolutely necessary, but here we'll let the layout render.
+  // Live quote polling: when 1D is selected during Taiwan market hours, poll every 10 s
+  // and patch the last history candle so the chart reflects the real-time price.
+  useEffect(() => {
+    setLivePrice(null);
+    if (timeRange !== '1D') return;
+    const poll = async () => {
+      if (!isTaiwanTradingHours()) return;
+      try {
+        const quotes = await api.getBatchQuotes([activeSymbol]);
+        const p: number | undefined = quotes[0]?.regularMarketPrice;
+        if (p && p > 0) setLivePrice(p);
+      } catch {}
+    };
+    void poll();
+    const timer = setInterval(poll, 10_000);
+    return () => clearInterval(timer);
+  }, [activeSymbol, timeRange]);
+
+  const liveHistory = useMemo(() => {
+    if (!livePrice || !history.length) return history;
+    const last = history[history.length - 1];
+    return [
+      ...history.slice(0, -1),
+      {
+        ...last,
+        close: livePrice,
+        high: typeof last.high === 'number' ? Math.max(last.high, livePrice) : livePrice,
+        low: typeof last.low === 'number' && last.low > 0 ? Math.min(last.low, livePrice) : livePrice,
+      },
+    ];
+  }, [history, livePrice]);
 
   if (error && !data) {
     return (
@@ -176,7 +208,7 @@ export function ResearchPage() {
         )}
 
         {viewMode === 'standard' ? (
-          <ChartPanel symbol={activeSymbol} history={history} range={timeRange} setRange={setTimeRange} />
+          <ChartPanel symbol={activeSymbol} history={liveHistory} range={timeRange} setRange={setTimeRange} isLive={!!livePrice} />
         ) : (
           <div className="flex flex-col gap-3 min-h-0 overflow-auto">
             <SecFilingsPanel symbol={activeSymbol} />
@@ -247,10 +279,21 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 import { useTranslation } from 'react-i18next';
 import ChartWidget from '../../components/ChartWidget';
 
-function ChartPanel({ symbol, history, range, setRange }: { symbol: string, history: any[], range: string, setRange: (r: string) => void }) {
+function ChartPanel({ symbol, history, range, setRange, isLive }: { symbol: string, history: any[], range: string, setRange: (r: string) => void, isLive?: boolean }) {
   const { t } = useTranslation();
   return (
-    <Panel title={t('research.priceAction', '交互式圖表 (Price Action)')} collapsible className="flex-1 min-h-[450px]" bodyClassName="flex min-h-0 flex-col">
+    <Panel
+      title={t('research.priceAction', '交互式圖表 (Price Action)')}
+      collapsible
+      className="flex-1 min-h-[450px]"
+      bodyClassName="flex min-h-0 flex-col"
+      actions={isLive ? (
+        <span className="flex items-center gap-1 text-[10px] tracking-widest text-emerald-400">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+          LIVE
+        </span>
+      ) : undefined}
+    >
       <div className="relative flex-1 min-h-0">
         {history.length > 0 ? (
           <ChartWidget symbol={symbol} data={history} timeframe={range} onTimeframeChange={setRange} />
