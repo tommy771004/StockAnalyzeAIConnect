@@ -97,6 +97,9 @@ export function ResearchPage() {
     return () => clearInterval(timer);
   }, [activeSymbol, timeRange]);
 
+  // Must be declared before liveHistory useMemo to avoid TDZ — data may be null on first render.
+  const history = data?.history ?? [];
+
   const liveHistory = useMemo(() => {
     if (!livePrice || !history.length) return history;
     const last = history[history.length - 1];
@@ -127,7 +130,6 @@ export function ResearchPage() {
   }
 
   const quote = data?.quote;
-  const history = data?.history || [];
   const tv = data?.tvOverview || {};
   const tvIndicators = data?.tvIndicators || {};
   const news = data?.tvNews || [];
