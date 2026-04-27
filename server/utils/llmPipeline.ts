@@ -144,9 +144,13 @@ async function fetchWithRetry(
   url: string,
   init: RequestInit,
   attempt = 0,
+  timeoutMs = 35_000,
 ): Promise<FetchAttemptResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
   try {
-    const res = await fetch(url, init);
+    const res = await fetch(url, { ...init, signal: ctrl.signal });
     const body = await res.text();
 
     if (!res.ok) {
@@ -167,9 +171,11 @@ async function fetchWithRetry(
       const backoff = Math.pow(2, attempt) * 500;
       console.warn(`[LLM] Network error on attempt ${attempt + 1}, retrying in ${backoff}ms:`, (err as Error).message);
       await sleep(backoff);
-      return fetchWithRetry(url, init, attempt + 1);
+      return fetchWithRetry(url, init, attempt + 1, timeoutMs);
     }
     throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -337,7 +343,6 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
           stream:      false,
           ...(opts.jsonMode && { response_format: { type: 'json_object' } }),
         }),
-        signal: AbortSignal.timeout(35_000),
       });
 
       if (!result.ok) {
@@ -345,18 +350,18 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
         if (result.status === 401) {
           throw new Error('OpenRouter API key is invalid or expired. Please update it in Settings.');
         }
+
+        // Credit exhaustion is account-level; rotating models won't help.
+        if (result.status === 402) {
+          const parsed = JSON.parse(result.body || '{}') as { error?: { message?: string } };
+          throw new Error(`OpenRouter 402: ${parsed.error?.message || '餘額不足 (Insufficient Credits)'}`);
+        }
         
         // If it's a credit/quota issue (402) or rate limit (429) or server error (5xx)
         // AND we have more models to try, then continue to next model.
         if (models.indexOf(model) < models.length - 1) {
           console.warn(`[LLM] Model ${model} failed (${result.status}), trying next candidate...`);
           continue; 
-        }
-
-        // Specific 402 handling for the last attempt
-        if (result.status === 402) {
-          const json = JSON.parse(result.body).error || {};
-          throw new Error(`OpenRouter 402: ${json.message || '餘額不足 (Insufficient Credits)'}`);
         }
         throw new Error(`OpenRouter ${result.status}: ${result.body.slice(0, 200)}`);
       }

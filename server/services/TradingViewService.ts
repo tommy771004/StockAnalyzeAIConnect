@@ -72,7 +72,8 @@ const BASE = (process.env.TV_SCRAPER_URL)
       ? `https://${process.env.VERCEL_URL || 'localhost'}/api/python`
       : 'http://127.0.0.1:8787');
 
-const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? 3000);
+const DEFAULT_TIMEOUT_MS = isVercel ? 5000 : 3000;
+const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
 
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */
 async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T | null> {
@@ -99,12 +100,17 @@ async function call<T>(path: string, params: Record<string, string | number | un
     return body.data;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`[TV Service] Failed to call ${path}:`, msg);
+    const transient = /ECONNREFUSED|fetch failed|ENOTFOUND|aborted|timeout/i.test(msg);
 
     // 服務未啟動 / DNS 解析失敗 / 逾時：視為「TV 不可用」
-    if (/ECONNREFUSED|fetch failed|ENOTFOUND|aborted/i.test(msg)) {
+    if (transient) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[TV Service] ${path} transient failure:`, msg);
+      }
       return null;
     }
+
+    console.warn(`[TV Service] Failed to call ${path}:`, msg);
     throw e;
   } finally {
     clearTimeout(timer);

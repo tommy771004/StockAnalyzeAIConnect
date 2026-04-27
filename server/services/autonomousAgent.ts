@@ -37,6 +37,17 @@ let tickTimeout: NodeJS.Timeout | null = null;
 let lossStreakCount = 0;
 let isTickRunning = false;
 
+const WARN_LOG_COOLDOWN_MS = 60_000;
+const warnLogTimestamps = new Map<string, number>();
+
+function warnWithCooldown(key: string, message: string) {
+  const now = Date.now();
+  const lastTs = warnLogTimestamps.get(key) ?? 0;
+  if (now - lastTs < WARN_LOG_COOLDOWN_MS) return;
+  warnLogTimestamps.set(key, now);
+  console.warn(message);
+}
+
 const executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
 
 export function setWsBroadcast(fn: (msg: any) => void) { wsBroadcast = fn; }
@@ -129,15 +140,21 @@ function parseInstitutionalFlowBias(flowText: string): number {
 async function runAnalysis(config: AgentConfig, symbol: string) {
   const sParams = { ...config.params, ...(config.symbolConfigs?.[symbol] || {}) };
   try {
-    const [news, flow, mtf, indicators, overview, quote, models] = await Promise.all([
+    const [news, flow, mtf, indicators, overview, quote, modelCandidates] = await Promise.all([
       getRecentNews(symbol, 3),
       getInstitutionalFlow(symbol),
       sParams.enableMTF ? getDailyContext(symbol) : Promise.resolve(null),
       TVService.getIndicators(symbol, '15m').catch(() => null), // TV rejects non-US symbols (e.g. .TW); null = skip
       TVService.getOverview(symbol).catch(() => null),
       TWSeService.realtimeQuote(symbol),
-      Promise.all([getFreeModelByTier(1), getFreeModelByTier(2)])
+      Promise.allSettled([getFreeModelByTier(1), getFreeModelByTier(2)]),
     ]);
+
+    const primaryModel = modelCandidates[0]?.status === 'fulfilled' ? modelCandidates[0].value : undefined;
+    const secondaryModel = modelCandidates[1]?.status === 'fulfilled' ? modelCandidates[1].value : primaryModel;
+    if (modelCandidates.some((m) => m.status === 'rejected')) {
+      warnWithCooldown(`model-selector:${symbol}`, `[Agent] Model selector degraded for ${symbol}; using callLLM auto routing.`);
+    }
 
     const rsiValue = Number(indicators?.['RSI'] || 50);
     const macdValue = Number(indicators?.['MACD.macd'] || 0);
@@ -152,12 +169,13 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
         const { text: sentimentText } = await callLLM({
           systemPrompt: '你是一個專業的金融分析師。請根據以下新聞摘要，回傳該股票的短線情緒：Bullish, Bearish 或 Neutral。僅回傳單字。',
           prompt: `新聞摘要：\n${news}`,
-          forceModel: models[1] || models[0], 
+          forceModel: secondaryModel,
           userId: config.userId || 'default'
         });
         sentiment = sentimentText.trim().replace(/[^a-zA-Z]/g, '');
       } catch (e) {
-        console.warn('[Agent] Sentiment analysis failed:', e);
+        const msg = e instanceof Error ? e.message : String(e);
+        warnWithCooldown(`sentiment:${symbol}`, `[Agent] Sentiment analysis fallback for ${symbol}: ${msg}`);
       }
     }
 
@@ -169,15 +187,26 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       mode: config.mode 
     });
     
-    const { text } = await callLLM({ 
-      systemPrompt: ORCHESTRATOR_PROMPT, 
-      prompt: orchestratorPrompt, 
-      forceModel: models[0], 
-      jsonMode: true, 
-      userId: config.userId || 'default' 
-    });
+    let dec: { action?: string; confidence?: number; reasoning?: string } = {
+      action: 'HOLD',
+      confidence: 0,
+      reasoning: 'LLM unavailable',
+    };
 
-    let dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    try {
+      const { text } = await callLLM({
+        systemPrompt: ORCHESTRATOR_PROMPT,
+        prompt: orchestratorPrompt,
+        forceModel: primaryModel,
+        jsonMode: true,
+        userId: config.userId || 'default',
+      });
+      dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      warnWithCooldown(`orchestrator:${symbol}`, `[Agent] Orchestrator decision fallback for ${symbol}: ${msg}`);
+    }
+
     const currentPrice = quote?.price || Number(overview?.close ?? 0) || 0;
     
     // 信心度過低時，觸發「深度研究任務」(Parallel-Web)
@@ -201,7 +230,7 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
            const { text: newText } = await callLLM({
              systemPrompt: ORCHESTRATOR_PROMPT,
              prompt: orchestratorPrompt + `\\n\\n[Deep Research Context]:\\n${deepContext}\\n\\n請重新評估並產出 JSON 決策。`,
-             forceModel: models[0],
+             forceModel: primaryModel,
              jsonMode: true,
              userId: config.userId || 'default'
            });
@@ -216,7 +245,8 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       }
     }
     
-    const aiAction = (['BUY', 'SELL', 'HOLD'].includes(dec.action) ? dec.action : 'HOLD') as 'BUY' | 'SELL' | 'HOLD';
+    const decAction = typeof dec.action === 'string' ? dec.action : 'HOLD';
+    const aiAction = (['BUY', 'SELL', 'HOLD'].includes(decAction) ? decAction : 'HOLD') as 'BUY' | 'SELL' | 'HOLD';
     const aiConfidence = Math.max(0, Math.min(100, Number(dec.confidence || 0)));
 
     const overbought = Number(sParams.RSI_REVERSION?.overbought ?? 70);
@@ -339,8 +369,9 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       confidence: fused.confidence || 0, 
       price: currentPrice 
     };
-  } catch (e) { 
-    console.error(`[Agent] Analysis failed for ${symbol}:`, e);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[Agent] Analysis failed for ${symbol}: ${msg}`);
     return { action: 'HOLD' }; 
   }
 }

@@ -33,14 +33,38 @@ export interface TWSeQuote {
   source: 'TWSE' | 'TPEX';
 }
 
-/** 正規化代碼：移除 .TW / .TWO 後綴 */
-function normCode(symbol: string): string {
-  return symbol.replace(/\.(TW|TWO)$/i, '');
-}
-
 /** 判斷是否為上市 (TSE) 或上櫃 (OTC/TPEx) */
 function isTSE(code: string): boolean {
   return /^\d{4}$/.test(code) && parseInt(code) < 9000;
+}
+
+type TwMarket = 'TSE' | 'OTC';
+
+interface ParsedTwSymbol {
+  code: string;
+  market: TwMarket;
+}
+
+/**
+ * 只接受台股代號：
+ *  - 2330 / 8069
+ *  - 2330.TW / 8069.TWO
+ */
+function parseTwSymbol(symbol: string): ParsedTwSymbol | null {
+  const raw = symbol.trim().toUpperCase();
+  if (!raw) return null;
+
+  if (/^\d{4,6}\.TW$/.test(raw)) {
+    return { code: raw.replace(/\.TW$/, ''), market: 'TSE' };
+  }
+  if (/^\d{4,6}\.TWO$/.test(raw)) {
+    return { code: raw.replace(/\.TWO$/, ''), market: 'OTC' };
+  }
+  if (/^\d{4,6}$/.test(raw)) {
+    return { code: raw, market: isTSE(raw) ? 'TSE' : 'OTC' };
+  }
+
+  return null;
 }
 
 // ── TWSE 上市即時 ──────────────────────────────────────────────────────────────
@@ -135,9 +159,12 @@ async function fetchTPEx(codes: string[]): Promise<TWSeQuote[]> {
 
 /** 取得單一台股即時報價；若不在交易時段可能回傳舊資料 */
 export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
-  const code = normCode(symbol);
+  const parsed = parseTwSymbol(symbol);
+  if (!parsed) return null;
+
+  const { code, market } = parsed;
   try {
-    const results = isTSE(code)
+    const results = market === 'TSE'
       ? await fetchTWSE([code])
       : await fetchTPEx([code]);
     return results.find(q => q.symbol === code) ?? null;
@@ -149,8 +176,12 @@ export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
 
 /** 批量取得台股即時報價 */
 export async function realtimePrices(symbols: string[]): Promise<TWSeQuote[]> {
-  const tseCodes = symbols.map(normCode).filter(isTSE);
-  const otcCodes = symbols.map(normCode).filter(c => !isTSE(c));
+  const parsed = symbols
+    .map(parseTwSymbol)
+    .filter((item): item is ParsedTwSymbol => item !== null);
+
+  const tseCodes = Array.from(new Set(parsed.filter(item => item.market === 'TSE').map(item => item.code)));
+  const otcCodes = Array.from(new Set(parsed.filter(item => item.market === 'OTC').map(item => item.code)));
   const results: TWSeQuote[] = [];
 
   if (tseCodes.length > 0) {

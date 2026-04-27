@@ -12,6 +12,8 @@ const ABLY_AUTH_URL = '/api/autotrading/ably/token';
 const ABLY_CHANNEL = (process.env.ABLY_AUTOTRADING_CHANNEL ?? 'autotrading:global').trim();
 const ABLY_API_KEY = (process.env.ABLY_API_KEY ?? '').trim();
 const ABLY_TOKEN_TTL_MS = Math.max(60_000, Number(process.env.ABLY_TOKEN_TTL_MS ?? 60 * 60 * 1000));
+const ABLY_PUBLISH_TIMEOUT_MS = Math.max(2000, Number(process.env.ABLY_PUBLISH_TIMEOUT_MS ?? 8000));
+const ABLY_ERROR_LOG_COOLDOWN_MS = Math.max(5000, Number(process.env.ABLY_ERROR_LOG_COOLDOWN_MS ?? 60_000));
 
 const KEY_NAME = ABLY_API_KEY.includes(':') ? ABLY_API_KEY.split(':')[0] : '';
 
@@ -88,6 +90,14 @@ export async function createAutotradingToken(clientId?: string) {
 // Clients retrieve logs via the REST polling endpoint instead.
 const SKIP_ABLY_TYPES = new Set(['agent_log', 'log_history']);
 
+let _lastPublishErrorAt = 0;
+function logAblyPublishError(message: string) {
+  const now = Date.now();
+  if (now - _lastPublishErrorAt < ABLY_ERROR_LOG_COOLDOWN_MS) return;
+  _lastPublishErrorAt = now;
+  console.warn(message);
+}
+
 // Batch queue: events are collected here and flushed together in a single Ably REST call,
 // avoiding concurrent HTTP requests that cause "operation aborted due to timeout" errors.
 let _pendingMessages: Array<{ name: string; data: unknown }> = [];
@@ -109,14 +119,14 @@ async function flushPendingMessages(): Promise<void> {
         Accept: 'application/json',
       },
       body: JSON.stringify(batch),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(ABLY_PUBLISH_TIMEOUT_MS),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      console.warn(`[Ably] publish failed (${res.status}): ${text || res.statusText}`);
+      logAblyPublishError(`[Ably] publish failed (${res.status}): ${text || res.statusText}`);
     }
   } catch (err) {
-    console.warn('[Ably] publish error:', (err as Error).message);
+    logAblyPublishError(`[Ably] publish error: ${(err as Error).message}`);
   }
 }
 
