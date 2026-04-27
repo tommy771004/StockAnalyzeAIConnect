@@ -63,27 +63,27 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   // Merge live WS config with server defaults so pre-flight checks (hasRisk) work before first engine start
   const effectiveConfig: AgentConfig | null = config ?? (defaultsConfig as AgentConfig | null);
 
-  // Sync state with backend config when it changes
+  // Sync from live WS/Ably config — runs only when the server pushes a config update.
+  // Keeping defaultsConfig out of deps prevents the 15s defaults-refresh from overwriting
+  // symbols the user just selected via the sector picker.
   React.useEffect(() => {
-    if (config) {
-      if (config.strategies) setStrategies(config.strategies);
-      if (config.params) setParams(config.params);
-      if (config.symbols) setSymbols(config.symbols);
-    } else if (defaultsConfig) {
-      // Fallback：尚未拿到 user config 時，套用 server defaults
-      if (defaultsConfig.strategies) setStrategies(defaultsConfig.strategies as StrategyType[]);
-      if (defaultsConfig.params) setParams(defaultsConfig.params);
-      if (defaultsConfig.symbols) setSymbols(defaultsConfig.symbols);
-    }
+    if (!config) return;
+    if (config.strategies) setStrategies(config.strategies);
+    if (config.params) setParams(config.params);
+    if (config.symbols) setSymbols(config.symbols);
+  }, [config]);
+
+  // Initial hydration from server defaults — only applies before the first WS config arrives.
+  React.useEffect(() => {
+    if (config) return; // live config takes priority
+    if (!defaultsConfig) return;
+    if (defaultsConfig.strategies) setStrategies(defaultsConfig.strategies as StrategyType[]);
+    if (defaultsConfig.params) setParams(defaultsConfig.params);
+    if (defaultsConfig.symbols) setSymbols(defaultsConfig.symbols);
   }, [config, defaultsConfig]);
 
   const updateConfig = async (patch: Partial<AgentConfig>) => {
-    const result = await onUpdateConfig({ mode, strategies, params, symbols, ...patch });
-    // Refresh defaults so effectiveConfig reflects the latest saved values
-    api.getAutotradingDefaults()
-      .then((d: any) => setDefaultsConfig(d?.config ?? null))
-      .catch(() => {});
-    return result;
+    return await onUpdateConfig({ mode, strategies, params, symbols, ...patch });
   };
 
   const handleSymbolsChange = (nextSymbols: string[]) => {
