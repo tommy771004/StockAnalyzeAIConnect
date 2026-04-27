@@ -61,7 +61,7 @@ export function Sidebar({ active, onChange, isOpen, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-(--color-term-muted) hover:text-(--color-term-text)"
+            className="text-(--color-term-muted) hover:text-(--color-term-text) hover:bg-white/5 p-1 rounded motion-safe:transition-colors focus-ring"
             aria-label={t('common.close')}
           >
             <X className="h-4 w-4" />

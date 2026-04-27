@@ -152,7 +152,7 @@ Style: `animate-spin border-2 border-white/20 border-t-white/80 rounded-full` â€
 |---------|-------|--------------|
 | Button (all variants) | color shift per variant | `.focus-ring` |
 | Nav item / tab | `text-white bg-white/5` | `.focus-ring` |
-| Icon button | `text-white bg-white/8` | `.focus-ring` |
+| Icon button | `text-white bg-white/10` | `.focus-ring` |
 | Panel collapse toggle | `bg-white/5` | `.focus-ring` |
 | Input / select | `border-white/20` | `border-cyan-500 ring-1 ring-cyan-500/30` |
 
