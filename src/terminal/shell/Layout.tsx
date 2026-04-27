@@ -100,34 +100,30 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
   return (
     <div className="flex h-dvh w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
       {/* Top navigation */}
-      <div style={{ viewTransitionName: 'persistent-topnav' }}>
-        <TopNav
-          active={active}
-          onChange={onChange}
-          searchPlaceholder={searchPlaceholder}
-          onToggleAgent={toggleAgent}
-          onToggleSidebar={toggleSidebar}
-        />
-      </div>
+      <TopNav
+        active={active}
+        onChange={onChange}
+        searchPlaceholder={searchPlaceholder}
+        onToggleAgent={toggleAgent}
+        onToggleSidebar={toggleSidebar}
+      />
 
       {/* Scrolling ticker tape */}
-      <div style={{ viewTransitionName: 'persistent-ticker' }}>
-        <TickerTape
-          items={
-            tickerItems.length > 0
-              ? tickerItems
-              : [{ symbol: '', label: t('market.loading', 'LOADING...'), value: '---', changePct: 0 }]
-          }
-          onSelect={handleTickerSelect}
-          onSymbolsChange={handleSymbolsChange}
-          changedSymbols={changedSymbols}
-        />
-      </div>
+      <TickerTape
+        items={
+          tickerItems.length > 0
+            ? tickerItems
+            : [{ symbol: '', label: t('market.loading', 'LOADING...'), value: '---', changePct: 0 }]
+        }
+        onSelect={handleTickerSelect}
+        onSymbolsChange={handleSymbolsChange}
+        changedSymbols={changedSymbols}
+      />
 
       {/* Main content area */}
       <div className="flex min-h-0 flex-1 relative">
         {/* Sidebar — controls its own mobile drawer state */}
-        <div style={{ viewTransitionName: 'persistent-sidebar' }} className="flex-shrink-0 h-full">
+        <div className="flex-shrink-0 h-full">
           <Sidebar
             active={active}
             onChange={onChange}
@@ -146,14 +142,12 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
       </div>
 
       {/* Footer — desktop only */}
-      <div style={{ viewTransitionName: 'persistent-footer' }}>
-        <Footer lastUpdated={lastUpdated} />
-      </div>
+      <Footer lastUpdated={lastUpdated} />
 
       {/* Mobile Bottom Navigation Bar */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-(--color-term-border) bg-(--color-term-bg)"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)', viewTransitionName: 'persistent-bottom-nav' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {BOTTOM_NAV_IDS.map((item) => {
           const isActive = active === item.id;

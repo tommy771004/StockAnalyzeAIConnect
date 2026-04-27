@@ -29,7 +29,7 @@ interface Props {
   decisionHeats: Record<string, DecisionHeat>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
-  onStart: (cfg: Partial<AgentConfig>) => void;
+  onStart: (cfg: Partial<AgentConfig>) => Promise<void>;
   onStop: () => void;
   onUpdateConfig: (cfg: Record<string, unknown>) => Promise<unknown>;
 }
@@ -44,28 +44,46 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
     api.getAutotradingDefaults().then((d: any) => setDefaultsConfig(d?.config ?? null)).catch(() => {/* ignore */});
   }, []);
 
+  // Refresh defaults every 15 s so that RiskControlPanel saves are reflected in effectiveConfig
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      api.getAutotradingDefaults()
+        .then((d: any) => setDefaultsConfig(d?.config ?? null))
+        .catch(() => {});
+    }, 15_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [mode] = useState<TradingMode>(config?.mode ?? 'simulated');
   const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? defaultsConfig?.strategies ?? []);
   const [params, setParams] = useState<StrategyParams>(config?.params ?? defaultsConfig?.params ?? {});
   const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? defaultsConfig?.symbols ?? []);
   const isRunning = status === 'running';
 
-  // Sync state with backend config when it changes
+  // Merge live WS config with server defaults so pre-flight checks (hasRisk) work before first engine start
+  const effectiveConfig: AgentConfig | null = config ?? (defaultsConfig as AgentConfig | null);
+
+  // Sync from live WS/Ably config — runs only when the server pushes a config update.
+  // Keeping defaultsConfig out of deps prevents the 15s defaults-refresh from overwriting
+  // symbols the user just selected via the sector picker.
   React.useEffect(() => {
-    if (config) {
-      if (config.strategies) setStrategies(config.strategies);
-      if (config.params) setParams(config.params);
-      if (config.symbols) setSymbols(config.symbols);
-    } else if (defaultsConfig) {
-      // Fallback：尚未拿到 user config 時，套用 server defaults
-      if (defaultsConfig.strategies) setStrategies(defaultsConfig.strategies as StrategyType[]);
-      if (defaultsConfig.params) setParams(defaultsConfig.params);
-      if (defaultsConfig.symbols) setSymbols(defaultsConfig.symbols);
-    }
+    if (!config) return;
+    if (config.strategies) setStrategies(config.strategies);
+    if (config.params) setParams(config.params);
+    if (config.symbols) setSymbols(config.symbols);
+  }, [config]);
+
+  // Initial hydration from server defaults — only applies before the first WS config arrives.
+  React.useEffect(() => {
+    if (config) return; // live config takes priority
+    if (!defaultsConfig) return;
+    if (defaultsConfig.strategies) setStrategies(defaultsConfig.strategies as StrategyType[]);
+    if (defaultsConfig.params) setParams(defaultsConfig.params);
+    if (defaultsConfig.symbols) setSymbols(defaultsConfig.symbols);
   }, [config, defaultsConfig]);
 
-  const updateConfig = (patch: Partial<AgentConfig>) => {
-    return onUpdateConfig({ mode, strategies, params, symbols, ...patch });
+  const updateConfig = async (patch: Partial<AgentConfig>) => {
+    return await onUpdateConfig({ mode, strategies, params, symbols, ...patch });
   };
 
   const handleSymbolsChange = (nextSymbols: string[]) => {
@@ -136,16 +154,16 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
       {/* 3. Dynamic Tab Content */}
       <div className="min-h-[450px]">
         {activeTab === 'monitor' && (
-          <MonitorTab 
-            symbols={symbols} 
-            isRunning={isRunning} 
+          <MonitorTab
+            symbols={symbols}
+            isRunning={isRunning}
             decisionHeats={decisionHeats}
             globalSentiment={globalSentiment}
             equityHistory={equityHistory}
-            config={config}
+            config={effectiveConfig}
             onNavigateTab={(tab) => setActiveTab(tab)}
-            onStart={() => onStart({ mode, strategies, params, symbols })} 
-            onStop={onStop} 
+            onStart={() => onStart({ mode, strategies, params, symbols })}
+            onStop={onStop}
           />
         )}
 

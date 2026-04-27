@@ -84,17 +84,20 @@ export async function createAutotradingToken(clientId?: string) {
   return await res.json();
 }
 
-export async function publishAutotradingEvent(data: unknown): Promise<void> {
-  if (!isAblyEnabled()) return;
+// High-frequency event types that would overwhelm Ably REST if published individually.
+// Clients retrieve logs via the REST polling endpoint instead.
+const SKIP_ABLY_TYPES = new Set(['agent_log', 'log_history']);
 
-  const payload = [
-    {
-      name: (data && typeof data === 'object' && 'type' in (data as Record<string, unknown>))
-        ? String((data as Record<string, unknown>).type)
-        : 'autotrading_event',
-      data,
-    },
-  ];
+// Batch queue: events are collected here and flushed together in a single Ably REST call,
+// avoiding concurrent HTTP requests that cause "operation aborted due to timeout" errors.
+let _pendingMessages: Array<{ name: string; data: unknown }> = [];
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+const BATCH_FLUSH_MS = 300;
+
+async function flushPendingMessages(): Promise<void> {
+  _flushTimer = null;
+  if (_pendingMessages.length === 0) return;
+  const batch = _pendingMessages.splice(0); // drain atomically before any await
 
   const endpoint = `${ABLY_REST_BASE}/channels/${encodeURIComponent(ABLY_CHANNEL)}/messages`;
   try {
@@ -105,15 +108,32 @@ export async function publishAutotradingEvent(data: unknown): Promise<void> {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(3000),
+      body: JSON.stringify(batch),
+      signal: AbortSignal.timeout(5000),
     });
-
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.warn(`[Ably] publish failed (${res.status}): ${text || res.statusText}`);
     }
   } catch (err) {
     console.warn('[Ably] publish error:', (err as Error).message);
+  }
+}
+
+// Synchronous enqueue — never blocks the agent tick.
+// Events are batched and sent in a single HTTP call BATCH_FLUSH_MS after the first enqueue.
+export function publishAutotradingEvent(data: unknown): void {
+  if (!isAblyEnabled()) return;
+
+  const type = (data && typeof data === 'object' && 'type' in (data as Record<string, unknown>))
+    ? String((data as Record<string, unknown>).type)
+    : 'autotrading_event';
+
+  if (SKIP_ABLY_TYPES.has(type)) return;
+
+  _pendingMessages.push({ name: type, data });
+
+  if (!_flushTimer) {
+    _flushTimer = setTimeout(() => { void flushPendingMessages(); }, BATCH_FLUSH_MS);
   }
 }

@@ -43,6 +43,15 @@ export interface DashboardData {
 // ─── Range → Yahoo interval/period1 map ────────────────────────────────────────
 export type ChartRange = '1D' | '5D' | '1W' | '1M' | '6M' | 'YTD' | '1Y';
 
+// TWSE trading hours: Mon–Fri 09:00–13:30 Taiwan Standard Time (UTC+8) = UTC 01:00–05:30
+export function isTaiwanTradingHours(): boolean {
+  const now = new Date();
+  const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+  if (utcDay === 0 || utcDay === 6) return false;
+  const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return utcMin >= 60 && utcMin < 330;
+}
+
 function rangeToParams(r: ChartRange): Record<string, string> {
   const now = Date.now();
   switch (r) {
@@ -157,7 +166,20 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
       // ── 3. Chart history for selected symbol ─────────────────────────────────
       try {
         const hist: any[] = await api.getHistory(sym, rangeToParams(rng));
-        const mapped = mapHistory(hist);
+        let mapped = mapHistory(hist);
+        // During 1D view within Taiwan market hours, patch the last candle's close/high/low
+        // with the live quote price so the chart reflects the real-time price immediately.
+        if (rng === '1D' && isTaiwanTradingHours() && mapped.length > 0) {
+          const liveQ = qMap.get(sym);
+          const livePrice: number | undefined = liveQ?.regularMarketPrice;
+          if (livePrice && livePrice > 0) {
+            const last = mapped[mapped.length - 1]!;
+            mapped = [
+              ...mapped.slice(0, -1),
+              { ...last, close: livePrice, high: Math.max(last.high, livePrice), low: last.low > 0 ? Math.min(last.low, livePrice) : livePrice },
+            ];
+          }
+        }
         if (mapped.length > 0) setCandles(mapped);
         else setCandles([]);
       } catch {
@@ -197,9 +219,9 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
   // Fetch on mount and whenever selected/range changes
   useEffect(() => {
     fetchAll(selected, range);
-    // Auto-refresh every 30 seconds during market hours
-    const MARKET_REFRESH_MS = 30_000;
-    const timer = setInterval(() => fetchAll(selected, range), MARKET_REFRESH_MS);
+    // Use 10 s interval during live 1D Taiwan market hours; 30 s otherwise
+    const REFRESH_MS = range === '1D' && isTaiwanTradingHours() ? 10_000 : 30_000;
+    const timer = setInterval(() => fetchAll(selected, range), REFRESH_MS);
     return () => {
       clearInterval(timer);
       abortRef.current?.abort();
