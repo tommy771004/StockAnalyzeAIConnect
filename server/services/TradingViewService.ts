@@ -19,6 +19,7 @@ import {
   toTVExchangeSymbol,
   type CanonicalSymbol,
 } from '../../src/utils/symbolParser.js';
+import { recordAutotradingDiagnostic } from './autotradingDiagnostics.js';
 
 export interface TVResponse<T> {
   status: 'success' | 'error';
@@ -75,6 +76,10 @@ const BASE = (process.env.TV_SCRAPER_URL)
 const DEFAULT_TIMEOUT_MS = isVercel ? 5000 : 3000;
 const TIMEOUT_MS = Number(process.env.TV_SCRAPER_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
 
+function toMetricPath(path: string): string {
+  return path.replace(/^\//, '').replace(/[^a-zA-Z0-9]+/g, '_') || 'root';
+}
+
 /** 內部 fetch：帶 timeout、統一解析 TVResponse<T>，服務未啟動時回 null。 */
 async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T | null> {
   const qs = new URLSearchParams(
@@ -101,15 +106,21 @@ async function call<T>(path: string, params: Record<string, string | number | un
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     const transient = /ECONNREFUSED|fetch failed|ENOTFOUND|aborted|timeout/i.test(msg);
+    const pathMetric = toMetricPath(path);
 
     // 服務未啟動 / DNS 解析失敗 / 逾時：視為「TV 不可用」
     if (transient) {
+      const timedOut = /aborted|timeout/i.test(msg);
+      recordAutotradingDiagnostic(timedOut ? 'tv.timeout' : 'tv.transient_error');
+      recordAutotradingDiagnostic(`tv.${pathMetric}.${timedOut ? 'timeout' : 'transient_error'}`);
       if (process.env.NODE_ENV !== 'production') {
         console.warn(`[TV Service] ${path} transient failure:`, msg);
       }
       return null;
     }
 
+    recordAutotradingDiagnostic('tv.error');
+    recordAutotradingDiagnostic(`tv.${pathMetric}.error`);
     console.warn(`[TV Service] Failed to call ${path}:`, msg);
     throw e;
   } finally {

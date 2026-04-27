@@ -13,6 +13,8 @@
  * 純數字4碼為上市(TSE)；後綴 .TWO 或 5~6 碼為上櫃(OTC)。
  */
 
+import { recordAutotradingDiagnostic } from './autotradingDiagnostics.js';
+
 const TWSE_REALTIME_URL = 'https://mis.twse.com.tw/stock/api/getStockInfo.asp';
 const TPEX_REALTIME_URL = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes';
 
@@ -160,7 +162,10 @@ async function fetchTPEx(codes: string[]): Promise<TWSeQuote[]> {
 /** 取得單一台股即時報價；若不在交易時段可能回傳舊資料 */
 export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
   const parsed = parseTwSymbol(symbol);
-  if (!parsed) return null;
+  if (!parsed) {
+    recordAutotradingDiagnostic('twse.skipped_non_tw_symbol');
+    return null;
+  }
 
   const { code, market } = parsed;
   try {
@@ -169,7 +174,9 @@ export async function realtimeQuote(symbol: string): Promise<TWSeQuote | null> {
       : await fetchTPEx([code]);
     return results.find(q => q.symbol === code) ?? null;
   } catch (err) {
-    console.warn(`[TWSE] realtimeQuote(${symbol}) failed:`, (err as Error).message);
+    const msg = (err as Error).message;
+    recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.timeout' : 'twse.error');
+    console.warn(`[TWSE] realtimeQuote(${symbol}) failed:`, msg);
     return null;
   }
 }
@@ -186,11 +193,19 @@ export async function realtimePrices(symbols: string[]): Promise<TWSeQuote[]> {
 
   if (tseCodes.length > 0) {
     try { results.push(...await fetchTWSE(tseCodes)); }
-    catch (err) { console.warn('[TWSE] batch TSE failed:', (err as Error).message); }
+    catch (err) {
+      const msg = (err as Error).message;
+      recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.batch_timeout' : 'twse.batch_error');
+      console.warn('[TWSE] batch TSE failed:', msg);
+    }
   }
   if (otcCodes.length > 0) {
     try { results.push(...await fetchTPEx(otcCodes)); }
-    catch (err) { console.warn('[TWSE] batch OTC failed:', (err as Error).message); }
+    catch (err) {
+      const msg = (err as Error).message;
+      recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.batch_timeout' : 'twse.batch_error');
+      console.warn('[TWSE] batch OTC failed:', msg);
+    }
   }
 
   return results;

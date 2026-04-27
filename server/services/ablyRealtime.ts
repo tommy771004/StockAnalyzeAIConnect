@@ -7,6 +7,8 @@
  * - Ably provides managed realtime transport; server publishes, clients subscribe directly.
  */
 
+import { recordAutotradingDiagnostic } from './autotradingDiagnostics.js';
+
 const ABLY_REST_BASE = 'https://rest.ably.io';
 const ABLY_AUTH_URL = '/api/autotrading/ably/token';
 const ABLY_CHANNEL = (process.env.ABLY_AUTOTRADING_CHANNEL ?? 'autotrading:global').trim();
@@ -122,11 +124,17 @@ async function flushPendingMessages(): Promise<void> {
       signal: AbortSignal.timeout(ABLY_PUBLISH_TIMEOUT_MS),
     });
     if (!res.ok) {
+      recordAutotradingDiagnostic(`ably.publish_http_${res.status}`);
+      if (res.status === 429) recordAutotradingDiagnostic('ably.publish_rate_limited');
       const text = await res.text().catch(() => '');
       logAblyPublishError(`[Ably] publish failed (${res.status}): ${text || res.statusText}`);
+      return;
     }
+    recordAutotradingDiagnostic('ably.publish_success');
   } catch (err) {
-    logAblyPublishError(`[Ably] publish error: ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'ably.publish_timeout' : 'ably.publish_error');
+    logAblyPublishError(`[Ably] publish error: ${msg}`);
   }
 }
 

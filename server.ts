@@ -56,6 +56,7 @@ import {
   createAutotradingToken,
   publishAutotradingEvent,
 } from './server/services/ablyRealtime.js';
+import { getAutotradingDiagnostics } from './server/services/autotradingDiagnostics.js';
 
 
 
@@ -645,6 +646,12 @@ app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
     risk: DEFAULT_RISK_CONFIG,
     tradingHours: DEFAULT_TRADING_HOURS,
   });
+});
+
+app.get('/api/autotrading/diagnostics', authMiddleware, (req: AuthRequest, res) => {
+  const requestedWindow = Number(req.query.windowMinutes ?? 60);
+  const diagnostics = getAutotradingDiagnostics(requestedWindow);
+  res.json({ ok: true, diagnostics });
 });
 
 app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {

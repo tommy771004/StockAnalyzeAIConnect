@@ -17,6 +17,7 @@
 
 import * as settingsRepo from '../repositories/settingsRepo.js';
 import { getTopFreeModels, getBestFreeModel } from './modelSelector.js';
+import { recordAutotradingDiagnostic } from '../services/autotradingDiagnostics.js';
 
 // ─── Pricing Reference (OpenRouter, approximate 2025-2026) ────────────────────
 // Free-tier models have $0 pricing — we track them for request counts, not $.
@@ -154,11 +155,15 @@ async function fetchWithRetry(
     const body = await res.text();
 
     if (!res.ok) {
+      recordAutotradingDiagnostic(`llm.http_${res.status}`);
+      if (res.status === 429) recordAutotradingDiagnostic('llm.rate_limited');
+
       if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES - 1) {
+        recordAutotradingDiagnostic('llm.retry_attempt');
         const backoff = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
         console.warn(`[LLM] Transient ${res.status} on attempt ${attempt + 1}, retrying in ${backoff}ms`);
         await sleep(backoff);
-        return fetchWithRetry(url, init, attempt + 1);
+        return fetchWithRetry(url, init, attempt + 1, timeoutMs);
       }
       // 401, 400 etc — fail immediately (not transient)
       return { ok: false, status: res.status, body };
@@ -166,10 +171,15 @@ async function fetchWithRetry(
 
     return { ok: true, status: res.status, body };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const timedOut = /aborted|timeout/i.test(msg);
+    recordAutotradingDiagnostic(timedOut ? 'llm.timeout' : 'llm.network_error');
+
     // Network-level errors (ECONNRESET, timeout) are transient
     if (attempt < MAX_RETRIES - 1) {
+      recordAutotradingDiagnostic('llm.retry_attempt');
       const backoff = Math.pow(2, attempt) * 500;
-      console.warn(`[LLM] Network error on attempt ${attempt + 1}, retrying in ${backoff}ms:`, (err as Error).message);
+      console.warn(`[LLM] Network error on attempt ${attempt + 1}, retrying in ${backoff}ms:`, msg);
       await sleep(backoff);
       return fetchWithRetry(url, init, attempt + 1, timeoutMs);
     }
@@ -305,9 +315,14 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
   }
 
   // ── 3. Resolve Candidate Models (for auto-fallback) ──────────────────────
-  const models = opts.forceModel 
-    ? [opts.forceModel] 
-    : await getTopFreeModels(3);
+  const models = opts.forceModel
+    ? [opts.forceModel]
+    : await getTopFreeModels(3).catch(async (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        recordAutotradingDiagnostic('llm.model_list_error');
+        console.warn('[LLM] Failed to load model list, falling back to best model:', msg);
+        return [await getBestFreeModel()];
+      });
 
   let lastError: Error | null = null;
 
@@ -353,6 +368,7 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
 
         // Credit exhaustion is account-level; rotating models won't help.
         if (result.status === 402) {
+          recordAutotradingDiagnostic('llm.credit_exhausted');
           const parsed = JSON.parse(result.body || '{}') as { error?: { message?: string } };
           throw new Error(`OpenRouter 402: ${parsed.error?.message || '餘額不足 (Insufficient Credits)'}`);
         }
@@ -360,6 +376,7 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
         // If it's a credit/quota issue (402) or rate limit (429) or server error (5xx)
         // AND we have more models to try, then continue to next model.
         if (models.indexOf(model) < models.length - 1) {
+          recordAutotradingDiagnostic('llm.model_fallback');
           console.warn(`[LLM] Model ${model} failed (${result.status}), trying next candidate...`);
           continue; 
         }
@@ -393,6 +410,7 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
       };
 
       tracker = addRecord(tracker, record);
+      recordAutotradingDiagnostic('llm.success');
 
       console.log(
         `[LLM] done  model=${model} in=${inputTokens} out=${outputTokens} cost=$${costUsd.toFixed(6)} total=$${totalCost(tracker).toFixed(6)}`,
@@ -402,6 +420,7 @@ export async function callLLM(opts: LLMCallOptions): Promise<LLMCallResult> {
 
     } catch (err: any) {
       lastError = err;
+      recordAutotradingDiagnostic('llm.model_error');
       // If it's the last model, or it's an auth error, rethrow
       if (models.indexOf(model) === models.length - 1 || err.message.includes('API key')) {
         throw err;
