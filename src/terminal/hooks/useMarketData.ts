@@ -86,15 +86,18 @@ export function useMarketData() {
     const fetchMarket = async () => {
       try {
         setLoading(true);
-        const [secRes, tickerRes] = await Promise.all([
-          getQuotes(SECTORS),
-          getQuotes(TICKER_TAPE_SYMBOLS),
-        ]);
+        // Combine both symbol lists into a single request to avoid concurrent /api/quotes calls.
+        // SECTORS symbols don't overlap with TICKER_TAPE_SYMBOLS, so the union is additive.
+        const combined = [...new Set([...SECTORS, ...TICKER_TAPE_SYMBOLS])];
+        const allQuotes = await getQuotes(combined);
+        const qBySymbol = new Map((allQuotes || []).map((q: YahooQuote) => [q.symbol, q]));
+        const secRes = SECTORS.map(s => qBySymbol.get(s)).filter(Boolean) as YahooQuote[];
+        const tickerRes = TICKER_TAPE_SYMBOLS.map(s => qBySymbol.get(s)).filter(Boolean) as YahooQuote[];
 
-        setSectors(secRes || []);
-        setTickerQuotes(tickerRes || []);
+        setSectors(secRes);
+        setTickerQuotes(tickerRes);
         // Filter indices (symbols starting with ^) from the ticker response
-        setIndices((tickerRes || []).filter((q: YahooQuote) => q.symbol?.startsWith('^')));
+        setIndices(tickerRes.filter((q: YahooQuote) => q.symbol?.startsWith('^')));
         setLastUpdated(formatTaipeiTime());
 
         // ── Price-change detection ───────────────────────────────────────────
