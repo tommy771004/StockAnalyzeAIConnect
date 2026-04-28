@@ -46,7 +46,7 @@ declare global {
   }
 }
 
-import { getCachedData, setCachedData, isMarketHours } from './cache';
+import { getCachedData, setCachedData, isMarketHours, isTaiwanTradingHours } from './cache';
 import { fetchJ } from '../utils/api';
 
 /** Log API fallbacks so failures are visible during development. */
@@ -71,7 +71,8 @@ export const showNotification = (title: string, body: string) => {
 
 // ── Stock ─────────────────────────────────────────────────────────────────────
 export const getQuote = async (sym: string): Promise<Quote> => {
-  const dynamicTTL = isMarketHours() ? 5000 : 60000; // 5s during market, 1m outside
+  const marketOpen = sym.endsWith('.TW') || sym === '^TWII' ? isTaiwanTradingHours() : isMarketHours();
+  const dynamicTTL = marketOpen ? 5000 : 60000; // 5s during market, 1m outside
   const cached = getCachedData<Quote>(`quote:${sym}`, undefined, dynamicTTL);
   if (cached) return cached;
   const data = IS_ELECTRON ? await E().getQuote(sym) : await fetchJ<Quote>(`/api/stock/${sym}`);
@@ -80,7 +81,8 @@ export const getQuote = async (sym: string): Promise<Quote> => {
 };
 
 export const getHistory = (sym: string, opts?: Record<string, string | number>): Promise<HistoricalData[]> => {
-  const dynamicTTL = isMarketHours() ? 30000 : 300000; // 30s during market, 5m outside
+  const marketOpen = sym.endsWith('.TW') || sym === '^TWII' ? isTaiwanTradingHours() : isMarketHours();
+  const dynamicTTL = marketOpen ? 30000 : 300000; // 30s during market, 5m outside
   const cached = getCachedData<HistoricalData[]>(`history:${sym}:${JSON.stringify(opts)}`, undefined, dynamicTTL);
   if (cached) return Promise.resolve(cached);
   
