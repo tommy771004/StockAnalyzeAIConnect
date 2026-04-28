@@ -36,6 +36,18 @@ export function setCachedData<T>(key: string, data: T): void {
 }
 
 /**
+ * Returns true if the current time is within Taiwan stock market hours
+ * (Mon–Fri, 09:00–13:30 CST = UTC 01:00–05:30).
+ */
+export function isTaiwanTradingHours(): boolean {
+  const now = new Date();
+  const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+  if (utcDay === 0 || utcDay === 6) return false;
+  const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return utcMin >= 60 && utcMin < 330;
+}
+
+/**
  * Returns true if the current time is within US market hours (Mon–Fri, 9:30–16:00 ET).
  * Used to select shorter TTLs during live trading hours.
  */
