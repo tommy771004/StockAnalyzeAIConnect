@@ -116,6 +116,23 @@ export interface SignalComponentInfo {
   weight: number;
 }
 
+export interface DecisionFusionComponent {
+  source: 'ai' | 'technical' | 'macro' | 'quantum';
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  weightedScore: number;
+}
+
+export interface DecisionFusion {
+  symbol: string;
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  score: number;
+  reason: string;
+  components: DecisionFusionComponent[];
+  timestamp: string;
+}
+
 export interface AgentLog {
   id: string;
   timestamp: string;
