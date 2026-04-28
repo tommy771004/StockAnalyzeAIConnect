@@ -62,7 +62,7 @@ interface Props {
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
   onStart: (cfg: Partial<AgentConfig>) => Promise<void>;
-  onStop: () => void;
+  onStop: () => void | Promise<void>;
   onUpdateConfig: (cfg: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -86,7 +86,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
     return () => clearInterval(timer);
   }, []);
 
-  const [mode] = useState<TradingMode>(config?.mode ?? 'simulated');
+  const [mode, setMode] = useState<TradingMode>(config?.mode ?? 'simulated');
   const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? defaultsConfig?.strategies ?? []);
   const [params, setParams] = useState<StrategyParams>(config?.params ?? defaultsConfig?.params ?? {});
   const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? defaultsConfig?.symbols ?? []);
@@ -100,6 +100,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   // symbols the user just selected via the sector picker.
   React.useEffect(() => {
     if (!config) return;
+    if (config.mode) setMode(config.mode);
     if (config.strategies) setStrategies(config.strategies);
     if (config.params) setParams(config.params);
     if (config.symbols) setSymbols(config.symbols);
