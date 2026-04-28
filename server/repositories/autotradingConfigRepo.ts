@@ -70,15 +70,28 @@ export const autotradingConfigRepo = {
 
   /**
    * 僅儲存運行狀態與計數 (P1)
+   * 含 3 次指數退避重試，應對 Neon HTTP 瞬斷問題。
    */
   async saveState(userId: string, state: { status: string; lossStreakCount: number; posTrack: any }) {
-    return await db.update(autotradingConfigs)
-      .set({
-        status: state.status as any,
-        lossStreakCount: state.lossStreakCount,
-        posTrack: state.posTrack,
-        updatedAt: new Date(),
-      })
-      .where(eq(autotradingConfigs.userId, userId));
+    const MAX_RETRIES = 3;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await db!.update(autotradingConfigs)
+          .set({
+            status: state.status as any,
+            lossStreakCount: state.lossStreakCount,
+            posTrack: state.posTrack,
+            updatedAt: new Date(),
+          })
+          .where(eq(autotradingConfigs.userId, userId));
+      } catch (e) {
+        lastError = e;
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 300 * attempt));
+        }
+      }
+    }
+    throw lastError;
   }
 };
