@@ -419,9 +419,24 @@ async function agentTick() {
       }
     }
 
-    for (const symbol of agentConfig.symbols) {
-      const signal = await runAnalysis(agentConfig, symbol);
-      
+    // Phase 1: 所有標的並行分析（純讀取，互不干擾）
+    const analysisResults = await Promise.allSettled(
+      agentConfig.symbols.map(symbol =>
+        runAnalysis(agentConfig, symbol).then(signal => ({ symbol, signal }))
+      )
+    );
+
+    // Phase 2: 循序執行下單（保護 posTrack / lossStreakCount / availableMargin）
+    let availableMargin = balance.availableMargin;
+
+    for (const settled of analysisResults) {
+      if (settled.status === 'rejected') {
+        emitLog({ level: 'ERROR', source: 'AGENT', symbol: 'UNKNOWN', message: `分析失敗: ${settled.reason}` });
+        continue;
+      }
+
+      const { symbol, signal } = settled.value;
+
       if (agentStatus === 'running' && signal.action !== 'HOLD') {
         const threshold = agentConfig.params.AI_LLM?.confidenceThreshold || 65;
         const signalConfidence = Number(signal.confidence ?? 0);
@@ -429,16 +444,16 @@ async function agentTick() {
         if (signalConfidence > threshold) {
           // 動態計算委託數量：預設每次投入可用資金的 10% 或配置的 maxAllocationPerTrade
           const allocation = agentConfig.params.maxAllocationPerTrade || 0.1;
-          const tradeAmount = balance.availableMargin * allocation;
+          const tradeAmount = availableMargin * allocation;
           const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
-          
+
           // 台股使用整張(1000股)；美股允許零股(小數股)
           const targetQty = signalPrice > 0
             ? (isTaiwanSymbol
               ? Math.floor(tradeAmount / (signalPrice * 1000)) * 1000
               : Math.floor((tradeAmount / signalPrice) * 1000) / 1000)
             : 0;
-          
+
           let finalQty = 0;
           if (signal.action === 'BUY') {
             if (targetQty <= 0) {
@@ -474,29 +489,31 @@ async function agentTick() {
             emitLog({ level: 'WARNING', source: 'RISK', symbol, message: riskCheck.reason });
           }
 
-          const result = await executor.executeTrade(agentConfig, {
+          const tradeResult = await executor.executeTrade(agentConfig, {
             symbol,
             side: signal.action as 'BUY' | 'SELL',
             qty: finalQty,
             price: signalPrice,
           });
-          if (result && result.status === 'FILLED') {
-            riskManager.recordTrade(result.filledQty * result.filledPrice);
+          if (tradeResult && tradeResult.status === 'FILLED') {
+            riskManager.recordTrade(tradeResult.filledQty * tradeResult.filledPrice);
           }
-          
+
           // 實戰化斷路器 2: 進階連損判定 (P1 - 深化)
-          if (result && result.status === 'FILLED') {
+          if (tradeResult && tradeResult.status === 'FILLED') {
             const track = posTrack.get(symbol) || { avgCost: 0, qty: 0 };
-            
+
             if (signal.action === 'BUY') {
               // 更新平均成本 (此處 posTrack 可能已被 broadcastAccountUpdate 更新，但交易後的精確成本仍建議以此計算)
-              const totalQty = track.qty + result.filledQty;
-              const newAvg = (track.qty * track.avgCost + result.filledQty * result.filledPrice) / totalQty;
+              const totalQty = track.qty + tradeResult.filledQty;
+              const newAvg = (track.qty * track.avgCost + tradeResult.filledQty * tradeResult.filledPrice) / totalQty;
               posTrack.set(symbol, { avgCost: newAvg, qty: totalQty });
+              // 扣除已投入資金，供後續標的計算用
+              availableMargin -= tradeResult.filledQty * tradeResult.filledPrice;
               emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `持倉更新：均價 ${newAvg.toFixed(2)} | 數量 ${totalQty}` });
             } else if (signal.action === 'SELL') {
               // 計算平倉損益
-              const realizedPnL = (result.filledPrice - track.avgCost) * result.filledQty;
+              const realizedPnL = (tradeResult.filledPrice - track.avgCost) * tradeResult.filledQty;
               riskManager.recordPnl(realizedPnL);
               if (realizedPnL < 0) {
                 lossStreakCount++;
@@ -505,9 +522,9 @@ async function agentTick() {
                 lossStreakCount = 0;
                 emitLog({ level: 'RISK_CHK', source: 'BREAKER', symbol, message: `✅ 平倉獲利：${realizedPnL.toFixed(0)} | 連損計數已歸零` });
               }
-              
+
               // 更新剩餘持倉
-              const remainQty = Math.max(0, track.qty - result.filledQty);
+              const remainQty = Math.max(0, track.qty - tradeResult.filledQty);
               if (remainQty === 0) posTrack.delete(symbol);
               else posTrack.set(symbol, { ...track, qty: remainQty });
             }
