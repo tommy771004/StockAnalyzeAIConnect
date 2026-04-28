@@ -208,12 +208,26 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
     }
   }, []);
 
-  // Fetch on mount and whenever selected/range changes
+  // Fetch on mount and whenever selected/range changes.
+  // Uses a fixed 2 s base tick; outside Taiwan 1D hours the actual fetch is throttled to 30 s.
   useEffect(() => {
+    let busy = false;
+    let msSinceLastFetch = 0;
+    const BASE_MS = 2_000;
+
     fetchAll(selected, range);
-    // Use 2 s interval during live 1D Taiwan market hours; 30 s otherwise
-    const REFRESH_MS = range === '1D' && isTaiwanTradingHours() ? 2_000 : 30_000;
-    const timer = setInterval(() => fetchAll(selected, range), REFRESH_MS);
+
+    const timer = setInterval(() => {
+      msSinceLastFetch += BASE_MS;
+      const isTaiwanLive = range === '1D' && isTaiwanTradingHours();
+      const threshold = isTaiwanLive ? BASE_MS : 30_000;
+      if (msSinceLastFetch < threshold) return;
+      if (busy) return;
+      msSinceLastFetch = 0;
+      busy = true;
+      void fetchAll(selected, range).finally(() => { busy = false; });
+    }, BASE_MS);
+
     return () => {
       clearInterval(timer);
       abortRef.current?.abort();
