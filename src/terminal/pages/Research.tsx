@@ -11,7 +11,7 @@ import { CongressTradesPanel } from '../ui/CongressTradesPanel';
 import { getFreeModels } from '../../services/aiService';
 import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
 import * as api from '../../services/api';
-import { isTaiwanTradingHours } from '../hooks/useDashboardData';
+import { isTaiwanTradingHours } from '../../services/cache';
 
 export function ResearchPage() {
   const [activeSymbol, setActiveSymbol] = useState('NVDA');
