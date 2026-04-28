@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '../../services/api';
+import { isTaiwanTradingHours } from '../../services/cache';
 import type { WatchlistRow, Mover, CandlePoint, DashboardNews } from '../types';
 
 // ─── Shape returned by the hook ────────────────────────────────────────────────
@@ -42,15 +43,6 @@ export interface DashboardData {
 
 // ─── Range → Yahoo interval/period1 map ────────────────────────────────────────
 export type ChartRange = '1D' | '5D' | '1W' | '1M' | '6M' | 'YTD' | '1Y';
-
-// TWSE trading hours: Mon–Fri 09:00–13:30 Taiwan Standard Time (UTC+8) = UTC 01:00–05:30
-export function isTaiwanTradingHours(): boolean {
-  const now = new Date();
-  const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
-  if (utcDay === 0 || utcDay === 6) return false;
-  const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  return utcMin >= 60 && utcMin < 330;
-}
 
 function rangeToParams(r: ChartRange): Record<string, string> {
   const now = Date.now();
@@ -198,9 +190,9 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
           return {
             id: n.id || String(n.providerPublishTime || Date.now()),
             category: catDesc as DashboardNews['category'],
-            time: n.providerPublishTime 
-               ? new Date(n.providerPublishTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-               : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time: n.providerPublishTime
+               ? new Date(n.providerPublishTime * 1000).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })
+               : new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' }),
             title: n.title,
             tickers: [sym, n.publisher].filter(Boolean) as string[],
           };
