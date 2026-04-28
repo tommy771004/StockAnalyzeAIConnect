@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { getBatchQuotes } from '../../services/api';
 import { isTaiwanTradingHours } from '../../services/cache';
-import type { Position, AgentLog } from './types';
+import type { Position, DecisionFusion } from './types';
 
 interface LiveQuote {
   price: number;
@@ -17,17 +17,12 @@ interface LiveQuote {
 interface Props {
   positions: Position[];
   symbols: string[];
-  logs: AgentLog[];
-}
-
-function getConfidenceFromLogs(logs: AgentLog[], symbol: string): { conf: number; action?: string } {
-  const recent = [...logs].reverse().find(l => l.symbol === symbol && l.confidence !== undefined);
-  return recent ? { conf: recent.confidence!, action: recent.action } : { conf: 0 };
+  decisionFusions: Record<string, DecisionFusion>;
 }
 
 const fmt = (n: number, d = 2) => n.toLocaleString('zh-TW', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-export function AssetMonitor({ positions, symbols, logs }: Props) {
+export function AssetMonitor({ positions, symbols, decisionFusions }: Props) {
   const { t } = useTranslation();
   const [liveQuotes, setLiveQuotes] = useState<Map<string, LiveQuote>>(new Map());
   const busyRef = useRef(false);
@@ -84,7 +79,9 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
 
   const rows = symbols.map(sym => {
     const pos = posMap.get(sym);
-    const { conf, action } = getConfidenceFromLogs(logs, sym);
+    const fusion = decisionFusions[sym];
+    const conf = fusion?.confidence ?? 0;
+    const action = fusion?.action;
     return { symbol: sym, pos, conf, action };
   });
 
