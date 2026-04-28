@@ -196,8 +196,16 @@ export function useAutotradingWS() {
         next.riskStats = statusData.riskStats ?? next.riskStats;
       }
       if (logsRes.status === 'fulfilled') {
-        const logs = Array.isArray(logsRes.value) ? (logsRes.value as AgentLog[]) : [];
-        next.logs = logs.slice(-MAX_LOGS);
+        const serverLogs = Array.isArray(logsRes.value) ? (logsRes.value as AgentLog[]) : [];
+        // Merge instead of replace: append only logs the client doesn't already have.
+        // agent_log events are intentionally skipped from Ably to avoid overwhelming the
+        // REST endpoint, so polling is the sole delivery path for logs. Merging prevents
+        // the DecisionLog panel from resetting every poll cycle.
+        const existingIds = new Set(prev.logs.map((l: AgentLog) => l.id));
+        const incoming = serverLogs.filter(l => !existingIds.has(l.id));
+        next.logs = incoming.length > 0
+          ? [...prev.logs, ...incoming].slice(-MAX_LOGS)
+          : prev.logs;
       }
       if (positionsRes.status === 'fulfilled' && Array.isArray(positionsRes.value)) {
         next.positions = positionsRes.value as Position[];
