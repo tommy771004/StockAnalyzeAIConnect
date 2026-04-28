@@ -93,7 +93,7 @@ export function ResearchPage() {
       } catch {}
     };
     void poll();
-    const timer = setInterval(poll, 10_000);
+    const timer = setInterval(poll, 2_000);
     return () => clearInterval(timer);
   }, [activeSymbol, timeRange]);
 
@@ -439,7 +439,7 @@ function RecentNewsPanel({ news }: { news: any[] }) {
             >
               <div className="mb-1 text-[10px] tracking-widest text-(--color-term-muted) flex justify-between">
                 <span className="group-hover/item:text-sky-400 transition-colors">{n.source || n.publisher || 'MARKET'}</span>
-                <span>{n.published ? new Date(n.published * 1000).toLocaleDateString() : (n.time || '')}</span>
+                <span>{n.published ? new Date(n.published * 1000).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit' }) : (n.time || '')}</span>
               </div>
               <p className="text-[12.5px] leading-snug text-(--color-term-text) font-medium group-hover/item:text-(--color-term-accent) transition-colors">
                 {n.title}
