@@ -18,6 +18,7 @@ import type {
   AgentConfig,
   RiskStats,
   DecisionHeat,
+  DecisionFusion,
   EquitySnapshot,
 } from './types';
 
@@ -95,6 +96,7 @@ interface AutotradingState {
   balance: AccountBalance | null;
   positions: Position[];
   decisionHeats: Record<string, DecisionHeat>;
+  decisionFusions: Record<string, DecisionFusion>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
   connected: boolean;
@@ -111,6 +113,7 @@ export function useAutotradingWS() {
     balance: null,
     positions: [],
     decisionHeats: {},
+    decisionFusions: {},
     globalSentiment: 50,
     equityHistory: [],
     connected: false,
@@ -125,6 +128,7 @@ export function useAutotradingWS() {
   const unmounted = useRef(false);
   const connectedRef = useRef(false);
   const pollBusyRef = useRef(false);
+  const pollSnapshotRef = useRef<() => Promise<void>>(async () => {});
   const ablyClientRef = useRef<any>(null);
   const ablyChannelRef = useRef<any>(null);
   const lastMetaReasonRef = useRef<string>('');
@@ -163,6 +167,18 @@ export function useAutotradingWS() {
               [msg.data.symbol]: msg.data,
             },
           };
+        case 'decision_fusion':
+          if (!msg.data?.symbol) return prev;
+          return {
+            ...prev,
+            decisionFusions: {
+              ...prev.decisionFusions,
+              [msg.data.symbol]: msg.data as DecisionFusion,
+            },
+          };
+        case 'trade_executed':
+          setTimeout(() => void pollSnapshotRef.current(), 0);
+          return prev;
         case 'global_sentiment':
           return { ...prev, globalSentiment: msg.data?.score ?? prev.globalSentiment };
         case 'equity_update':
@@ -212,12 +228,21 @@ export function useAutotradingWS() {
       }
       if (balanceRes.status === 'fulfilled' && balanceRes.value) {
         next.balance = balanceRes.value as AccountBalance;
+        const equity = (balanceRes.value as AccountBalance).totalAssets;
+        if (equity > 0) {
+          next.equityHistory = [...prev.equityHistory, {
+            timestamp: new Date().toISOString(),
+            equity,
+          }].slice(-100);
+        }
       }
 
       return next;
     });
     pollBusyRef.current = false;
   }, []);
+
+  pollSnapshotRef.current = pollSnapshot;
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
