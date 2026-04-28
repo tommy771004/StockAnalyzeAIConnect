@@ -126,6 +126,11 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                 const changePct = live
                   ? live.changePct
                   : pos ? ((pos.currentPrice - pos.avgCost) / pos.avgCost) * 100 : 0;
+                // PnL: recalculate client-side from live price so it updates without waiting
+                // for the next server positions_update push.
+                const unrealizedPnl = live && pos
+                  ? (live.price - pos.avgCost) * pos.qty
+                  : pos?.unrealizedPnl ?? 0;
                 const isBuy = action === 'BUY';
                 const isSell = action === 'SELL';
 
@@ -169,9 +174,9 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                     </td>
                     <td className={cn(
                       'text-right px-3 py-2 font-bold',
-                      (pos?.unrealizedPnl ?? 0) >= 0 ? 'text-cyan-400' : 'text-rose-400'
+                      unrealizedPnl >= 0 ? 'text-cyan-400' : 'text-rose-400'
                     )}>
-                      {pos ? `${pos.unrealizedPnl >= 0 ? '+' : ''}${fmt(pos.unrealizedPnl, 0)}` : '0'}
+                      {pos ? `${unrealizedPnl >= 0 ? '+' : ''}${fmt(unrealizedPnl, 0)}` : '0'}
                     </td>
                   </tr>
                 );
