@@ -157,7 +157,7 @@ export function AutoTradingPage() {
                 <AssetMonitor
                   positions={ws.positions}
                   symbols={currentSymbols}
-                  logs={ws.logs}
+                  decisionFusions={ws.decisionFusions}
                 />
               </div>
             </>
