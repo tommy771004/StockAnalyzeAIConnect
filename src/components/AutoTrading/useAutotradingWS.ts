@@ -124,16 +124,13 @@ export function useAutotradingWS() {
   const reconnectAttempts = useRef(0);
   const unmounted = useRef(false);
   const connectedRef = useRef(false);
+  const pollBusyRef = useRef(false);
   const ablyClientRef = useRef<any>(null);
   const ablyChannelRef = useRef<any>(null);
   const lastMetaReasonRef = useRef<string>('');
   // 當伺服器明確回報 provider=ably (例如部署在 Vercel 的 serverless 環境)，
   // 即使 token 失敗也應略過原生 WebSocket 嘗試 — 否則只會額外塞滿 console error。
   const skipWsRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    connectedRef.current = state.connected;
-  }, [state.connected]);
 
   const applyEvent = useCallback((msg: any) => {
     if (!msg || typeof msg !== 'object') return;
@@ -180,6 +177,8 @@ export function useAutotradingWS() {
   }, []);
 
   const pollSnapshot = useCallback(async () => {
+    if (pollBusyRef.current) return;
+    pollBusyRef.current = true;
     const [statusRes, logsRes, positionsRes, balanceRes] = await Promise.allSettled([
       api.getAutotradingStatus(),
       api.getAutotradingLogs(80),
@@ -209,6 +208,7 @@ export function useAutotradingWS() {
 
       return next;
     });
+    pollBusyRef.current = false;
   }, []);
 
   const stopPolling = useCallback(() => {
@@ -276,11 +276,13 @@ export function useAutotradingWS() {
     ws.onopen = () => {
       reconnectAttempts.current = 0;
       stopPolling();
+      connectedRef.current = true;
       setState(prev => ({ ...prev, connected: true, transport: 'ws', offlineReason: '' }));
     };
 
     ws.onclose = () => {
       if (unmounted.current) return;
+      connectedRef.current = false;
       setState(prev => ({ ...prev, connected: false }));
       scheduleWsReconnect(connectWs);
     };
@@ -366,11 +368,13 @@ export function useAutotradingWS() {
         if (current === 'connected') {
           reconnectAttempts.current = 0;
           stopPolling();
+          connectedRef.current = true;
           setState(prev => ({ ...prev, connected: true, transport: 'ably', offlineReason: '' }));
           void pollSnapshot(); // hydrate current snapshot immediately
           return;
         }
         if (current === 'failed' || current === 'suspended' || current === 'disconnected') {
+          connectedRef.current = false;
           const reason = stateChange?.reason?.message || `Ably 連線狀態：${current}`;
           startPolling(`${reason}；已切換輪詢。`);
         }
