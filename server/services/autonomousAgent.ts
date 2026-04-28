@@ -430,6 +430,14 @@ async function agentTick() {
     let availableMargin = balance.availableMargin;
 
     for (const settled of analysisResults) {
+      if (
+        agentConfig.circuitBreaker?.enabled &&
+        lossStreakCount >= (agentConfig.circuitBreaker.maxLossStreak || 3)
+      ) {
+        activateCooldown(`連損次數已達上限 (${lossStreakCount})`);
+        break;
+      }
+
       if (settled.status === 'rejected') {
         emitLog({ level: 'ERROR', source: 'AGENT', symbol: 'UNKNOWN', message: `分析失敗: ${settled.reason}` });
         continue;
@@ -496,6 +504,16 @@ async function agentTick() {
             price: signalPrice,
           });
           if (tradeResult && tradeResult.status === 'FILLED') {
+            wsBroadcast?.({
+              type: 'trade_executed',
+              data: {
+                symbol,
+                side: signal.action,
+                qty: tradeResult.filledQty,
+                price: tradeResult.filledPrice,
+                timestamp: new Date().toISOString(),
+              },
+            });
             riskManager.recordTrade(tradeResult.filledQty * tradeResult.filledPrice);
           }
 
@@ -649,6 +667,7 @@ export function emergencyKillSwitch() {
 export function deactivateKillSwitch() {
   riskManager.deactivateKillSwitch();
   emitLog({ level: 'INFO', source: 'SYSTEM', symbol: 'ALL', message: '🟢 緊急停止已解除，可重新啟動引擎。' });
+  wsBroadcast?.({ type: 'status', data: { status: agentStatus, config: agentConfig } });
   return { ok: true };
 }
 
