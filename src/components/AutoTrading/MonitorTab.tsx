@@ -2,10 +2,10 @@
  * src/components/AutoTrading/MonitorTab.tsx
  * 監控分頁組件：展示標的狀態與啟停控制
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
-import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight, X } from 'lucide-react';
+import { Activity, Play, Square, LineChart, TrendingUp, CheckCircle2, CircleAlert, ArrowRight, X, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { DecisionHeatmap } from './DecisionHeatmap';
 import type { AgentConfig, DecisionHeat, EquitySnapshot } from './types';
@@ -20,7 +20,7 @@ interface Props {
   onRemoveSymbol: (symbol: string) => void;
   onNavigateTab?: (tab: 'strategy' | 'broker') => void;
   onStart: () => Promise<void>;
-  onStop: () => void;
+  onStop: () => void | Promise<void>;
 }
 
 export function MonitorTab({
@@ -37,17 +37,43 @@ export function MonitorTab({
 }: Props) {
   const { t } = useTranslation();
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+
+  // Optimistic running state: set immediately after API responds so the button
+  // switches without waiting for the next WS/polling cycle.
+  const [optimisticRunning, setOptimisticRunning] = useState<boolean | null>(null);
+
+  // Clear optimistic state once the real WS status arrives.
+  useEffect(() => {
+    setOptimisticRunning(null);
+  }, [isRunning]);
+
+  const effectiveIsRunning = optimisticRunning ?? isRunning;
 
   const handleStart = async () => {
     setIsStarting(true);
     setStartError(null);
     try {
       await onStart();
+      setOptimisticRunning(true);
     } catch (e) {
       setStartError(e instanceof Error ? e.message : '啟動失敗，請稍後再試');
+      setOptimisticRunning(null);
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handleStop = async () => {
+    setIsStopping(true);
+    try {
+      await onStop();
+      setOptimisticRunning(false);
+    } catch {
+      setOptimisticRunning(null);
+    } finally {
+      setIsStopping(false);
     }
   };
 
@@ -72,7 +98,7 @@ export function MonitorTab({
     { id: 1, label: t('autotrading.monitor.steps.selectSymbols'), done: hasSymbols, action: () => onNavigateTab?.('strategy') },
     { id: 2, label: t('autotrading.monitor.steps.selectStrategies'), done: hasStrategies, action: () => onNavigateTab?.('strategy') },
     { id: 3, label: t('autotrading.monitor.steps.configureRisk'), done: hasRisk },
-    { id: 4, label: t('autotrading.monitor.steps.startEngine'), done: isRunning },
+    { id: 4, label: t('autotrading.monitor.steps.startEngine'), done: effectiveIsRunning },
   ];
 
   return (
@@ -127,18 +153,18 @@ export function MonitorTab({
            <div className="flex-1 h-full bg-rose-500/20" />
            <div className="flex-1 h-full bg-amber-500/20" />
            <div className="flex-1 h-full bg-emerald-500/20" />
-           <div 
+           <div
              className={cn(
                "absolute h-1.5 rounded-full transition-all duration-1000",
-               globalSentiment > 60 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
-               globalSentiment < 40 ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" : 
+               globalSentiment > 60 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+               globalSentiment < 40 ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" :
                "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-             )} 
-             style={{ width: '4px', left: `calc(${globalSentiment}% - 2px)` }} 
+             )}
+             style={{ width: '4px', left: `calc(${globalSentiment}% - 2px)` }}
            />
         </div>
       </div>
-      
+
       {/* Live Session Performance */}
       <div className="bg-black/20 border border-white/5 p-4 rounded-sm space-y-4">
         <div className="flex items-center justify-between">
@@ -167,16 +193,16 @@ export function MonitorTab({
                 </defs>
                 <XAxis dataKey="timestamp" hide />
                 <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#111', border: '1px solid #333', fontSize: '9px' }}
                   labelStyle={{ display: 'none' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="equity" 
-                  stroke="#10b981" 
-                  fillOpacity={1} 
-                  fill="url(#colorEquity)" 
+                <Area
+                  type="monotone"
+                  dataKey="equity"
+                  stroke="#10b981"
+                  fillOpacity={1}
+                  fill="url(#colorEquity)"
                   strokeWidth={2}
                   isAnimationActive={false}
                 />
@@ -202,7 +228,7 @@ export function MonitorTab({
                   <Activity className="h-3 w-3 text-cyan-400 opacity-50" />
                   <button
                     type="button"
-                    disabled={isRunning}
+                    disabled={effectiveIsRunning}
                     onClick={() => onRemoveSymbol(sym)}
                     aria-label={t('autotrading.monitor.removeSymbol', '移除監控標的')}
                     title={t('autotrading.monitor.removeSymbol', '移除監控標的')}
@@ -223,7 +249,7 @@ export function MonitorTab({
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-violet-300 uppercase tracking-widest">{t('autotrading.monitor.alphaReasoning')}</span>
         </div>
-        
+
         <div className="space-y-2">
           {latestHeat ? (
             <div key={latestHeat.timestamp} className="flex items-start gap-3 p-2 bg-black/40 rounded border border-white/5 animate-in fade-in slide-in-from-left-2 duration-500">
@@ -261,23 +287,28 @@ export function MonitorTab({
 
       {/* Control Action */}
       <div className="pt-6 border-t border-white/5">
-        {!isRunning && missingItems.length > 0 && (
+        {!effectiveIsRunning && missingItems.length > 0 && (
           <div className="mb-3 p-2 rounded border border-amber-500/25 bg-amber-500/10 text-[11px] text-amber-200">
             <div className="font-bold mb-1">{t('autotrading.monitor.startBlocked', '啟動前需完成')}</div>
             <div>{missingItems.join(' / ')}</div>
           </div>
         )}
-        {isRunning ? (
+        {effectiveIsRunning ? (
           <button
             type="button"
-            onClick={onStop}
-            className="focus-ring w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 motion-safe:transition-all flex items-center justify-center gap-2"
+            onClick={handleStop}
+            disabled={isStopping}
+            className="focus-ring w-full py-3 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold uppercase tracking-[0.2em] hover:bg-rose-500/30 motion-safe:transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Square className="h-4 w-4 fill-current" /> {t('autotrading.monitor.emergencyStop')}
+            {isStopping
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('autotrading.monitor.stopping', '停止中…')}</>
+              : <><Square className="h-4 w-4 fill-current" /> {t('autotrading.monitor.emergencyStop')}</>
+            }
           </button>
         ) : (
           <>
             <button
+              type="button"
               onClick={handleStart}
               disabled={!readyToStart || isStarting}
               className={cn(
@@ -287,8 +318,10 @@ export function MonitorTab({
                   : 'bg-zinc-800/40 text-zinc-500 border border-zinc-700 cursor-not-allowed'
               )}
             >
-              <Play className="h-4 w-4 fill-current" />
-              {isStarting ? t('autotrading.monitor.starting', '啟動中…') : t('autotrading.monitor.initiateEngine')}
+              {isStarting
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('autotrading.monitor.starting', '啟動中…')}</>
+                : <><Play className="h-4 w-4 fill-current" /> {t('autotrading.monitor.initiateEngine')}</>
+              }
             </button>
             {startError && (
               <p className="text-center text-[10px] text-rose-300 mt-2 px-2">{startError}</p>
