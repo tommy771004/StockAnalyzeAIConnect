@@ -79,7 +79,7 @@ export function ResearchPage() {
     if (activeSymbol) fetchSummary();
   }, [activeSymbol, persona, selectedModel]);
 
-  // Live quote polling: when 1D is selected during Taiwan market hours, poll every 10 s
+  // Live quote polling: when 1D is selected during Taiwan market hours, poll every 2 s
   // and patch the last history candle so the chart reflects the real-time price.
   useEffect(() => {
     setLivePrice(null);
