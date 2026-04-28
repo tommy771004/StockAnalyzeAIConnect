@@ -36,6 +36,7 @@ let wsBroadcast: ((msg: any) => void) | null = null;
 let tickTimeout: NodeJS.Timeout | null = null;
 let lossStreakCount = 0;
 let isTickRunning = false;
+let syncInProgress = false;
 
 const WARN_LOG_COOLDOWN_MS = 60_000;
 const warnLogTimestamps = new Map<string, number>();
@@ -109,11 +110,13 @@ function broadcastSentiment(score: number) {
   wsBroadcast?.({ type: 'global_sentiment', data: { score: lastSentimentScore } });
 }
 
-/** 
+/**
  * 將目前運行狀態同步到資料庫 (P1)
+ * syncInProgress 旗標防止前次 DB 寫入未完成時重複觸發，避免 Neon 連線堆積。
  */
 async function syncStateToDb() {
-  if (!agentConfig.userId) return;
+  if (!agentConfig.userId || syncInProgress) return;
+  syncInProgress = true;
   try {
     await autotradingConfigRepo.saveState(agentConfig.userId, {
       status: agentStatus,
@@ -122,6 +125,8 @@ async function syncStateToDb() {
     });
   } catch (e) {
     console.error('[Agent] 狀態同步失敗:', e);
+  } finally {
+    syncInProgress = false;
   }
 }
 
@@ -506,7 +511,7 @@ async function agentTick() {
               if (remainQty === 0) posTrack.delete(symbol);
               else posTrack.set(symbol, { ...track, qty: remainQty });
             }
-            syncStateToDb();
+            void syncStateToDb();
             // 成交後立即更新 UI (P1)
             await broadcastAccountUpdate();
           } else {
@@ -532,14 +537,14 @@ async function agentTick() {
 function activateCooldown(reason: string) {
   agentStatus = 'cooldown';
   emitLog({ level: 'CRITICAL', source: 'BREAKER', symbol: 'ALL', message: `🚨 斷路器觸發：${reason}。實盤交易已暫停。` });
-  syncStateToDb();
+  void syncStateToDb();
   if (tickTimeout) clearTimeout(tickTimeout);
   tickTimeout = setTimeout(() => {
     if (agentStatus === 'cooldown') {
       agentStatus = 'running';
       lossStreakCount = 0;
       agentTick();
-      syncStateToDb();
+      void syncStateToDb();
     }
   }, (agentConfig.circuitBreaker?.cooldownMinutes || 60) * 60000);
 }
@@ -554,7 +559,7 @@ export function resetCircuitBreaker() {
     agentTick();
   }
   emitLog({ level: 'INFO', source: 'SYSTEM', symbol: 'BREAKER', message: '斷路器已手動重置，計數歸零。' });
-  syncStateToDb();
+  void syncStateToDb();
   return { ok: true };
 }
 
@@ -566,19 +571,19 @@ export function startAgent(c?: any) {
     if (!v.ok) return v;
   }
   
-  agentStatus = 'running'; 
+  agentStatus = 'running';
   lossStreakCount = 0;
   isTickRunning = false; // 重置鎖
-  agentTick(); 
-  syncStateToDb();
-  return { ok: true }; 
+  agentTick();
+  void syncStateToDb();
+  return { ok: true };
 }
 
 export function stopAgent() {
   agentStatus = 'stopped';
   if (tickTimeout) clearTimeout(tickTimeout);
   emitLog({ level: 'INFO', source: 'SYSTEM', symbol: 'ENGINE', message: 'AI 引擎已手動停止' });
-  syncStateToDb();
+  void syncStateToDb();
   return { ok: true };
 }
 
