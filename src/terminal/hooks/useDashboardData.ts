@@ -211,8 +211,8 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
   // Fetch on mount and whenever selected/range changes
   useEffect(() => {
     fetchAll(selected, range);
-    // Use 10 s interval during live 1D Taiwan market hours; 30 s otherwise
-    const REFRESH_MS = range === '1D' && isTaiwanTradingHours() ? 10_000 : 30_000;
+    // Use 2 s interval during live 1D Taiwan market hours; 30 s otherwise
+    const REFRESH_MS = range === '1D' && isTaiwanTradingHours() ? 2_000 : 30_000;
     const timer = setInterval(() => fetchAll(selected, range), REFRESH_MS);
     return () => {
       clearInterval(timer);
