@@ -1,11 +1,18 @@
 /**
  * src/components/AutoTrading/AssetMonitor.tsx
- * 多股資產監控表格
+ * 多股資產監控表格 — 含即時報價輪詢
  */
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import { getBatchQuotes } from '../../services/api';
+import { isTaiwanTradingHours } from '../../services/cache';
 import type { Position, AgentLog } from './types';
+
+interface LiveQuote {
+  price: number;
+  changePct: number;
+}
 
 interface Props {
   positions: Position[];
@@ -22,9 +29,59 @@ const fmt = (n: number, d = 2) => n.toLocaleString('zh-TW', { minimumFractionDig
 
 export function AssetMonitor({ positions, symbols, logs }: Props) {
   const { t } = useTranslation();
+  const [liveQuotes, setLiveQuotes] = useState<Map<string, LiveQuote>>(new Map());
+  const busyRef = useRef(false);
+  const unmountedRef = useRef(false);
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    if (symbols.length === 0) return;
+
+    let elapsed = 0;
+    const BASE_MS = 2_000;
+
+    const fetchQuotes = async () => {
+      if (busyRef.current || unmountedRef.current) return;
+      busyRef.current = true;
+      try {
+        const quotes = await getBatchQuotes(symbols);
+        if (unmountedRef.current) return;
+        const next = new Map<string, LiveQuote>();
+        quotes.forEach((q: any, i: number) => {
+          if (!q) return;
+          const sym = q.symbol ?? symbols[i];
+          if (!sym) return;
+          const price: number = q.regularMarketPrice ?? 0;
+          const changePct: number = q.regularMarketChangePercent ?? 0;
+          if (price > 0) next.set(sym, { price, changePct });
+        });
+        setLiveQuotes(next);
+      } catch {
+        // keep previous data on error
+      } finally {
+        busyRef.current = false;
+      }
+    };
+
+    void fetchQuotes();
+
+    const timer = setInterval(() => {
+      elapsed += BASE_MS;
+      const isTaiwanLive = isTaiwanTradingHours();
+      const threshold = isTaiwanLive ? BASE_MS : 30_000;
+      if (elapsed < threshold) return;
+      elapsed = 0;
+      void fetchQuotes();
+    }, BASE_MS);
+
+    return () => {
+      unmountedRef.current = true;
+      clearInterval(timer);
+    };
+  }, [symbols]);
+
   const posMap = new Map(positions.map(p => [p.symbol, p]));
 
-  // Show all monitored symbols, with positions if any
   const rows = symbols.map(sym => {
     const pos = posMap.get(sym);
     const { conf, action } = getConfidenceFromLogs(logs, sym);
@@ -63,8 +120,12 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
               </tr>
             ) : (
               rows.map(({ symbol, pos, conf, action }) => {
-                const price = pos?.currentPrice ?? 0;
-                const changePct = pos ? ((pos.currentPrice - pos.avgCost) / pos.avgCost) * 100 : 0;
+                const live = liveQuotes.get(symbol);
+                const price = live?.price ?? pos?.currentPrice ?? 0;
+                // Daily change % from live quote; fallback to unrealised cost-basis change
+                const changePct = live
+                  ? live.changePct
+                  : pos ? ((pos.currentPrice - pos.avgCost) / pos.avgCost) * 100 : 0;
                 const isBuy = action === 'BUY';
                 const isSell = action === 'SELL';
 
@@ -74,6 +135,7 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           'h-1.5 w-1.5 rounded-full',
+                          live ? 'animate-pulse bg-emerald-400' :
                           conf > 70 ? 'bg-cyan-400' : conf > 40 ? 'bg-amber-400' : 'bg-(--color-term-muted)'
                         )} />
                         <span className="text-(--color-term-accent) font-bold">{symbol}</span>
@@ -86,7 +148,7 @@ export function AssetMonitor({ positions, symbols, logs }: Props) {
                       {price > 0 ? fmt(price) : '---'}
                     </td>
                     <td className={cn('text-right px-2 py-2 font-bold', changePct >= 0 ? 'text-cyan-400' : 'text-rose-400')}>
-                      {pos ? `${changePct >= 0 ? '+' : ''}${fmt(changePct)}%` : '---'}
+                      {price > 0 ? `${changePct >= 0 ? '+' : ''}${fmt(changePct)}%` : '---'}
                     </td>
                     <td className="text-right px-2 py-2">
                       {conf > 0 ? (
