@@ -165,11 +165,6 @@ export function SettingsPage() {
               <p className="text-[10px] text-(--color-term-muted) mt-2 italic">
                 * {t('settings.apiKeyDesc')}
               </p>
-              </div>
-                API
-                金鑰儲存於本地設定檔（僅在您的裝置上使用），請避免洩露給他人。
-                如有疑慮，可於 OpenRouter 後台定期輪替（Rotate）金鑰。
-              </div>
             </div>
 
             <div className="flex items-center justify-between border-t border-(--color-term-border) pt-4">
