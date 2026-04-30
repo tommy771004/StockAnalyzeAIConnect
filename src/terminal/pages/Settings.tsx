@@ -170,12 +170,6 @@ export function SettingsPage() {
                 金鑰儲存於本地設定檔（僅在您的裝置上使用），請避免洩露給他人。
                 如有疑慮，可於 OpenRouter 後台定期輪替（Rotate）金鑰。
               </div>
-              <Row
-                label="OpenRouter API Key"
-                hint="至 openrouter.ai 取得，用於 AI 分析功能"
-              >
-                <SecretInput k="openrouterKey" placeholder="sk-or-v1-…" />
-              </Row>
             </div>
 
             <div className="flex items-center justify-between border-t border-(--color-term-border) pt-4">
