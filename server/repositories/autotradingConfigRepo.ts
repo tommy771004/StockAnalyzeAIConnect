@@ -4,7 +4,7 @@
  */
 import { db } from '../../src/db/index.js';
 import { autotradingConfigs, type AutotradingConfig, type NewAutotradingConfig } from '../../src/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { AgentConfig } from '../../src/components/AutoTrading/types.js';
 
 export const autotradingConfigRepo = {
@@ -41,7 +41,7 @@ export const autotradingConfigRepo = {
   async getAllActiveConfigs() {
     return await db.select()
       .from(autotradingConfigs)
-      .where(eq(autotradingConfigs.status, 'running'));
+      .where(inArray(autotradingConfigs.status, ['running', 'cooldown']));
   },
 
   /**

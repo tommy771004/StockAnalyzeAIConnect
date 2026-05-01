@@ -426,6 +426,22 @@ async function agentTick() {
       )
     );
 
+    // 主動停損：Phase 2 前先掃描所有持倉，達停損門檻則強制注入 SELL（繞過 LLM 信心度）
+    const stopLossPct = agentConfig.params.stopLossPct ?? 0.05;
+    for (const settled of analysisResults) {
+      if (settled.status !== 'fulfilled') continue;
+      const { symbol, signal } = settled.value;
+      if (signal.action === 'SELL') continue;
+      const track = posTrack.get(symbol);
+      if (!track || track.qty <= 0 || !signal.price || signal.price <= 0 || track.avgCost <= 0) continue;
+      const lossFraction = (signal.price - track.avgCost) / track.avgCost;
+      if (lossFraction <= -stopLossPct) {
+        signal.action = 'SELL';
+        signal.confidence = 100;
+        emitLog({ level: 'RISK_CHK', source: 'STOP_LOSS', symbol, message: `🛑 主動停損觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 虧損 ${(lossFraction * 100).toFixed(2)}%，強制出場` });
+      }
+    }
+
     // Phase 2: 循序執行下單（保護 posTrack / lossStreakCount / availableMargin）
     let availableMargin = balance.availableMargin;
 
@@ -602,12 +618,18 @@ export function startAgent(c?: any) {
   if (tickTimeout) clearTimeout(tickTimeout);
   
   if (c) {
+    // 若切換到不同的 userId，清空前一個用戶的記憶體狀態，防止跨用戶污染
+    const incomingUserId = c.userId as string | undefined;
+    if (incomingUserId && incomingUserId !== agentConfig.userId) {
+      posTrack = new Map();
+      lossStreakCount = 0;
+      console.log(`[Agent] userId 切換 ${agentConfig.userId ?? 'none'} → ${incomingUserId}，清空 posTrack 與 lossStreakCount`);
+    }
     const v = updateAgentConfig(c, true); // silent=true: status broadcast happens after agentStatus = 'running'
     if (!v.ok) return v;
   }
   
   agentStatus = 'running';
-  lossStreakCount = 0;
   isTickRunning = false; // 重置鎖
   agentTick();
   void syncStateToDb();

@@ -325,6 +325,7 @@ export interface InsightsPayload {
   tvOverview: Record<string, unknown> | null;
   tvIndicators: Record<string, number | string | null> | null;
   tvNews: Array<{ id: string; title: string; published: number; source: string; storyPath: string }> | null;
+  history: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number; adjclose?: number }> | null;
   wantGooChip: {
     mainPlayersNet: number;
     brokerDiff: number;

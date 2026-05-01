@@ -65,6 +65,7 @@ export interface AgentConfig {
     hedgeRatio: number;
     hedgeSymbol?: string;
     hedgeBrokerId?: string;
+    hedgeType?: 'inverse_etf' | 'direct';
   };
   circuitBreaker?: {
     enabled: boolean;

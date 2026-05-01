@@ -61,6 +61,15 @@ function resolveApiBaseUrl(): string | undefined {
   }
 }
 
+/** Format raw volume number → human-readable string (e.g. 45123456 → "45.1M") */
+function fmtVol(v: number): string {
+  if (!v || isNaN(v)) return '0';
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return String(Math.floor(v));
+}
+
 const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, timeframe: timeframeProp, onTimeframeChange }) => {
   const { t } = useTranslation();
   const [internalTimeframe, setInternalTimeframe] = useState("1D");
@@ -225,24 +234,24 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         rightOffset: 0,
         barSpacing: 12,
         minBarSpacing: 1,
-tickMarkFormatter: (time: number) => {
-  const date = new Date(time * 1000);
-  if (["1D", "5D", "1W"].includes(timeframe)) {
-    return date.toLocaleTimeString("zh-TW", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Asia/Taipei"
-    });
-  } else {
-    return date.toLocaleDateString("zh-TW", {
-      month: "2-digit",
-      day: "2-digit",
-      timeZone: "Asia/Taipei"
-    });
-  }
-},
-},
+        tickMarkFormatter: (time: number) => {
+          const date = new Date(time * 1000);
+          if (["1D", "5D", "1W"].includes(timeframe)) {
+            return date.toLocaleTimeString("zh-TW", {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Asia/Taipei",
+            });
+          } else {
+            return date.toLocaleDateString("zh-TW", {
+              month: "2-digit",
+              day: "2-digit",
+              timeZone: "Asia/Taipei",
+            });
+          }
+        },
+      },
       rightPriceScale: {
         borderColor: gridColor,
         autoScale: true,
@@ -255,7 +264,21 @@ tickMarkFormatter: (time: number) => {
       localization: {
         locale: 'zh-Hant-TW',
         dateFormat: 'yyyy/MM/dd',
-       
+        timeFormatter: (time: any) => {
+          // time is UTCTimestamp (seconds) or BusinessDay object
+          if (typeof time === 'number') {
+            return new Date(time * 1000).toLocaleString('zh-TW', {
+              timeZone: 'Asia/Taipei',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            });
+          }
+          return `${time.year}/${String(time.month).padStart(2, '0')}/${String(time.day).padStart(2, '0')}`;
+        },
       },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
@@ -559,39 +582,30 @@ tickMarkFormatter: (time: number) => {
 
           {/* Indicators */}
           <div className="flex items-center gap-1.5">
-            <button 
-              onClick={() => setShowSMA5(!showSMA5)}
-              className={safeCn(
-                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
-                showSMA5 
-                  ? "bg-blue-500/20 border-blue-500/40 text-blue-500" 
-                  : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              )}
-            >
-              MA5
-            </button>
-            <button 
-              onClick={() => setShowSMA20(!showSMA20)}
-              className={safeCn(
-                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
-                showSMA20 
-                  ? "bg-amber-500/20 border-amber-500/40 text-amber-500" 
-                  : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              )}
-            >
-              MA20
-            </button>
-            <button 
-              onClick={() => setShowSMA60(!showSMA60)}
-              className={safeCn(
-                "px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0",
-                showSMA60 
-                  ? "bg-purple-500/20 border-purple-500/40 text-purple-500" 
-                  : "border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              )}
-            >
-              MA60
-            </button>
+            {([
+              { period: 5,  show: showSMA5,  setShow: setShowSMA5,  label: 'MA5',  activeClass: 'bg-blue-500/20 border-blue-500/40 text-blue-500' },
+              { period: 20, show: showSMA20, setShow: setShowSMA20, label: 'MA20', activeClass: 'bg-amber-500/20 border-amber-500/40 text-amber-500' },
+              { period: 60, show: showSMA60, setShow: setShowSMA60, label: 'MA60', activeClass: 'bg-purple-500/20 border-purple-500/40 text-purple-500' },
+            ] as const).map(({ period, show, setShow, label, activeClass }) => {
+              const canCompute = processedData.length >= period;
+              return (
+                <button
+                  key={label}
+                  onClick={() => canCompute && setShow(!show)}
+                  title={canCompute ? undefined : `需要至少 ${period} 根 K 棒（目前 ${processedData.length} 根）`}
+                  className={safeCn(
+                    'px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0',
+                    !canCompute
+                      ? 'border-zinc-200/10 dark:border-zinc-800/20 text-zinc-600/50 cursor-not-allowed'
+                      : show
+                        ? activeClass
+                        : 'border-zinc-200/30 dark:border-zinc-800/30 text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50',
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
             <button 
               onClick={() => setShowVolume(!showVolume)}
               className={safeCn(
@@ -684,7 +698,7 @@ tickMarkFormatter: (time: number) => {
              </div>
              <div className="flex justify-between items-center mt-1 border-t border-white/10 pt-1.5">
                <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('chart.volBase', '成交量')}:</span>
-               <span className="text-[11px] font-mono font-bold text-zinc-300">{(Number(hoverData.volume ?? 0) / 1000).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}K</span>
+               <span className="text-[11px] font-mono font-bold text-zinc-300">{fmtVol(Number(hoverData.volume ?? 0))}</span>
              </div>
              {hoverData.sma5 !== null && (
                <div className="flex justify-between items-center">

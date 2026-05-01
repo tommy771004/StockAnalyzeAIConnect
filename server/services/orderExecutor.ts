@@ -54,17 +54,23 @@ export class OrderExecutor {
   }
 
   private async executeHedge(config: AgentConfig, trade: { symbol: string; side: 'BUY' | 'SELL'; qty: number }) {
-    const { hedgeSymbol, hedgeRatio } = config.hedgeConfig!;
+    const { hedgeSymbol, hedgeRatio, hedgeType } = config.hedgeConfig!;
     const hedgeQty = Math.floor(trade.qty * (hedgeRatio || 0.5));
-    
+
     if (hedgeQty <= 0) return;
 
-    this.emitLog({ level: 'EXECUTION', source: 'HEDGE', symbol: hedgeSymbol, message: `🛡️ 對沖連動：${hedgeSymbol} 買入 ${hedgeQty} 股 (比例: ${hedgeRatio})` });
-    
+    // 'direct': 正向標的，對沖方向與主單相反（delta-neutral）
+    // 'inverse_etf': 反向 ETF，永遠 BUY（預設）
+    const hedgeSide: 'BUY' | 'SELL' = hedgeType === 'direct'
+      ? (trade.side === 'BUY' ? 'SELL' : 'BUY')
+      : 'BUY';
+
+    this.emitLog({ level: 'EXECUTION', source: 'HEDGE', symbol: hedgeSymbol, message: `🛡️ 對沖連動：${hedgeSymbol} ${hedgeSide} ${hedgeQty} 股 (比例: ${hedgeRatio}, 類型: ${hedgeType ?? 'inverse_etf'})` });
+
     try {
       await this.hedgeBroker.placeOrder({
         symbol: hedgeSymbol!,
-        side: 'BUY', // 避險通常是買入反向標的
+        side: hedgeSide,
         qty: hedgeQty,
         orderType: 'MARKET',
         marketType: isTaiwanSymbol(hedgeSymbol!) ? 'TW_STOCK' : 'US_STOCK'
