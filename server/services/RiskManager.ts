@@ -52,6 +52,16 @@ export interface RiskCheckResult {
   level?: 'WARNING' | 'BLOCK' | 'KILL';
 }
 
+export interface MonteCarloRiskSnapshot {
+  paths: number;
+  horizonSteps: number;
+  ruinProbability: number;
+  valueAtRisk95Pct: number;
+  expectedMaxDrawdownPct: number;
+  ruinThresholdTWD: number;
+  lastUpdated: string;
+}
+
 class RiskManager {
   private config: RiskConfig = { ...DEFAULT_RISK_CONFIG };
   private modelRisk: ModelRiskConfig = { ...DEFAULT_MODEL_RISK_CONFIG };
@@ -60,6 +70,15 @@ class RiskManager {
   private killSwitchActive = false;
   private totalUsed = 0;
   private consecutiveDrawdownDays = 0;
+  private monteCarlo: MonteCarloRiskSnapshot = {
+    paths: 1000,
+    horizonSteps: 30,
+    ruinProbability: 0,
+    valueAtRisk95Pct: 0,
+    expectedMaxDrawdownPct: 0,
+    ruinThresholdTWD: 0,
+    lastUpdated: new Date(0).toISOString(),
+  };
 
   updateConfig(cfg: Partial<RiskConfig>) {
     this.config = { ...this.config, ...cfg };
@@ -214,6 +233,73 @@ class RiskManager {
 
   getConsecutiveDrawdownDays(): number { return this.consecutiveDrawdownDays; }
 
+  runMonteCarloRuinAssessment(input: {
+    capitalTWD: number;
+    paths?: number;
+    horizonSteps?: number;
+    driftPerStep?: number;
+    volatilityPerStep?: number;
+    ruinThresholdTWD?: number;
+  }): MonteCarloRiskSnapshot {
+    const paths = Math.max(100, Math.floor(input.paths ?? 1000));
+    const horizonSteps = Math.max(10, Math.floor(input.horizonSteps ?? 30));
+    const capital = Math.max(1, Number(input.capitalTWD || 0));
+    const drift = Number.isFinite(input.driftPerStep) ? Number(input.driftPerStep) : 0;
+    const vol = Math.max(0.0001, Number.isFinite(input.volatilityPerStep) ? Number(input.volatilityPerStep) : 0.012);
+    const ruinThreshold = Math.max(1, Number(input.ruinThresholdTWD || capital * 0.65));
+
+    let ruinCount = 0;
+    const terminalReturns: number[] = [];
+    let maxDrawdownAccum = 0;
+
+    const sampleNormal = () => {
+      const u1 = Math.max(Number.EPSILON, Math.random());
+      const u2 = Math.random();
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    };
+
+    for (let i = 0; i < paths; i++) {
+      let equity = capital;
+      let peak = capital;
+      let pathMaxDd = 0;
+      let ruined = false;
+
+      for (let step = 0; step < horizonSteps; step++) {
+        const stepRet = drift + vol * sampleNormal();
+        equity = Math.max(1, equity * (1 + stepRet));
+        if (equity > peak) peak = equity;
+        const dd = (peak - equity) / Math.max(peak, 1);
+        if (dd > pathMaxDd) pathMaxDd = dd;
+        if (equity <= ruinThreshold) {
+          ruined = true;
+          break;
+        }
+      }
+
+      if (ruined) ruinCount += 1;
+      terminalReturns.push((equity - capital) / capital);
+      maxDrawdownAccum += pathMaxDd;
+    }
+
+    terminalReturns.sort((a, b) => a - b);
+    const idx = Math.max(0, Math.min(terminalReturns.length - 1, Math.floor(0.05 * terminalReturns.length)));
+    const var95 = Math.max(0, -terminalReturns[idx] * 100);
+    const ruinProbability = ruinCount / paths;
+    const expectedMaxDrawdownPct = (maxDrawdownAccum / paths) * 100;
+
+    this.monteCarlo = {
+      paths,
+      horizonSteps,
+      ruinProbability: Number(ruinProbability.toFixed(4)),
+      valueAtRisk95Pct: Number(var95.toFixed(2)),
+      expectedMaxDrawdownPct: Number(expectedMaxDrawdownPct.toFixed(2)),
+      ruinThresholdTWD: Number(ruinThreshold.toFixed(2)),
+      lastUpdated: new Date().toISOString(),
+    };
+
+    return { ...this.monteCarlo };
+  }
+
   getStats() {
     return {
       dailyLoss: this.currentDailyLoss,
@@ -223,6 +309,7 @@ class RiskManager {
       config: this.config,
       modelRisk: this.modelRisk,
       consecutiveDrawdownDays: this.consecutiveDrawdownDays,
+      monteCarlo: this.monteCarlo,
     };
   }
 }

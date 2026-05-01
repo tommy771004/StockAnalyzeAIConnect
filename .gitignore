@@ -8,6 +8,8 @@ dist/
 .cache/
 skills-lock.json
 .agents/skills/*
+.agents/rules/*
+.agents/workflows/*
 .claude/skills/*
 .windsurf/skills/*
 src/tests/*
@@ -21,3 +23,6 @@ scratch/fix_encoding.ps1
 scratch/fix_server_final.ps1
 scratch/fix_server_register.ps1
 scratch/fix_server.ps1
+graphify-out/*
+知識庫資料夾/*
+graphify_vendor/*

@@ -3,7 +3,7 @@
  * Unified signal contracts for strategy/live/backtest paths.
  */
 
-export type SignalSource = 'technical' | 'ai' | 'quantum' | 'macro';
+export type SignalSource = 'technical' | 'ai' | 'quantum' | 'macro' | 'forecast';
 export type SignalAction = 'BUY' | 'SELL' | 'HOLD';
 
 export interface SignalObservation {
@@ -51,4 +51,3 @@ export interface SignalFusionResult {
     preferSource?: SignalSource;
   };
 }
-

@@ -25,6 +25,7 @@ export interface StrategyParams {
   BOLLINGER_BREAKOUT?: { period: number; stdDev: number; weight: number };
   MACD_CROSS?: { fast: number; slow: number; signal: number; weight: number };
   AI_LLM?: { confidenceThreshold: number; weight: number };
+  TIMESFM_FORECAST?: { horizonTicks: number; minEdgePct: number; weight: number };
   stopLossPct?: number;
   takeProfitPct?: number;
   trailingStopPct?: number;
@@ -44,6 +45,15 @@ export interface RiskStats {
   totalUsed: number;
   lossStreakCount: number;
   killSwitchActive: boolean;
+  monteCarlo?: {
+    paths: number;
+    horizonSteps: number;
+    ruinProbability: number;
+    valueAtRisk95Pct: number;
+    expectedMaxDrawdownPct: number;
+    ruinThresholdTWD: number;
+    lastUpdated: string;
+  };
   config: {
     budgetLimitTWD: number;
     maxDailyLossTWD: number;
@@ -106,19 +116,20 @@ export const STRATEGY_LABELS: Record<StrategyType, { name: string; desc: string 
 export const BROKER_OPTIONS = [
   { id: 'simulated', name: 'Simulated Broker (AI 模擬交易)', available: true, note: '內建的高頻模擬引擎，支持台股交易稅與規費模擬。' },
   { id: 'sinopac', name: 'SinoPac (永豐金證券 Shioaji)', available: false, note: '透過 Python Bridge 串接永豐金 API，需安裝相關憑證。' },
+  { id: 'kgi', name: 'KGI (群益證券 SKCOM)', available: true, note: '需 Windows COM 元件與本地 Python Bridge，支援實盤下單回報。' },
   { id: 'fugle', name: 'Fugle (富果玉山證券)', available: false, note: '使用 Fugle HTTP API 進行下單，支持即時庫存同步。' },
   { id: 'ib', name: 'Interactive Brokers (盈透證券)', available: false, note: '全球化交易接口，支持美股與台股複委託。' }
 ];
 
 export interface SignalComponentInfo {
-  source: 'technical' | 'ai' | 'quantum' | 'macro';
+  source: 'technical' | 'ai' | 'quantum' | 'macro' | 'forecast';
   action: string;
   score: number;
   weight: number;
 }
 
 export interface DecisionFusionComponent {
-  source: 'ai' | 'technical' | 'macro' | 'quantum';
+  source: 'ai' | 'technical' | 'macro' | 'quantum' | 'forecast';
   action: 'BUY' | 'SELL' | 'HOLD';
   confidence: number;
   weightedScore: number;

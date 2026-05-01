@@ -464,6 +464,7 @@ export const connectAutotradingBroker = (config: {
   apiKey?: string;
   apiSecret?: string;
   certPath?: string;
+  certPassphrase?: string;
   accountId?: string;
   bridgeUrl?: string;
   mode?: string;

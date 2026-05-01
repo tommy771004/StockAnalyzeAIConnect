@@ -3,7 +3,13 @@
  * AI 自動交易引擎 (完整實戰版)
  */
 import crypto from 'crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { simulatedAdapter } from './brokers/SimulatedAdapter.js';
+import { sinopacAdapter } from './brokers/SinopacAdapter.js';
+import { kgiAdapter } from './brokers/KGIAdapter.js';
+import { yuantaAdapter } from './brokers/YuantaAdapter.js';
 import { OrderExecutor } from './orderExecutor.js';
 import * as TWSeService from './TWSeService.js';
 import * as TVService from './TradingViewService.js';
@@ -18,9 +24,54 @@ import { anyMarketOpen, isTradingSession } from './tradingSession.js';
 import { DEFAULT_AGENT_CONFIG } from './autotradingDefaults.js';
 import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
 import type { SignalObservation } from '../types/signal.js';
-import { getQuantumSignal } from '../utils/scienceService.js';
+import type { RawQuantumOutput } from './quantum/quantumPolicy.js';
+import { applyQuantumPolicy } from './quantum/quantumPolicy.js';
+import { getQuantumSignal, timesFmPredict } from '../utils/scienceService.js';
+import { notifier } from './notifier/index.js';
 
 import { autotradingConfigRepo } from '../repositories/autotradingConfigRepo.js';
+
+interface TaiwanSkillRules {
+  settlementCycle: 'T+2';
+  priceLimitPct: number;
+  regularLotSize: number;
+  intradayOddLot: { start: string; end: string; minQty: number; maxQty: number };
+}
+
+interface AnalysisSignal {
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  price?: number;
+  prevClose?: number;
+  quantumForcedLiquidation?: boolean;
+  defensiveMode?: boolean;
+  timesFmMeta?: {
+    action: 'BUY' | 'SELL' | 'HOLD';
+    confidence: number;
+    horizonTicks: number;
+    predictedEndPrice: number;
+    edgePct: number;
+    model: string;
+  };
+  quantumMeta?: {
+    confidence: number;
+    regimeFlipProb: number;
+    uncertaintyPenalty: number;
+    gated?: boolean;
+    leverageMultiplier?: number;
+  };
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const TAIWAN_SKILL_PATH = path.resolve(__dirname, '../../skills/Taiwan_Stock_Skill.md');
+
+const DEFAULT_TAIWAN_SKILL_RULES: TaiwanSkillRules = {
+  settlementCycle: 'T+2',
+  priceLimitPct: 0.1,
+  regularLotSize: 1000,
+  intradayOddLot: { start: '09:00', end: '13:30', minQty: 1, maxQty: 999 },
+};
 
 // ── 狀態與配置 ──────────────────────────────────────────────────
 let agentStatus: AgentStatus = 'stopped';
@@ -28,9 +79,11 @@ let agentConfig: AgentConfig = { ...DEFAULT_AGENT_CONFIG };
 let lastSentimentScore = 50;
 let lastEquityBroadcast = 0;
 
-const activeBroker: IBrokerAdapter = simulatedAdapter;
-const hedgeBroker: IBrokerAdapter = simulatedAdapter;
+let activeBroker: IBrokerAdapter = simulatedAdapter;
+let hedgeBroker: IBrokerAdapter = simulatedAdapter;
+let activeBrokerId: 'simulated' | 'sinopac' | 'kgi' | 'yuanta' = 'simulated';
 const logBuffer: AgentLog[] = [];
+const recentPriceSeries = new Map<string, number[]>();
 let posTrack = new Map<string, { avgCost: number; qty: number }>(); // 追蹤各標的平均成本 (P1)
 let wsBroadcast: ((msg: any) => void) | null = null;
 let tickTimeout: NodeJS.Timeout | null = null;
@@ -40,6 +93,8 @@ let syncInProgress = false;
 
 const WARN_LOG_COOLDOWN_MS = 60_000;
 const warnLogTimestamps = new Map<string, number>();
+let taiwanSkillRulesCache: TaiwanSkillRules = { ...DEFAULT_TAIWAN_SKILL_RULES };
+let taiwanSkillLoadedAt = 0;
 
 function warnWithCooldown(key: string, message: string) {
   const now = Date.now();
@@ -49,7 +104,168 @@ function warnWithCooldown(key: string, message: string) {
   console.warn(message);
 }
 
-const executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
+function parseRuleNumber(content: string, key: string, fallback: number): number {
+  const re = new RegExp(`${key}\\s*:\\s*([0-9.]+)`, 'i');
+  const m = content.match(re);
+  if (!m) return fallback;
+  const v = Number(m[1]);
+  return Number.isFinite(v) ? v : fallback;
+}
+
+function parseRuleTime(content: string, key: string, fallback: string): string {
+  const re = new RegExp(`${key}\\s*:\\s*([0-2]?\\d:[0-5]\\d)`, 'i');
+  const m = content.match(re);
+  return m?.[1] || fallback;
+}
+
+async function loadTaiwanSkillRules(force = false): Promise<TaiwanSkillRules> {
+  const cacheFresh = Date.now() - taiwanSkillLoadedAt < 60_000;
+  if (!force && cacheFresh) return taiwanSkillRulesCache;
+
+  try {
+    const raw = await readFile(TAIWAN_SKILL_PATH, 'utf-8');
+    const parsed: TaiwanSkillRules = {
+      settlementCycle: 'T+2',
+      priceLimitPct: parseRuleNumber(raw, 'price_limit_pct', DEFAULT_TAIWAN_SKILL_RULES.priceLimitPct),
+      regularLotSize: Math.max(1, Math.floor(parseRuleNumber(raw, 'regular_lot_size', DEFAULT_TAIWAN_SKILL_RULES.regularLotSize))),
+      intradayOddLot: {
+        start: parseRuleTime(raw, 'intraday_odd_lot_start', DEFAULT_TAIWAN_SKILL_RULES.intradayOddLot.start),
+        end: parseRuleTime(raw, 'intraday_odd_lot_end', DEFAULT_TAIWAN_SKILL_RULES.intradayOddLot.end),
+        minQty: Math.max(1, Math.floor(parseRuleNumber(raw, 'intraday_odd_lot_min_qty', DEFAULT_TAIWAN_SKILL_RULES.intradayOddLot.minQty))),
+        maxQty: Math.max(1, Math.floor(parseRuleNumber(raw, 'intraday_odd_lot_max_qty', DEFAULT_TAIWAN_SKILL_RULES.intradayOddLot.maxQty))),
+      },
+    };
+    taiwanSkillRulesCache = parsed;
+    taiwanSkillLoadedAt = Date.now();
+  } catch (e) {
+    warnWithCooldown('tw_skill_load', `[Agent] Taiwan skill load fallback: ${(e as Error).message}`);
+  }
+
+  return taiwanSkillRulesCache;
+}
+
+function parseHHMM(value: string): number {
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
+}
+
+function isWithinTaiwanOddLotSession(now = new Date(), rules = taiwanSkillRulesCache): boolean {
+  const tpeDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const current = tpeDate.getHours() * 60 + tpeDate.getMinutes();
+  const start = parseHHMM(rules.intradayOddLot.start);
+  const end = parseHHMM(rules.intradayOddLot.end);
+  return current >= start && current <= end;
+}
+
+function isTaiwanSymbol(symbol: string): boolean {
+  return /\.(TW|TWO)$/i.test(symbol);
+}
+
+function validateTaiwanOrderBySkill(input: {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  qty: number;
+  price: number;
+  prevClose?: number;
+  availableMargin: number;
+  rules: TaiwanSkillRules;
+}): { allowed: boolean; reason?: string } {
+  const { symbol, side, qty, price, prevClose, availableMargin, rules } = input;
+  if (!isTaiwanSymbol(symbol)) return { allowed: true };
+
+  if (side === 'BUY') {
+    const required = qty * price;
+    if (required > availableMargin) {
+      return {
+        allowed: false,
+        reason: `T+2 資金約束：可用資金不足（需 ${required.toFixed(0)}，可用 ${availableMargin.toFixed(0)}）`,
+      };
+    }
+  }
+
+  if (prevClose && prevClose > 0 && price > 0) {
+    const upper = prevClose * (1 + rules.priceLimitPct);
+    const lower = prevClose * (1 - rules.priceLimitPct);
+    if (price > upper || price < lower) {
+      return {
+        allowed: false,
+        reason: `台股漲跌幅 ${rules.priceLimitPct * 100}% 限制：委託價 ${price.toFixed(2)} 超出區間 [${lower.toFixed(2)}, ${upper.toFixed(2)}]`,
+      };
+    }
+  }
+
+  const isRegularLot = qty % rules.regularLotSize === 0;
+  if (!isRegularLot) {
+    const inOddLotSession = isWithinTaiwanOddLotSession(new Date(), rules);
+    if (!inOddLotSession) {
+      return {
+        allowed: false,
+        reason: `台股零股下單僅限 ${rules.intradayOddLot.start}-${rules.intradayOddLot.end}，目前非盤中零股時段`,
+      };
+    }
+    if (qty < rules.intradayOddLot.minQty || qty > rules.intradayOddLot.maxQty) {
+      return {
+        allowed: false,
+        reason: `台股盤中零股數量限制 ${rules.intradayOddLot.minQty}-${rules.intradayOddLot.maxQty} 股，目前 ${qty} 股`,
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+function pushRecentPrice(symbol: string, price: number, maxLen = 240): number[] {
+  if (!Number.isFinite(price) || price <= 0) return recentPriceSeries.get(symbol) ?? [];
+  const arr = recentPriceSeries.get(symbol) ?? [];
+  arr.push(Number(price));
+  if (arr.length > maxLen) arr.splice(0, arr.length - maxLen);
+  recentPriceSeries.set(symbol, arr);
+  return arr;
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+let executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
+
+function refreshExecutor() {
+  executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
+}
+
+function resolveBrokerById(brokerId: string): IBrokerAdapter {
+  switch (brokerId) {
+    case 'sinopac':
+      return sinopacAdapter;
+    case 'kgi':
+      return kgiAdapter;
+    case 'yuanta':
+      return yuantaAdapter;
+    default:
+      return simulatedAdapter;
+  }
+}
+
+export function setPrimaryBroker(brokerId: string) {
+  activeBrokerId = (['sinopac', 'kgi', 'yuanta'].includes(brokerId) ? brokerId : 'simulated') as
+    | 'simulated'
+    | 'sinopac'
+    | 'kgi'
+    | 'yuanta';
+  activeBroker = resolveBrokerById(activeBrokerId);
+  refreshExecutor();
+  emitLog({
+    level: 'SYSTEM',
+    source: 'BROKER',
+    symbol: 'ALL',
+    message: `主券商已切換為 ${activeBrokerId}`,
+  });
+}
+
+export function getPrimaryBrokerId() {
+  return activeBrokerId;
+}
 
 export function setWsBroadcast(fn: (msg: any) => void) { wsBroadcast = fn; }
 
@@ -142,7 +358,7 @@ function parseInstitutionalFlowBias(flowText: string): number {
 }
 
 // ── 分析邏輯 ──────────────────────────────────────────────────
-async function runAnalysis(config: AgentConfig, symbol: string) {
+async function runAnalysis(config: AgentConfig, symbol: string): Promise<AnalysisSignal> {
   const sParams = { ...config.params, ...(config.symbolConfigs?.[symbol] || {}) };
   try {
     const [news, flow, mtf, indicators, overview, quote, modelCandidates] = await Promise.all([
@@ -215,6 +431,18 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
     }
 
     const currentPrice = quote?.price || Number(overview?.close ?? 0) || 0;
+    const prevClose = quote?.prevClose || 0;
+    const recentPrices = pushRecentPrice(symbol, currentPrice);
+    const timesFmCfg = {
+      horizonTicks: Math.max(3, Math.min(32, Math.floor(Number(sParams.TIMESFM_FORECAST?.horizonTicks ?? 8)))),
+      minEdgePct: Math.max(0.01, Number(sParams.TIMESFM_FORECAST?.minEdgePct ?? 0.2)),
+      weight: Math.max(0, Math.min(1, Number(sParams.TIMESFM_FORECAST?.weight ?? 0.35))),
+    };
+    let timesFmMeta: AnalysisSignal['timesFmMeta'];
+    let quantumForcedLiquidation = false;
+    let defensiveMode = false;
+    let quantumMeta: AnalysisSignal['quantumMeta'];
+    let quantumRaw: RawQuantumOutput | null = null;
     
     // 信心度過低時，觸發「深度研究任務」(Parallel-Web)
     if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65) {
@@ -276,6 +504,43 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
     const macroAction: 'BUY' | 'SELL' | 'HOLD' = macroBias > 0.2 ? 'BUY' : macroBias < -0.2 ? 'SELL' : 'HOLD';
     const macroConfidence = Math.round(Math.abs(macroBias) * 100);
 
+    let forecastAction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+    let forecastConfidence = 45;
+    let forecastScore = 0;
+    if (recentPrices.length >= 8) {
+      try {
+        const tf = await timesFmPredict(symbol, timesFmCfg.horizonTicks, recentPrices);
+        if (tf.status === 'success' && tf.data) {
+          const prediction = Array.isArray(tf.data.prediction) ? tf.data.prediction.map(Number).filter(Number.isFinite) : [];
+          const predictedEndPrice = prediction.length > 0 ? Number(prediction[prediction.length - 1]) : currentPrice;
+          const edgePct = currentPrice > 0 ? ((predictedEndPrice - currentPrice) / currentPrice) * 100 : 0;
+          const impliedAction: 'BUY' | 'SELL' | 'HOLD' =
+            edgePct >= timesFmCfg.minEdgePct
+              ? 'BUY'
+              : edgePct <= -timesFmCfg.minEdgePct
+                ? 'SELL'
+                : 'HOLD';
+          const baseConfidence = clamp(Number(tf.data.confidence ?? 50), 0, 100);
+          const edgeBoost = clamp(Math.abs(edgePct) * 12, 0, 30);
+          forecastConfidence = clamp(baseConfidence * 0.7 + edgeBoost, 30, 95);
+          forecastAction = impliedAction;
+          forecastScore = clamp(Math.tanh(edgePct / 1.5), -1, 1);
+          timesFmMeta = {
+            action: forecastAction,
+            confidence: Number(forecastConfidence.toFixed(2)),
+            horizonTicks: timesFmCfg.horizonTicks,
+            predictedEndPrice: Number(predictedEndPrice.toFixed(4)),
+            edgePct: Number(edgePct.toFixed(4)),
+            model: String(tf.data.model ?? 'timesfm'),
+          };
+        } else if (tf.errors?.length) {
+          warnWithCooldown(`timesfm:${symbol}`, `[Agent] TimesFM fallback for ${symbol}: ${tf.errors[0]}`);
+        }
+      } catch (e) {
+        warnWithCooldown(`timesfm:${symbol}`, `[Agent] TimesFM call failed for ${symbol}: ${(e as Error).message}`);
+      }
+    }
+
     const observations: SignalObservation[] = [
       {
         source: 'ai',
@@ -300,6 +565,18 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       },
     ];
 
+    if (timesFmCfg.weight > 0 && timesFmMeta) {
+      observations.push({
+        source: 'forecast',
+        action: forecastAction,
+        confidence: forecastConfidence,
+        weight: timesFmCfg.weight,
+        score: forecastScore,
+        reason: `TimesFM ${timesFmMeta.model} edge=${timesFmMeta.edgePct.toFixed(3)}% horizon=${timesFmMeta.horizonTicks}`,
+        sourceVersion: timesFmMeta.model,
+      });
+    }
+
     if (isQuantumSignalEnabled()) {
       const quantumRes = await getQuantumSignal({
         symbol,
@@ -314,15 +591,34 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       if (quantumRes.status === 'success' && quantumRes.data) {
         const qa = String(quantumRes.data.action || 'HOLD').toUpperCase();
         const quantumAction = (qa === 'BUY' || qa === 'SELL' || qa === 'HOLD' ? qa : 'HOLD') as 'BUY' | 'SELL' | 'HOLD';
+        const quantumConfidence = Number(quantumRes.data.confidence ?? 45);
+        const regimeFlipProb = Number(quantumRes.data.regime_flip_prob ?? 0);
+        const uncertaintyPenalty = Number(quantumRes.data.uncertainty_penalty ?? 0);
+        quantumRaw = {
+          action: quantumAction,
+          confidence: quantumConfidence,
+          momentum_phase: Number(quantumRes.data.momentum_phase ?? 0),
+          regime_flip_prob: regimeFlipProb,
+          uncertainty_penalty: uncertaintyPenalty,
+          model: String(quantumRes.data.model ?? 'quantum-fallback'),
+          errors: Array.isArray(quantumRes.data.errors) ? quantumRes.data.errors.map(String) : [],
+        };
         observations.push({
           source: 'quantum',
           action: quantumAction,
-          confidence: Number(quantumRes.data.confidence ?? 45),
+          confidence: quantumConfidence,
           weight: 0.6,
           score: Number(quantumRes.data.momentum_phase ?? 0),
           reason: 'Quantum meta-signal',
           sourceVersion: String(quantumRes.meta?.model || quantumRes.data.model || 'quantum-fallback'),
         });
+        quantumMeta = {
+          confidence: quantumConfidence,
+          regimeFlipProb,
+          uncertaintyPenalty,
+        };
+        quantumForcedLiquidation = quantumAction === 'SELL' && quantumConfidence >= 70 && regimeFlipProb >= 0.65;
+        defensiveMode = regimeFlipProb >= 0.7 || uncertaintyPenalty >= 0.65;
       } else if (quantumRes.errors?.length) {
         emitLog({ level: 'WARNING', source: 'QUANTUM', symbol, message: `Quantum signal fallback: ${quantumRes.errors[0]}` });
       }
@@ -335,15 +631,22 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
       preferSource: 'ai',
       quantumEnabled: isQuantumSignalEnabled(),
     });
+    const quantumPolicy = quantumRaw ? applyQuantumPolicy(fused, quantumRaw) : null;
+    const effectiveAction = quantumPolicy?.action ?? fused.action;
+    const effectiveConfidence = quantumPolicy?.confidence ?? fused.confidence;
+    if (quantumMeta && quantumPolicy) {
+      quantumMeta.gated = quantumPolicy.gated;
+      quantumMeta.leverageMultiplier = quantumPolicy.leverageMultiplier;
+    }
 
     wsBroadcast?.({
       type: 'decision_fusion',
       data: {
         symbol,
-        action: fused.action,
-        confidence: fused.confidence,
+        action: effectiveAction,
+        confidence: effectiveConfidence,
         score: fused.score,
-        reason: fused.reason,
+        reason: quantumPolicy ? `${quantumPolicy.reason}; ${fused.reason}` : fused.reason,
         components: fused.components.map((c) => ({
           source: c.source,
           action: c.action,
@@ -355,32 +658,37 @@ async function runAnalysis(config: AgentConfig, symbol: string) {
     });
 
     // 發送決策熱圖數據到前端（改用融合決策）
-    const heatScore = fused.confidence * (fused.action === 'SELL' ? -1 : fused.action === 'BUY' ? 1 : 0);
+    const heatScore = effectiveConfidence * (effectiveAction === 'SELL' ? -1 : effectiveAction === 'BUY' ? 1 : 0);
     wsBroadcast?.({
       type: 'decision_heat',
       data: {
         symbol,
         score: heatScore,
-        reason: fused.reason,
+        reason: quantumPolicy ? quantumPolicy.reason : fused.reason,
         timestamp: new Date().toISOString(),
       }
     });
 
     // 把單一決策心情正規化到 0-100 推進整體情緒分數
-    const sentimentDelta = fused.action === 'BUY' ? 50 + heatScore / 2
-      : fused.action === 'SELL' ? 50 - Math.abs(heatScore) / 2
+    const sentimentDelta = effectiveAction === 'BUY' ? 50 + heatScore / 2
+      : effectiveAction === 'SELL' ? 50 - Math.abs(heatScore) / 2
       : 50;
     broadcastSentiment(sentimentDelta);
 
     return { 
-      action: fused.action || 'HOLD', 
-      confidence: fused.confidence || 0, 
-      price: currentPrice 
+      action: effectiveAction || 'HOLD', 
+      confidence: effectiveConfidence || 0, 
+      price: currentPrice,
+      prevClose,
+      quantumForcedLiquidation,
+      defensiveMode,
+      timesFmMeta,
+      quantumMeta,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[Agent] Analysis failed for ${symbol}: ${msg}`);
-    return { action: 'HOLD' }; 
+    return { action: 'HOLD', confidence: 0 }; 
   }
 }
 
@@ -419,6 +727,30 @@ async function agentTick() {
       }
     }
 
+    const taiwanSkillRules = await loadTaiwanSkillRules();
+    const driftFromSentiment = ((lastSentimentScore - 50) / 50) * 0.0015;
+    const pnlPressure = Math.max(-0.001, Math.min(0.001, (balance.dailyPnl / Math.max(balance.totalAssets, 1)) * 0.35));
+    const monteCarlo = riskManager.runMonteCarloRuinAssessment({
+      capitalTWD: balance.totalAssets,
+      paths: 1000,
+      horizonSteps: 30,
+      driftPerStep: driftFromSentiment + pnlPressure,
+      volatilityPerStep: 0.012 + Math.min(0.02, lossStreakCount * 0.0025),
+      ruinThresholdTWD: Math.max(balance.totalAssets * 0.65, balance.totalAssets - agentConfig.maxDailyLossTWD * 5),
+    });
+    wsBroadcast?.({
+      type: 'status',
+      data: {
+        status: agentStatus,
+        config: agentConfig,
+        riskStats: {
+          ...riskManager.getStats(),
+          lossStreakCount,
+          monteCarlo,
+        },
+      },
+    });
+
     // Phase 1: 所有標的並行分析（純讀取，互不干擾）
     const analysisResults = await Promise.allSettled(
       agentConfig.symbols.map(symbol =>
@@ -431,14 +763,45 @@ async function agentTick() {
     for (const settled of analysisResults) {
       if (settled.status !== 'fulfilled') continue;
       const { symbol, signal } = settled.value;
-      if (signal.action === 'SELL') continue;
       const track = posTrack.get(symbol);
       if (!track || track.qty <= 0 || !signal.price || signal.price <= 0 || track.avgCost <= 0) continue;
-      const lossFraction = (signal.price - track.avgCost) / track.avgCost;
-      if (lossFraction <= -stopLossPct) {
+      if (signal.action !== 'SELL') {
+        const lossFraction = (signal.price - track.avgCost) / track.avgCost;
+        if (lossFraction <= -stopLossPct) {
+          signal.action = 'SELL';
+          signal.confidence = 100;
+          emitLog({ level: 'RISK_CHK', source: 'STOP_LOSS', symbol, message: `🛑 主動停損觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 虧損 ${(lossFraction * 100).toFixed(2)}%，強制出場` });
+          if (agentConfig.userId) {
+            void notifier.dispatch(agentConfig.userId, 'stop_loss_intercept', {
+              symbol,
+              price: signal.price.toFixed(2),
+              reason: `loss ${(lossFraction * 100).toFixed(2)}% <= stopLoss ${((stopLossPct || 0) * 100).toFixed(2)}%`,
+            });
+          }
+        }
+      }
+
+      if (
+        signal.quantumForcedLiquidation &&
+        signal.quantumMeta &&
+        track.qty > 0
+      ) {
         signal.action = 'SELL';
         signal.confidence = 100;
-        emitLog({ level: 'RISK_CHK', source: 'STOP_LOSS', symbol, message: `🛑 主動停損觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 虧損 ${(lossFraction * 100).toFixed(2)}%，強制出場` });
+        emitLog({
+          level: 'CRITICAL',
+          source: 'QUANTUM',
+          symbol,
+          message: `⚛️ 量子強制平倉：regime_flip_prob=${signal.quantumMeta.regimeFlipProb.toFixed(3)} / confidence=${signal.quantumMeta.confidence.toFixed(0)}`,
+        });
+        if (agentConfig.userId) {
+          void notifier.dispatch(agentConfig.userId, 'quantum_forced_liquidation', {
+            symbol,
+            confidence: signal.quantumMeta.confidence,
+            regimeFlipProb: signal.quantumMeta.regimeFlipProb.toFixed(3),
+            reason: 'high regime flip risk',
+          });
+        }
       }
     }
 
@@ -465,10 +828,21 @@ async function agentTick() {
         const threshold = agentConfig.params.AI_LLM?.confidenceThreshold || 65;
         const signalConfidence = Number(signal.confidence ?? 0);
         const signalPrice = Number(signal.price ?? 0);
-        if (signalConfidence > threshold) {
+        const defensiveThreshold = signal.defensiveMode ? threshold + 12 : threshold;
+        if (signalConfidence > defensiveThreshold) {
+          if (signal.defensiveMode && signal.action === 'BUY') {
+            emitLog({
+              level: 'MONITOR',
+              source: 'QUANTUM',
+              symbol,
+              message: `🛡️ Regime 防禦模式啟用：跳過 BUY（confidence ${signalConfidence.toFixed(1)}，threshold ${defensiveThreshold}）`,
+            });
+            continue;
+          }
           // 動態計算委託數量：預設每次投入可用資金的 10% 或配置的 maxAllocationPerTrade
           const allocation = agentConfig.params.maxAllocationPerTrade || 0.1;
-          const tradeAmount = availableMargin * allocation;
+          const defensiveScale = signal.defensiveMode ? 0.4 : 1;
+          const tradeAmount = availableMargin * allocation * defensiveScale;
           const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
 
           // 台股使用整張(1000股)；美股允許零股(小數股)
@@ -500,6 +874,20 @@ async function agentTick() {
             finalQty = currentPos.qty;
           }
 
+          const twValidation = validateTaiwanOrderBySkill({
+            symbol,
+            side: signal.action as 'BUY' | 'SELL',
+            qty: finalQty,
+            price: signalPrice,
+            prevClose: signal.prevClose,
+            availableMargin,
+            rules: taiwanSkillRules,
+          });
+          if (!twValidation.allowed) {
+            emitLog({ level: 'RISK_CHK', source: 'TW_RULE', symbol, message: `🧭 台股規則攔截：${twValidation.reason}` });
+            continue;
+          }
+
           // 訂單前置風控檢查
           const riskCheck = riskManager.validateOrder(
             { symbol, side: signal.action as 'BUY' | 'SELL', quantity: finalQty, price: signalPrice },
@@ -507,6 +895,14 @@ async function agentTick() {
           );
           if (!riskCheck.allowed) {
             emitLog({ level: 'RISK_CHK', source: 'RISK', symbol, message: `🛑 風控攔截：${riskCheck.reason}` });
+            if (agentConfig.userId) {
+              void notifier.dispatch(agentConfig.userId, 'risk_block', {
+                symbol,
+                side: signal.action,
+                qty: finalQty,
+                reason: riskCheck.reason || 'risk block',
+              });
+            }
             continue;
           }
           if (riskCheck.level === 'WARNING' && riskCheck.reason) {
@@ -531,6 +927,14 @@ async function agentTick() {
               },
             });
             riskManager.recordTrade(tradeResult.filledQty * tradeResult.filledPrice);
+            if (agentConfig.userId) {
+              void notifier.dispatch(agentConfig.userId, 'fill', {
+                symbol,
+                side: signal.action,
+                qty: tradeResult.filledQty,
+                price: tradeResult.filledPrice,
+              });
+            }
           }
 
           // 實戰化斷路器 2: 進階連損判定 (P1 - 深化)
@@ -683,6 +1087,11 @@ export function emergencyKillSwitch() {
   stopAgent();
   riskManager.activateKillSwitch();
   emitLog({ level: 'CRITICAL', source: 'SYSTEM', symbol: 'ALL', message: '🚨 緊急停止已觸發！所有自動交易已停止。' });
+  if (agentConfig.userId) {
+    void notifier.dispatch(agentConfig.userId, 'kill_switch', {
+      reason: 'manual emergency kill switch',
+    });
+  }
   return { ok: true };
 }
 

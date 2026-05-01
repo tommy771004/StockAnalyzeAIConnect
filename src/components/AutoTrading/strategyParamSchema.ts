@@ -21,6 +21,7 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   BOLLINGER_BREAKOUT: { period: 20, stdDev: 2, weight: 0.25 },
   MACD_CROSS: { fast: 12, slow: 26, signal: 9, weight: 0.25 },
   AI_LLM: { confidenceThreshold: 65, weight: 0.25 },
+  TIMESFM_FORECAST: { horizonTicks: 8, minEdgePct: 0.2, weight: 0.35 },
   stopLossPct: 5,
   takeProfitPct: 10,
   trailingStopPct: 3,

@@ -3,7 +3,7 @@
  * Walk-forward + regime split 評估。
  * 每個 window: train → 回測; test → 評分。Regime: 牛/熊/震盪。
  */
-import { runAdvancedBacktest } from '../backtestEngine.js';
+import { runBacktestWithBestEngine } from '../backtestEngine.js';
 
 export type Regime = 'bull' | 'bear' | 'sideways';
 
@@ -73,7 +73,7 @@ export async function runWalkForward(
 
     if (testSlice.length < 20) break;
 
-    const result = await runAdvancedBacktest(symbol, testSlice, config);
+    const result = await runBacktestWithBestEngine(symbol, testSlice, config);
     const prices = testSlice.map((h: any) => h.close).filter((p: number) => p > 0);
 
     windows.push({

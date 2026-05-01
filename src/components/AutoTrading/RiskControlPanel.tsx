@@ -196,6 +196,36 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
         </div>
       )}
 
+      {riskStats?.monteCarlo && (
+        <div className="p-2 bg-white/5 border border-white/5 rounded space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">Monte Carlo</span>
+            <span className={cn(
+              'text-[10px] font-mono font-bold',
+              riskStats.monteCarlo.ruinProbability >= 0.1
+                ? 'text-rose-400'
+                : riskStats.monteCarlo.ruinProbability >= 0.03
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+            )}>
+              Ruin {(riskStats.monteCarlo.ruinProbability * 100).toFixed(2)}%
+            </span>
+          </div>
+          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+            <span>Paths / Horizon</span>
+            <span className="font-mono">{riskStats.monteCarlo.paths} / {riskStats.monteCarlo.horizonSteps}</span>
+          </div>
+          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+            <span>VaR 95%</span>
+            <span className="font-mono">{riskStats.monteCarlo.valueAtRisk95Pct.toFixed(2)}%</span>
+          </div>
+          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+            <span>Expected Max DD</span>
+            <span className="font-mono">{riskStats.monteCarlo.expectedMaxDrawdownPct.toFixed(2)}%</span>
+          </div>
+        </div>
+      )}
+
       {/* Kill Switch */}
       {!killConfirm ? (
         <button

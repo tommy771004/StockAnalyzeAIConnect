@@ -26,6 +26,11 @@ export const StrategyParamsSchema = z.object({
     confidenceThreshold: z.number().min(0).max(100),
     weight: z.number().min(0).max(1)
   }).optional(),
+  TIMESFM_FORECAST: z.object({
+    horizonTicks: z.number().min(3).max(32),
+    minEdgePct: z.number().min(0.01).max(10),
+    weight: z.number().min(0).max(1)
+  }).optional(),
   stopLossPct: z.number().min(0.1).max(20),
   takeProfitPct: z.number().min(0.5).max(100),
   trailingStopPct: z.number().min(0.1).max(10),

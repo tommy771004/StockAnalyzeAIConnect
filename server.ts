@@ -35,15 +35,19 @@ import {
   startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
   getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
   setWsBroadcast, getLossStreakCount, resetCircuitBreaker, deactivateKillSwitch,
+  setPrimaryBroker, getPrimaryBrokerId,
 } from './server/services/autonomousAgent.js';
 import { DEFAULT_AGENT_CONFIG, DEFAULT_RISK_CONFIG, DEFAULT_TRADING_HOURS } from './server/services/autotradingDefaults.js';
 import { isTradingSession } from './server/services/tradingSession.js';
 import { riskManager } from './server/services/RiskManager.js';
 import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
+import { sinopacAdapter } from './server/services/brokers/SinopacAdapter.js';
+import { kgiAdapter } from './server/services/brokers/KGIAdapter.js';
+import { yuantaAdapter } from './server/services/brokers/YuantaAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
 import { callAISimple } from './server/utils/llmPipeline.js';
-import { runAdvancedBacktest } from './server/services/backtestEngine.js';
+import { runBacktestWithBestEngine } from './server/services/backtestEngine.js';
 import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
 import { generateWeeklyReport } from './server/services/reportService.js';
@@ -702,39 +706,62 @@ app.get('/api/autotrading/balance', authMiddleware, async (_req, res) => {
 
 app.get('/api/autotrading/broker/status', authMiddleware, (_req, res) => {
   const cfg = getAgentConfig();
+  const brokerBridgeUrl =
+    process.env.BROKER_BRIDGE_URL ??
+    process.env.SINOPAC_BRIDGE_URL ??
+    process.env.KGI_BRIDGE_URL ??
+    'http://127.0.0.1:18080';
   res.json({
     ok: true,
     config: {
-      brokerId: cfg.mode === 'real' ? 'sinopac' : 'simulated',
+      brokerId: getPrimaryBrokerId(),
       accountId: '',
       mode: cfg.mode,
     },
-    bridgeUrl: process.env.SINOPAC_BRIDGE_URL ?? 'http://localhost:8001',
+    bridgeUrl: brokerBridgeUrl,
   });
 });
 
 app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequest, res) => {
-  const { brokerId, apiKey, apiSecret, certPath, accountId, mode } = req.body;
-  if (brokerId !== 'simulated') {
-    // 真實券商需要本地服務，回傳設定說明
-    const brokerInfo: Record<string, { name: string; url: string; note: string }> = {
-      sinopac: { name: '永豐金證券 (Shioaji)', url: 'https://sinotrade.github.io/', note: '需啟動本地 Python bridge service' },
-      kgi:     { name: '群益證券 (SKCOM)',      url: 'https://easywin.capital.com.tw/trade/skcom', note: '需 Windows COM 元件' },
-      yuanta:  { name: '元大證券',              url: 'https://www.yuantafutures.com.tw/', note: '需 Windows COM 元件 + 書面申請' },
-      fubon:   { name: '富邦證券',              url: 'https://www.fubon.com/securities/', note: '需申請 API 使用權限' },
-    };
-    const info = brokerInfo[brokerId] ?? { name: brokerId, url: '', note: '' };
-    res.json({
+  const { brokerId, apiKey, apiSecret, certPath, certPassphrase, accountId, mode, bridgeUrl } = req.body ?? {};
+  const adapters = {
+    simulated: simulatedAdapter,
+    sinopac: sinopacAdapter,
+    kgi: kgiAdapter,
+    yuanta: yuantaAdapter,
+  } as const;
+
+  const adapter = adapters[brokerId as keyof typeof adapters];
+  if (!adapter) {
+    return res.status(400).json({
       ok: false,
-      brokerId,
-      message: `${info.name} 需要本地環境設定。${info.note}。
-請參考說明：${info.url}`,
-      requiresLocalSetup: true,
+      message: `Unsupported brokerId: ${brokerId}`,
     });
-    return;
   }
-  const result = await simulatedAdapter.connect({ brokerId: 'simulated', mode: mode ?? 'simulated' });
-  res.json(result);
+
+  try {
+    const result = await adapter.connect({
+      brokerId,
+      apiKey,
+      apiSecret,
+      certPath,
+      certPassphrase,
+      accountId,
+      bridgeUrl,
+      mode: (mode === 'real' ? 'real' : 'simulated'),
+    });
+    if (result?.ok) {
+      setPrimaryBroker(brokerId);
+    }
+    return res.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'broker connect failed';
+    return res.status(500).json({
+      ok: false,
+      message: msg,
+      requiresLocalSetup: brokerId !== 'simulated',
+    });
+  }
 });
 
 app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, res) => {
@@ -752,7 +779,7 @@ app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, r
       close: q.close
     })).filter((q: any) => q.close != null);
 
-    const result = await runAdvancedBacktest(symbol, quotes, config);
+    const result = await runBacktestWithBestEngine(symbol, quotes, config);
 
     res.json({ ok: true, data: result });
   } catch (e) {
@@ -925,7 +952,14 @@ app.put('/api/autotrading/notifications', authMiddleware, async (req: AuthReques
   const rawTriggers = Array.isArray(req.body?.triggers) ? req.body.triggers : [];
 
   const allowedChannels = new Set(['telegram', 'discord', 'webhook', 'email']);
-  const allowedTriggers = new Set<NotifyEvent>(['kill_switch', 'risk_block', 'fill', 'daily_report']);
+  const allowedTriggers = new Set<NotifyEvent>([
+    'kill_switch',
+    'risk_block',
+    'fill',
+    'daily_report',
+    'stop_loss_intercept',
+    'quantum_forced_liquidation',
+  ]);
   const triggers = rawTriggers
     .map((x: unknown) => String(x))
     .filter((x: string): x is NotifyEvent => allowedTriggers.has(x as NotifyEvent));

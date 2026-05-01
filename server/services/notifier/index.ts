@@ -23,6 +23,7 @@ import { webhookNotifier } from './WebhookNotifier.js';
 import { emailNotifier } from './EmailNotifier.js';
 
 export type NotifyEvent = 'kill_switch' | 'risk_block' | 'fill' | 'daily_report';
+export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation';
 
 export interface NotifierChannel {
   channel: string;
@@ -44,7 +45,7 @@ interface SettingRow {
   triggers: unknown;
 }
 
-function formatMessage(event: NotifyEvent, payload: Record<string, unknown>): { subject: string; body: string } {
+function formatMessage(event: ExtendedNotifyEvent, payload: Record<string, unknown>): { subject: string; body: string } {
   switch (event) {
     case 'kill_switch':
       return {
@@ -66,11 +67,21 @@ function formatMessage(event: NotifyEvent, payload: Record<string, unknown>): { 
         subject: '📊 AI 自動交易每日報告',
         body: typeof payload.text === 'string' ? payload.text : JSON.stringify(payload),
       };
+    case 'stop_loss_intercept':
+      return {
+        subject: `🛑 停損攔截 ${payload.symbol ?? ''}`.trim(),
+        body: `標的：${payload.symbol ?? 'UNKNOWN'}\n原因：${payload.reason ?? 'stop loss triggered'}\n價格：${payload.price ?? '-'}`,
+      };
+    case 'quantum_forced_liquidation':
+      return {
+        subject: `⚛️ 量子強制平倉 ${payload.symbol ?? ''}`.trim(),
+        body: `標的：${payload.symbol ?? 'UNKNOWN'}\n原因：${payload.reason ?? 'quantum risk gate'}\n信心度：${payload.confidence ?? '-'}\nregime_flip_prob：${payload.regimeFlipProb ?? '-'}`,
+      };
   }
 }
 
 export const notifier = {
-  async dispatch(userId: string, event: NotifyEvent, payload: Record<string, unknown>): Promise<void> {
+  async dispatch(userId: string, event: ExtendedNotifyEvent, payload: Record<string, unknown>): Promise<void> {
     let rows: SettingRow[] = [];
     try {
       rows = await db.select().from(notificationSettings)

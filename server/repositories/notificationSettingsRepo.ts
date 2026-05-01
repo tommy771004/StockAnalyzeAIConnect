@@ -6,7 +6,13 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../../src/db/index.js';
 import { notificationSettings, type NotificationSetting } from '../../src/db/schema.js';
 
-export type NotifyEvent = 'kill_switch' | 'risk_block' | 'fill' | 'daily_report';
+export type NotifyEvent =
+  | 'kill_switch'
+  | 'risk_block'
+  | 'fill'
+  | 'daily_report'
+  | 'stop_loss_intercept'
+  | 'quantum_forced_liquidation';
 
 export interface NotificationSettingInput {
   channel: string;
@@ -69,4 +75,3 @@ export async function deleteNotificationSettingByUser(userId: string, id: number
     .returning({ id: notificationSettings.id });
   return rows.length > 0;
 }
-

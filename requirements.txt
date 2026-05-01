@@ -14,3 +14,7 @@ aiohttp>=3.9.5
 # timesfm>=1.2.0
 # qiskit>=1.2.0
 # qiskit-aer>=0.15.0
+
+# Optional live-broker bridge dependencies (Windows only)
+# shioaji>=1.2.6
+# pywin32>=306

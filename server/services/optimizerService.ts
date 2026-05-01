@@ -2,7 +2,7 @@
  * server/services/optimizerService.ts
  * 策略自動優化器：透過參數變異與回測尋找最優配置
  */
-import { runAdvancedBacktest } from './backtestEngine.js';
+import { runBacktestWithBestEngine } from './backtestEngine.js';
 import { getAgentConfig } from './autonomousAgent.js';
 
 interface OptimizationProposal {
@@ -50,7 +50,7 @@ export async function runOptimizationScan(symbol: string, history: any[]): Promi
   const currentParams = currentConfig.params;
   
   // 1. 先測試目前參數的績效 (基準)
-  const baseResult = await runAdvancedBacktest(symbol, history, currentConfig);
+  const baseResult = await runBacktestWithBestEngine(symbol, history, currentConfig);
   const baseScore = riskAdjustedScore(baseResult.metrics);
 
   let bestParams = currentParams;
@@ -62,7 +62,7 @@ export async function runOptimizationScan(symbol: string, history: any[]): Promi
     const candidateParams = mutateParams(currentParams);
     const candidateConfig = { ...currentConfig, params: candidateParams };
 
-    const result = await runAdvancedBacktest(symbol, history, candidateConfig);
+    const result = await runBacktestWithBestEngine(symbol, history, candidateConfig);
     const score = riskAdjustedScore(result.metrics);
     if (score > bestScore) {
       bestScore = score;

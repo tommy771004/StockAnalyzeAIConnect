@@ -273,24 +273,42 @@ export async function runAdvancedBacktestPolars(
 ): Promise<BacktestResult | null> {
   try {
     const { polarsBacktest } = await import('../utils/scienceService.js');
-    console.log(`[BacktestEngine] Sending ${history.length} records to Polars Engine for ${symbol}...`);
-    
-    // We send payload to Python
-    const result = await polarsBacktest({ data: history, strategy: config.strategies.join(',') });
-    
-    // The python service returns: { data: { total_rows, signal_counts, sample } }
-    // We would map it back to BacktestResult. For now, just generate a dummy metrics based on signal counts or return local if fail.
-    if (result && result.status === 'success') {
-      console.log(`[BacktestEngine] Polars processed ${result.data.total_rows} rows successfully.`);
-      // If we had a full python implementation that returned equity curves, we'd map them here.
-      // E.g.
-      // return { metrics: result.data.metrics, equityCurve: result.data.curve, trades: result.data.trades };
+    console.log(`[BacktestEngine] Dispatching ${history.length} rows to Polars Engine for ${symbol}...`);
+
+    const result = await polarsBacktest({
+      symbol,
+      data: history,
+      config,
+      strategies: Array.isArray(config?.strategies) ? config.strategies : [],
+    });
+
+    if (result?.status === 'success' && result.data?.metrics && result.data?.equityCurve && result.data?.trades) {
+      return result.data as BacktestResult;
     }
-    
-    // Fallback to local if python doesn't return full structure yet
-    return runAdvancedBacktest(symbol, history, config);
+
+    if (result?.errors?.length) {
+      console.warn('[BacktestEngine] Polars service returned error:', result.errors[0]);
+    }
+    return null;
   } catch (e) {
-    console.error('Polars backtest failed, falling back to local engine:', e);
-    return runAdvancedBacktest(symbol, history, config);
+    console.error('[BacktestEngine] Polars backtest failed:', e);
+    return null;
   }
+}
+
+export async function runBacktestWithBestEngine(
+  symbol: string,
+  history: any[],
+  config: any
+): Promise<BacktestResult> {
+  const minRowsForPolars = Number(process.env.POLARS_BACKTEST_MIN_ROWS || 1500);
+  const forcePolars = config?.backtestEngine === 'polars';
+  const preferPolars = forcePolars || history.length >= minRowsForPolars;
+
+  if (preferPolars) {
+    const result = await runAdvancedBacktestPolars(symbol, history, config);
+    if (result) return result;
+  }
+
+  return runAdvancedBacktest(symbol, history, config);
 }

@@ -3,7 +3,7 @@
  * Ablation 分析：技術指標 only vs +AI vs +AI+Quantum。
  * 每次優化任務都附帶此報告，決定是否 promote 進 live。
  */
-import { runAdvancedBacktest } from '../backtestEngine.js';
+import { runBacktestWithBestEngine } from '../backtestEngine.js';
 
 export type AblationVariant = 'technical_only' | 'technical_plus_ai' | 'full';
 
@@ -63,7 +63,7 @@ export async function runAblation(
 
   for (const variant of variants) {
     const cfg = buildConfig(config, variant);
-    const result = await runAdvancedBacktest(symbol, history, cfg);
+    const result = await runBacktestWithBestEngine(symbol, history, cfg);
     const score = riskAdjustedScore(result.metrics);
     results.push({
       variant,

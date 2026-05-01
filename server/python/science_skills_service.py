@@ -58,6 +58,13 @@ class FeatureAggregatePayload(BaseModel):
     window: int = Field(default=14, ge=3, le=120)
 
 
+class PolarsBacktestPayload(BaseModel):
+    symbol: str = Field(default="UNKNOWN")
+    data: list[dict[str, Any]] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    strategies: list[str] = Field(default_factory=list)
+
+
 @app.get("/arxiv/search")
 def search_arxiv(query: str, max_results: int = 5):
     """
@@ -129,51 +136,225 @@ async def scrape_urls(urls: str = Query(..., description="Comma-separated URLs")
         return err("web scrape failed", errors=[str(exc)], meta={"requested": len(url_list)})
 
 
-@app.post("/polars/backtest")
-async def polars_backtest(payload: dict):
-    """
-    Use Polars to perform high-performance backtest processing.
-    Expects payload: {"data": [... historical records ...], "strategy": "..."}
-    """
+def _num(v: Any, default: float = 0.0) -> float:
     try:
-        data = payload.get("data", [])
-        if not data:
+        return float(v)
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _calc_mdd(curve: list[dict[str, Any]]) -> float:
+    peak = 1.0
+    max_dd = 0.0
+    for row in curve:
+        portfolio_pct = _num(row.get("portfolio", 0.0)) / 100.0
+        equity = 1.0 + portfolio_pct
+        if equity > peak:
+            peak = equity
+        dd = 0.0 if peak <= 0 else (peak - equity) / peak
+        if dd > max_dd:
+            max_dd = dd
+    return round(max_dd * 100.0, 2)
+
+
+def _calc_sharpe(returns: list[float]) -> float:
+    if len(returns) < 2:
+        return 0.0
+    mean = sum(returns) / len(returns)
+    variance = sum((r - mean) ** 2 for r in returns) / max(1, len(returns) - 1)
+    std = variance ** 0.5
+    if std <= 1e-12:
+        return 0.0
+    # daily-like scaling
+    return round((mean / std) * (252 ** 0.5), 3)
+
+
+@app.post("/polars/backtest")
+async def polars_backtest(payload: PolarsBacktestPayload):
+    """High-throughput backtest path for large datasets using Polars preprocessing."""
+    try:
+        if not payload.data:
             return err("No data provided for backtest")
 
-        df = pl.DataFrame(data)
-        if "close" in df.columns:
-            if "date" in df.columns:
-                df = df.sort("date")
+        df = pl.DataFrame(payload.data)
+        if "close" not in df.columns:
+            return err("Missing required column: close")
 
-            df = df.with_columns(
+        if "date" in df.columns:
+            df = df.sort("date")
+        else:
+            df = df.with_row_count(name="idx").with_columns(pl.col("idx").cast(pl.Utf8).alias("date")).drop("idx")
+
+        # Normalize and precompute indicators in Polars.
+        df = (
+            df.with_columns(pl.col("close").cast(pl.Float64))
+            .with_columns(
                 [
                     pl.col("close").rolling_mean(window_size=10).alias("sma_10"),
                     pl.col("close").rolling_mean(window_size=50).alias("sma_50"),
+                    pl.col("close").ewm_mean(span=12).alias("ema_12"),
+                    pl.col("close").ewm_mean(span=26).alias("ema_26"),
+                    pl.col("close").diff().alias("delta"),
                 ]
-            ).with_columns(
-                pl.when(pl.col("sma_10") > pl.col("sma_50"))
-                .then(1)
-                .otherwise(-1)
-                .alias("signal")
+            )
+            .with_columns(
+                [
+                    pl.when(pl.col("delta") > 0).then(pl.col("delta")).otherwise(0.0).alias("gain"),
+                    pl.when(pl.col("delta") < 0).then(-pl.col("delta")).otherwise(0.0).alias("loss"),
+                ]
+            )
+            .with_columns(
+                [
+                    pl.col("gain").rolling_mean(window_size=14).alias("avg_gain"),
+                    pl.col("loss").rolling_mean(window_size=14).alias("avg_loss"),
+                ]
+            )
+            .with_columns(
+                [
+                    (pl.col("ema_12") - pl.col("ema_26")).alias("macd_diff"),
+                    pl.when(pl.col("avg_loss") <= 1e-12)
+                    .then(100.0)
+                    .otherwise(100.0 - (100.0 / (1.0 + (pl.col("avg_gain") / pl.col("avg_loss")))))
+                    .alias("rsi"),
+                ]
+            )
+            .fill_null(strategy="forward")
+            .fill_null(0)
+        )
+
+        rows = df.select(["date", "close", "rsi", "macd_diff"]).to_dicts()
+        if len(rows) < 55:
+            return err("Not enough history for backtest (need at least 55 rows)")
+
+        cfg = payload.config or {}
+        params = cfg.get("params", {}) if isinstance(cfg, dict) else {}
+        stop_loss_pct = _num(params.get("stopLossPct", 5), 5.0)
+        take_profit_pct = _num(params.get("takeProfitPct", 10), 10.0)
+        trailing_stop_pct = _num(params.get("trailingStopPct", 3), 3.0)
+
+        initial_capital = 1_000_000.0
+        balance = initial_capital
+        shares = 0
+        entry_price = 0.0
+        high_water = 0.0
+        entry_date = ""
+        trades: list[dict[str, Any]] = []
+        equity_curve: list[dict[str, Any]] = []
+        rets: list[float] = []
+
+        bench_start = _num(rows[0].get("close"), 1.0) or 1.0
+        prev_equity = initial_capital
+
+        for row in rows[50:]:
+            current_price = _num(row.get("close"))
+            current_date = str(row.get("date", ""))
+            rsi = _num(row.get("rsi"), 50.0)
+            macd_diff = _num(row.get("macd_diff"), 0.0)
+
+            if shares > 0:
+                pnl_pct = ((current_price - entry_price) / max(entry_price, 1e-9)) * 100.0
+                high_water = max(high_water, current_price)
+                drop_from_high = ((high_water - current_price) / max(high_water, 1e-9)) * 100.0
+
+                should_exit = False
+                reason = ""
+                if pnl_pct <= -stop_loss_pct:
+                    should_exit = True
+                    reason = "Stop Loss"
+                elif pnl_pct >= take_profit_pct:
+                    should_exit = True
+                    reason = "Take Profit"
+                elif trailing_stop_pct > 0 and pnl_pct > 2 and drop_from_high >= trailing_stop_pct:
+                    should_exit = True
+                    reason = "Trailing Stop"
+
+                if should_exit:
+                    trade_value = shares * current_price
+                    commission = max(20.0, trade_value * 0.001425)
+                    tax = trade_value * 0.003
+                    balance += trade_value - commission - tax
+                    pnl = (current_price - entry_price) * shares - commission - tax
+                    trades.append(
+                        {
+                            "symbol": payload.symbol,
+                            "entryPrice": round(entry_price, 4),
+                            "exitPrice": round(current_price, 4),
+                            "entryDate": entry_date,
+                            "exitDate": current_date,
+                            "pnl": round(pnl, 2),
+                            "pnlPct": round(pnl_pct, 2),
+                            "reason": reason,
+                            "type": "WIN" if pnl > 0 else "LOSS",
+                        }
+                    )
+                    shares = 0
+                    entry_price = 0.0
+                    high_water = 0.0
+
+            if shares == 0:
+                signal = "HOLD"
+                if rsi <= 30 or macd_diff > current_price * 0.002:
+                    signal = "BUY"
+                elif rsi >= 70 or macd_diff < -current_price * 0.002:
+                    signal = "SELL"
+
+                if signal == "BUY":
+                    target_invest = balance * 0.9
+                    est_shares = int(target_invest // max(current_price, 1e-9))
+                    if est_shares > 0:
+                        trade_value = est_shares * current_price
+                        commission = max(20.0, trade_value * 0.001425)
+                        total_cost = trade_value + commission
+                        if total_cost <= balance:
+                            balance -= total_cost
+                            shares = est_shares
+                            entry_price = total_cost / shares
+                            entry_date = current_date
+                            high_water = current_price
+
+            total_assets = balance + shares * current_price
+            portfolio_pct = ((total_assets / initial_capital) - 1.0) * 100.0
+            benchmark_pct = ((current_price / bench_start) - 1.0) * 100.0
+            equity_curve.append(
+                {
+                    "date": current_date,
+                    "portfolio": round(portfolio_pct, 2),
+                    "benchmark": round(benchmark_pct, 2),
+                }
             )
 
-            signal_counts = df["signal"].value_counts().to_dicts()
-            return ok(
-                {
-                    "total_rows": len(df),
-                    "signal_counts": signal_counts,
-                    "sample": df.tail(5).to_dicts(),
-                },
-                meta={"columns": df.columns, "engine": "polars"},
-            )
+            ret = (total_assets - prev_equity) / max(prev_equity, 1e-9)
+            rets.append(ret)
+            prev_equity = total_assets
+
+        roi = equity_curve[-1]["portfolio"] if equity_curve else 0.0
+        wins = [t for t in trades if _num(t.get("pnl")) > 0]
+        losses = [t for t in trades if _num(t.get("pnl")) <= 0]
+        gross_win = sum(_num(t.get("pnl")) for t in wins)
+        gross_loss = abs(sum(_num(t.get("pnl")) for t in losses))
+        win_rate = (len(wins) / len(trades) * 100.0) if trades else 0.0
+        profit_factor = round(gross_win / gross_loss, 3) if gross_loss > 1e-9 else 0.0
+
+        result = {
+            "metrics": {
+                "roi": round(roi, 2),
+                "sharpe": _calc_sharpe(rets),
+                "maxDrawdown": _calc_mdd(equity_curve),
+                "winRate": round(win_rate, 2),
+                "totalTrades": len(trades),
+                "profitFactor": profit_factor,
+            },
+            "equityCurve": equity_curve,
+            "trades": trades,
+        }
 
         return ok(
-            {
-                "total_rows": len(df),
-                "columns": df.columns,
-                "message": "DataFrame constructed but 'close' column missing",
+            result,
+            meta={
+                "engine": "polars",
+                "rows": len(df),
+                "symbol": payload.symbol,
             },
-            meta={"engine": "polars"},
         )
     except Exception as exc:  # noqa: BLE001
         return err("polars backtest failed", errors=[str(exc)])

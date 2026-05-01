@@ -143,7 +143,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
       {/* API Form */}
       {selectedBroker !== 'simulated' && (
         <div className="p-4 border border-(--color-term-border) rounded-sm space-y-3 bg-black/20">
-          {selectedBroker === 'sinopac' && (
+          {(selectedBroker === 'sinopac' || selectedBroker === 'kgi') && (
             <div>
               <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
                 <Globe className="h-2.5 w-2.5" /> {t('autotrading.broker.pythonBridgeUrl', 'Python Bridge URL')}
@@ -156,7 +156,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
                 className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-[11px] text-white font-mono focus:border-cyan-500/50 outline-none"
                 placeholder={t('autotrading.broker.bridgePlaceholder', 'http://localhost:8001')}
               />
-              <div className="text-[9px] text-(--color-term-muted) mt-1">{t('autotrading.broker.bridgeHint', '需先啟動 server/python/sinopac_bridge.py')}</div>
+              <div className="text-[9px] text-(--color-term-muted) mt-1">{t('autotrading.broker.bridgeHint', '需先啟動 server/python/windows_broker_bridge.py')}</div>
             </div>
           )}
 
@@ -187,7 +187,7 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
               className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-[11px] text-white font-mono focus:border-cyan-500/50 outline-none"
             />
           </div>
-          {selectedBroker === 'sinopac' && (
+          {(selectedBroker === 'sinopac' || selectedBroker === 'kgi') && (
             <div>
               <label className="flex items-center gap-1.5 text-[9px] text-(--color-term-muted) uppercase mb-1.5">
                 <FileText className="h-2.5 w-2.5" /> {t('autotrading.broker.certPath', '憑證路徑 (.pfx)')}

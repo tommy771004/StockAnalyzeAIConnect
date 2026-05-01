@@ -20,7 +20,9 @@ export interface BrokerConfig {
   apiKey?: string;
   apiSecret?: string;
   certPath?: string;      // 電子憑證路徑（永豐/元大/群益）
+  certPassphrase?: string;
   accountId?: string;
+  bridgeUrl?: string;
   mode: TradingMode;
 }
 
