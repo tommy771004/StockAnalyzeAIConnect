@@ -621,7 +621,7 @@ export function startAgent(c?: any) {
     // 若切換到不同的 userId，清空前一個用戶的記憶體狀態，防止跨用戶污染
     const incomingUserId = c.userId as string | undefined;
     if (incomingUserId && incomingUserId !== agentConfig.userId) {
-      posTrack = new Map();
+      posTrack = new Map<string, { avgCost: number; qty: number }>();
       lossStreakCount = 0;
       console.log(`[Agent] userId 切換 ${agentConfig.userId ?? 'none'} → ${incomingUserId}，清空 posTrack 與 lossStreakCount`);
     }
@@ -709,7 +709,9 @@ export async function startAutonomousAgent() {
         agentConfig = { ...agentConfig, ...savedConfig };
         agentStatus = savedConfig.status || 'stopped';
         lossStreakCount = savedConfig.lossStreakCount || 0;
-        posTrack = new Map(Object.entries(savedConfig.posTrack || {}));
+        posTrack = new Map<string, { avgCost: number; qty: number }>(
+          Object.entries(savedConfig.posTrack || {}) as [string, { avgCost: number; qty: number }][]
+        );
         
         if (agentStatus === 'running' || agentStatus === 'cooldown') {
           agentTick();
