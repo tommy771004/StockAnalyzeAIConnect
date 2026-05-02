@@ -47,9 +47,10 @@ export function TradeToast({ events }: Props) {
   const seenRef = useRef(new Set<number>());
 
   useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
     events.forEach(e => {
-      if (seenRef.current.has(e.orderId)) return;
       if (e.status !== 'FILLED') return;
+      if (seenRef.current.has(e.orderId)) return;
       seenRef.current.add(e.orderId);
 
       const item: ToastItem = {
@@ -61,10 +62,12 @@ export function TradeToast({ events }: Props) {
       };
 
       setToasts(prev => [...prev.slice(-2), item]);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== item.id));
       }, 4200);
+      timers.push(timer);
     });
+    return () => { timers.forEach(clearTimeout); };
   }, [events]);
 
   if (toasts.length === 0) return null;
