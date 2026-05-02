@@ -22,8 +22,10 @@ function ProgressBar({ type }: { type: ToastItem['type'] }) {
     el.style.transition = 'none';
     el.style.width = '100%';
     requestAnimationFrame(() => {
-      el.style.transition = 'width 4s linear';
-      el.style.width = '0%';
+      requestAnimationFrame(() => {
+        el.style.transition = 'width 4s linear';
+        el.style.width = '0%';
+      });
     });
   }, []);
   return (
@@ -71,7 +73,7 @@ export function TradeToast({ events }: Props) {
     t.type === 'buy' ? '✓ 已買入' : t.type === 'sell' ? '✓ 已賣出' : '✗ 已取消';
 
   return (
-    <div className="fixed z-50 flex flex-col gap-2 bottom-4 right-4 md:bottom-4 md:right-4 top-4 sm:top-auto">
+    <div className="fixed z-50 flex flex-col gap-2 bottom-4 right-4">
       {toasts.map(toast => (
         <div
           key={toast.id}
