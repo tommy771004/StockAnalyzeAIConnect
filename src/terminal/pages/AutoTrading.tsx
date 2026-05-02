@@ -19,6 +19,9 @@ import { PerformanceDashboard } from '../../components/AutoTrading/PerformanceDa
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
 import '../../components/AutoTrading/autotrading.css';
+import { cn } from '../../lib/utils';
+import { DecisionAnalysisPanel } from '../../components/AutoTrading/DecisionAnalysisPanel';
+import { TradeToast } from '../../components/AutoTrading/TradeToast';
 
 const SIDEBAR_WIDTH_KEY = 'autotrading.sidebarWidthPx';
 const SIDEBAR_MIN_PX = 260;
@@ -44,6 +47,10 @@ export function AutoTradingPage() {
   const [defaults, setDefaults] = React.useState<{ config: AgentConfig } | null>(null);
   const [sidebarWidth, setSidebarWidth] = React.useState<number>(readStoredSidebarWidth);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
+  const [liveViewMobileTab, setLiveViewMobileTab] = React.useState<'decision' | 'log' | 'position'>('log');
+  const [highlightedSymbols, setHighlightedSymbols] = React.useState<Set<string>>(new Set());
+  const highlightTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const prevOrderEventsLenRef = React.useRef(0);
 
   React.useEffect(() => {
     api.getAutotradingDefaults().then((d: any) => setDefaults(d)).catch(() => {/* 未登入時跳過 */});
@@ -53,6 +60,38 @@ export function AutoTradingPage() {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  React.useEffect(() => {
+    const events = ws.orderEvents;
+    if (events.length <= prevOrderEventsLenRef.current) {
+      prevOrderEventsLenRef.current = events.length;
+      return;
+    }
+    const newEvents = events.slice(prevOrderEventsLenRef.current);
+    prevOrderEventsLenRef.current = events.length;
+
+    const filledSymbols = newEvents
+      .filter(e => e.status === 'FILLED')
+      .map(e => e.symbol);
+
+    if (filledSymbols.length === 0) return;
+
+    setHighlightedSymbols(prev => new Set([...prev, ...filledSymbols]));
+
+    filledSymbols.forEach(sym => {
+      const existing = highlightTimersRef.current.get(sym);
+      if (existing) clearTimeout(existing);
+      highlightTimersRef.current.set(sym, setTimeout(() => {
+        setHighlightedSymbols(prev => { const n = new Set(prev); n.delete(sym); return n; });
+        highlightTimersRef.current.delete(sym);
+      }, 1500));
+    });
+  }, [ws.orderEvents]);
+
+  React.useEffect(() => {
+    const timers = highlightTimersRef.current;
+    return () => { timers.forEach(clearTimeout); };
+  }, []);
 
   const handleSplitterResize = React.useCallback((deltaX: number) => {
     setSidebarWidth(prev => clampSidebar(prev - deltaX));
@@ -86,6 +125,7 @@ export function AutoTradingPage() {
 
   return (
     <div className="autotrading-pane h-full flex flex-col gap-2 overflow-hidden">
+      <TradeToast events={ws.orderEvents} />
       {/* Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border border-(--color-term-border) rounded-sm shrink-0">
         <div className="flex items-center gap-4">
@@ -148,30 +188,74 @@ export function AutoTradingPage() {
         <div className="flex flex-col gap-2 min-h-0 flex-1 min-w-0">
           {mainTab === 'LIVE_VIEW' && (
             <>
-              {/* Decision Log */}
-              <div className="flex-1 border border-(--color-term-border) rounded-sm min-h-0 overflow-hidden">
-                <DecisionLog
-                  logs={ws.logs}
-                  connectionInfo={{
-                    connected: ws.connected,
-                    transport: ws.transport,
-                    reason: ws.offlineReason,
-                  }}
-                />
+              {/* Mobile tab switcher — hidden on md+ */}
+              <div className="flex md:hidden shrink-0 border-b border-(--color-term-border)">
+                {(['decision', 'log', 'position'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setLiveViewMobileTab(tab)}
+                    className={cn(
+                      'flex-1 py-2 text-[10px] uppercase tracking-widest transition-colors',
+                      liveViewMobileTab === tab
+                        ? 'text-(--color-term-accent) border-b border-(--color-term-accent)'
+                        : 'text-(--color-term-muted) hover:text-(--color-term-text)'
+                    )}
+                  >
+                    {tab === 'decision' ? '決策' : tab === 'log' ? '日誌' : '部位'}
+                  </button>
+                ))}
               </div>
-              <div className="flex gap-2 h-52 shrink-0">
-                {/* Asset Monitor */}
-                <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
-                  <AssetMonitor
-                    positions={ws.positions}
-                    symbols={currentSymbols}
+
+              {/* Three-column grid (desktop) / single column (mobile) */}
+              <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[320px_1fr_280px] gap-2">
+
+                {/* Left: Decision Analysis Panel */}
+                <div className={cn(
+                  'border border-(--color-term-border) rounded-sm overflow-hidden flex flex-col',
+                  liveViewMobileTab !== 'decision' ? 'hidden md:flex' : 'flex'
+                )}>
+                  <DecisionAnalysisPanel
                     decisionFusions={ws.decisionFusions}
+                    logs={ws.logs}
+                    symbols={currentSymbols}
                   />
                 </div>
-                {/* Order Book Panel */}
-                <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
-                  <OrderBookPanel events={ws.orderEvents} />
+
+                {/* Center: Decision Log */}
+                <div className={cn(
+                  'border border-(--color-term-border) rounded-sm min-h-0 overflow-hidden',
+                  liveViewMobileTab !== 'log' ? 'hidden md:block' : 'block'
+                )}>
+                  <DecisionLog
+                    logs={ws.logs}
+                    highlightedSymbols={highlightedSymbols}
+                    connectionInfo={{
+                      connected: ws.connected,
+                      transport: ws.transport,
+                      reason: ws.offlineReason,
+                    }}
+                  />
                 </div>
+
+                {/* Right: Asset Monitor + Order Book */}
+                <div className={cn(
+                  'flex flex-col gap-2',
+                  liveViewMobileTab !== 'position' ? 'hidden md:flex' : 'flex'
+                )}>
+                  <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
+                    <AssetMonitor
+                      positions={ws.positions}
+                      symbols={currentSymbols}
+                      decisionFusions={ws.decisionFusions}
+                      highlightedSymbols={highlightedSymbols}
+                    />
+                  </div>
+                  <div className="h-52 shrink-0 border border-(--color-term-border) rounded-sm overflow-hidden">
+                    <OrderBookPanel events={ws.orderEvents} />
+                  </div>
+                </div>
+
               </div>
             </>
           )}
