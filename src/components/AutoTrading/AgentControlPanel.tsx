@@ -90,6 +90,9 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   const [strategies, setStrategies] = useState<StrategyType[]>(config?.strategies ?? defaultsConfig?.strategies ?? []);
   const [params, setParams] = useState<StrategyParams>(config?.params ?? defaultsConfig?.params ?? {});
   const [symbols, setSymbols] = useState<string[]>(config?.symbols ?? defaultsConfig?.symbols ?? []);
+  const [tradingHours, setTradingHours] = useState<{ start: string; end: string }>(
+    config?.tradingHours ?? { start: '09:00', end: '13:30' }
+  );
   const isRunning = status === 'running';
 
   // Merge live WS config with server defaults so pre-flight checks (hasRisk) work before first engine start
@@ -104,6 +107,7 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
     if (config.strategies) setStrategies(config.strategies);
     if (config.params) setParams(config.params);
     if (config.symbols) setSymbols(config.symbols);
+    if (config.tradingHours) setTradingHours(config.tradingHours);
   }, [config]);
 
   // Initial hydration from server defaults — only applies before the first WS config arrives.
@@ -139,6 +143,11 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
   const handleParamsChange = (nextParams: StrategyParams) => {
     setParams(nextParams);
     void updateConfig({ params: nextParams });
+  };
+
+  const handleTradingHoursChange = (hours: { start: string; end: string }) => {
+    setTradingHours(hours);
+    void updateConfig({ tradingHours: hours });
   };
 
   return (
@@ -223,6 +232,8 @@ export function AgentControlPanel({ status, config, decisionHeats, globalSentime
               onParamsChange={handleParamsChange} 
               isRunning={isRunning}
               activeHeat={config?.decisionHeat?.score}
+              tradingHours={tradingHours}
+              onTradingHoursChange={handleTradingHoursChange}
             />
           </div>
         )}

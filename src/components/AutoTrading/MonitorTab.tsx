@@ -10,6 +10,35 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { DecisionHeatmap } from './DecisionHeatmap';
 import type { AgentConfig, DecisionHeat, EquitySnapshot } from './types';
 
+function calculateMetrics(history: EquitySnapshot[]) {
+  if (history.length < 2) return { winRate: 0, sharpe: 0, maxDrawdown: 0 };
+  let wins = 0;
+  let maxEquity = history[0].equity;
+  let maxDrawdown = 0;
+  const returns: number[] = [];
+
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1].equity;
+    const curr = history[i].equity;
+    const ret = prev > 0 ? (curr - prev) / prev : 0;
+    returns.push(ret);
+    if (curr > prev) wins++;
+    if (curr > maxEquity) maxEquity = curr;
+    const dd = maxEquity > 0 ? (maxEquity - curr) / maxEquity : 0;
+    if (dd > maxDrawdown) maxDrawdown = dd;
+  }
+
+  const winRate = wins / returns.length;
+  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  // Sample variance
+  const variance = returns.reduce((a, b) => a + Math.pow(b - avgReturn, 2), 0) / (returns.length > 1 ? returns.length - 1 : 1);
+  const stdDev = Math.sqrt(variance);
+  // Simple Sharpe approximation (assuming periods are evenly spaced)
+  const sharpe = stdDev > 0 ? avgReturn / stdDev : 0;
+
+  return { winRate, sharpe, maxDrawdown };
+}
+
 interface Props {
   symbols: string[];
   isRunning: boolean;
@@ -101,6 +130,8 @@ export function MonitorTab({
     { id: 4, label: t('autotrading.monitor.steps.startEngine'), done: effectiveIsRunning },
   ];
 
+  const metrics = calculateMetrics(equityHistory);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Quick Start Guide */}
@@ -181,6 +212,29 @@ export function MonitorTab({
              </span>
            )}
         </div>
+        
+        {/* Performance Metrics Dashboard */}
+        {equityHistory.length > 1 && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white/5 p-2 rounded border border-white/5 text-center">
+              <div className="text-[8px] text-white/40 uppercase tracking-wider mb-1">Win Rate</div>
+              <div className="text-[12px] font-mono font-bold text-cyan-400">{(metrics.winRate * 100).toFixed(1)}%</div>
+            </div>
+            <div className="bg-white/5 p-2 rounded border border-white/5 text-center">
+              <div className="text-[8px] text-white/40 uppercase tracking-wider mb-1">Sharpe</div>
+              <div className={cn("text-[12px] font-mono font-bold", metrics.sharpe > 1 ? "text-emerald-400" : "text-amber-400")}>
+                {metrics.sharpe.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-white/5 p-2 rounded border border-white/5 text-center">
+              <div className="text-[8px] text-white/40 uppercase tracking-wider mb-1">Max DD</div>
+              <div className={cn("text-[12px] font-mono font-bold", metrics.maxDrawdown > 0.05 ? "text-rose-400" : "text-emerald-400")}>
+                {(metrics.maxDrawdown * 100).toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="h-[100px] w-full">
           {equityHistory.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">

@@ -78,6 +78,7 @@ let agentStatus: AgentStatus = 'stopped';
 let agentConfig: AgentConfig = { ...DEFAULT_AGENT_CONFIG };
 let lastSentimentScore = 50;
 let lastEquityBroadcast = 0;
+let equityHistory: {timestamp: string; equity: number}[] = [];
 
 let activeBroker: IBrokerAdapter = simulatedAdapter;
 let hedgeBroker: IBrokerAdapter = simulatedAdapter;
@@ -337,7 +338,8 @@ async function syncStateToDb() {
     await autotradingConfigRepo.saveState(agentConfig.userId, {
       status: agentStatus,
       lossStreakCount,
-      posTrack: Object.fromEntries(posTrack) // Map 轉 JSON
+      posTrack: Object.fromEntries(posTrack), // Map 轉 JSON
+      equityHistory
     });
   } catch (e) {
     console.error('[Agent] 狀態同步失敗:', e);
@@ -694,7 +696,15 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
 
 // ── 核心 Tick ──────────────────────────────────────────────────
 async function agentTick() {
-  if (agentStatus === 'stopped' || agentStatus === 'paused' || isTickRunning) return;
+  // cooldown 狀態：繼續排程（以便計時到期後自動回復），但跳過所有分析與下單
+  if (agentStatus === 'stopped' || agentStatus === 'paused') return;
+  if (agentStatus === 'cooldown') {
+    // 只維持 tick 排程，不做任何操作
+    if (tickTimeout) clearTimeout(tickTimeout);
+    tickTimeout = setTimeout(agentTick, agentConfig.tickIntervalMs);
+    return;
+  }
+  if (isTickRunning) return;
 
   isTickRunning = true;
   try {
@@ -842,7 +852,8 @@ async function agentTick() {
           // 動態計算委託數量：預設每次投入可用資金的 10% 或配置的 maxAllocationPerTrade
           const allocation = agentConfig.params.maxAllocationPerTrade || 0.1;
           const defensiveScale = signal.defensiveMode ? 0.4 : 1;
-          const tradeAmount = availableMargin * allocation * defensiveScale;
+          const monteCarloScale = riskManager.getDynamicPositionScaling();
+          const tradeAmount = availableMargin * allocation * defensiveScale * monteCarloScale;
           const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
 
           // 台股使用整張(1000股)；美股允許零股(小數股)
@@ -915,7 +926,7 @@ async function agentTick() {
             qty: finalQty,
             price: signalPrice,
           });
-          if (tradeResult && tradeResult.status === 'FILLED') {
+          if (tradeResult && (tradeResult.status === 'FILLED' || tradeResult.status === 'PARTIAL')) {
             wsBroadcast?.({
               type: 'trade_executed',
               data: {
@@ -923,6 +934,7 @@ async function agentTick() {
                 side: signal.action,
                 qty: tradeResult.filledQty,
                 price: tradeResult.filledPrice,
+                status: tradeResult.status,
                 timestamp: new Date().toISOString(),
               },
             });
@@ -937,8 +949,8 @@ async function agentTick() {
             }
           }
 
-          // 實戰化斷路器 2: 進階連損判定 (P1 - 深化)
-          if (tradeResult && tradeResult.status === 'FILLED') {
+          // 實戰化斷路器 2: 進階連損判定 — FILLED 或 PARTIAL 都計算已成交部分
+          if (tradeResult && (tradeResult.status === 'FILLED' || tradeResult.status === 'PARTIAL')) {
             const track = posTrack.get(symbol) || { avgCost: 0, qty: 0 };
 
             if (signal.action === 'BUY') {
@@ -973,7 +985,7 @@ async function agentTick() {
             emitLog({ level: 'WARNING', source: 'AGENT', symbol, message: `委託未完全成交，跳過損益計數。` });
           }
         }
-      } else if (agentStatus === 'cooldown' && signal.action !== 'HOLD') {
+      } else if ((agentStatus as AgentStatus) === 'cooldown' && signal.action !== 'HOLD') {
         emitLog({ level: 'INFO', source: 'MONITOR', symbol, message: `👁️ [冷卻監控] AI 建議 ${signal.action}，訂單已攔截。` });
       }
     }
@@ -982,7 +994,7 @@ async function agentTick() {
     emitLog({ level: 'ERROR', source: 'SYSTEM', symbol: 'ENGINE', message: `Tick 異常: ${(e as Error).message}` });
   } finally {
     isTickRunning = false;
-    if (agentStatus === 'running' || agentStatus === 'cooldown') {
+    if (agentStatus === 'running' || (agentStatus as AgentStatus) === 'cooldown') {
       if (tickTimeout) clearTimeout(tickTimeout);
       tickTimeout = setTimeout(agentTick, agentConfig.tickIntervalMs);
     }
@@ -1086,7 +1098,48 @@ export function getLossStreakCount() { return lossStreakCount; }
 export function emergencyKillSwitch() {
   stopAgent();
   riskManager.activateKillSwitch();
-  emitLog({ level: 'CRITICAL', source: 'SYSTEM', symbol: 'ALL', message: '🚨 緊急停止已觸發！所有自動交易已停止。' });
+  emitLog({ level: 'CRITICAL', source: 'SYSTEM', symbol: 'ALL', message: '🚨 緊急停止已觸發！正在清空所有部位...' });
+
+  // ── 改善3：觸發 Kill Switch 後真正清空所有部位 ──
+  void (async () => {
+    try {
+      // 1. 取消所有活躍中（PENDING / PARTIAL）的掛單
+      for (const order of executor.getActiveOrders()) {
+        await executor.cancelOrder(order.orderId).catch(() => {});
+      }
+
+      // 2. 呼叫券商平倉（SimulatedAdapter 的 resetBalance 只重置資金，此處用 getPositions + SELL）
+      const positions = await activeBroker.getPositions().catch(() => []);
+      for (const pos of positions) {
+        if (pos.qty <= 0) continue;
+        try {
+          await activeBroker.placeOrder({
+            symbol: pos.symbol,
+            side: 'SELL',
+            qty: pos.qty,
+            orderType: 'MARKET',
+            marketType: /\.(TW|TWO)$/i.test(pos.symbol) ? 'TW_STOCK' : 'US_STOCK',
+          });
+          emitLog({ level: 'CRITICAL', source: 'KILL', symbol: pos.symbol, message: `💣 Kill Switch 強平：SELL ${pos.qty} 股` });
+        } catch (e) {
+          emitLog({ level: 'ERROR', source: 'KILL', symbol: pos.symbol, message: `強平失敗：${(e as Error).message}，請手動確認！` });
+        }
+      }
+
+      // 3. 清空本地 posTrack
+      posTrack.clear();
+
+      // 4. 廣播最新持倉（空）與帳戶餘額
+      const balance = await activeBroker.getBalance().catch(() => null);
+      wsBroadcast?.({ type: 'positions_update', data: [] });
+      if (balance) wsBroadcast?.({ type: 'account_update', data: balance });
+
+      emitLog({ level: 'CRITICAL', source: 'KILL', symbol: 'ALL', message: '✅ Kill Switch 完成：所有部位已清空，帳戶已同步。' });
+    } catch (e) {
+      emitLog({ level: 'ERROR', source: 'KILL', symbol: 'ALL', message: `Kill Switch 清倉過程異常：${(e as Error).message}` });
+    }
+  })();
+
   if (agentConfig.userId) {
     void notifier.dispatch(agentConfig.userId, 'kill_switch', {
       reason: 'manual emergency kill switch',

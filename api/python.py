@@ -174,3 +174,51 @@ def get_news(exchange: str, symbol: str) -> Dict[str, Any]:
         # instead of surfacing an error (common when TV's news endpoint 403s).
         print(f"[python] news fetch failed for {exchange}:{symbol}: {e}", file=sys.stderr)
         return {"status": "success", "data": [], "message": str(e)}
+
+import math
+
+def norm_cdf(x: float) -> float:
+    return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+
+def norm_pdf(x: float) -> float:
+    return math.exp(-x**2 / 2.0) / math.sqrt(2.0 * math.pi)
+
+@app.get("/api/python/options_greeks")
+def get_options_greeks(S: float, K: float, r: float, sigma: float, T: float, option_type: str = "call") -> Dict[str, Any]:
+    try:
+        if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+            return {"status": "error", "message": "Invalid parameters: must be positive."}
+        
+        d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+        d2 = d1 - sigma * math.sqrt(T)
+        
+        is_call = option_type.lower() == 'call'
+        
+        if is_call:
+            price = S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
+            delta = norm_cdf(d1)
+            theta = (- (S * norm_pdf(d1) * sigma) / (2 * math.sqrt(T))
+                     - r * K * math.exp(-r * T) * norm_cdf(d2))
+            rho = K * T * math.exp(-r * T) * norm_cdf(d2)
+        else:
+            price = K * math.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1)
+            delta = norm_cdf(d1) - 1.0
+            theta = (- (S * norm_pdf(d1) * sigma) / (2 * math.sqrt(T))
+                     + r * K * math.exp(-r * T) * norm_cdf(-d2))
+            rho = -K * T * math.exp(-r * T) * norm_cdf(-d2)
+            
+        gamma = norm_pdf(d1) / (S * sigma * math.sqrt(T))
+        vega = S * norm_pdf(d1) * math.sqrt(T)
+        
+        data = {
+            "price": price,
+            "delta": delta,
+            "gamma": gamma,
+            "theta": theta / 365.0,
+            "vega": vega / 100.0,
+            "rho": rho / 100.0
+        }
+        return {"status": "success", "data": data}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+

@@ -214,9 +214,8 @@ export function useAutotradingWS() {
       if (logsRes.status === 'fulfilled') {
         const serverLogs = Array.isArray(logsRes.value) ? (logsRes.value as AgentLog[]) : [];
         // Merge instead of replace: append only logs the client doesn't already have.
-        // agent_log events are intentionally skipped from Ably to avoid overwhelming the
-        // REST endpoint, so polling is the sole delivery path for logs. Merging prevents
-        // the DecisionLog panel from resetting every poll cycle.
+        // We now receive agent_log events via Ably realtime, but polling serves as a fallback.
+        // Merging prevents the DecisionLog panel from resetting or duplicating logs.
         const existingIds = new Set(prev.logs.map((l: AgentLog) => l.id));
         const incoming = serverLogs.filter(l => !existingIds.has(l.id));
         next.logs = incoming.length > 0

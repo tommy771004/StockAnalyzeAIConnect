@@ -20,10 +20,30 @@ interface Props {
   params: StrategyParams;
   onChange: (strategies: StrategyType[], params: StrategyParams) => void;
   disabled?: boolean;
+  tradingHours?: { start: string; end: string };
+  onTradingHoursChange?: (hours: { start: string; end: string }) => void;
 }
 
-export function StrategySelector({ selected, params, onChange, disabled }: Props) {
+export function StrategySelector({ selected, params, onChange, disabled, tradingHours, onTradingHoursChange }: Props) {
   const { t } = useTranslation();
+  const [hoursError, setHoursError] = React.useState<string | null>(null);
+  const currentHours = tradingHours ?? { start: '09:00', end: '13:30' };
+
+  const validateHHMM = (val: string) => /^([01]?\d|2[0-3]):[0-5]\d$/.test(val);
+
+  const handleHoursChange = (field: 'start' | 'end', value: string) => {
+    const next = { ...currentHours, [field]: value };
+    if (!validateHHMM(value)) {
+      setHoursError(`格式應為 HH:MM（例如 09:00）`);
+      return;
+    }
+    if (next.start >= next.end) {
+      setHoursError('開始時間必須早於結束時間');
+      return;
+    }
+    setHoursError(null);
+    onTradingHoursChange?.(next);
+  };
   const strategyNameKeys: Record<StrategyType, string> = {
     RSI_REVERSION: 'autotrading.strategy.names.rsiReversion',
     BOLLINGER_BREAKOUT: 'autotrading.strategy.names.bollingerBreakout',
@@ -364,28 +384,46 @@ export function StrategySelector({ selected, params, onChange, disabled }: Props
       </div>
 
       {/* Trading Window */}
-      <div className="p-3 border border-blue-500/20 bg-blue-500/5 rounded-sm flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clock className="h-3 w-3 text-blue-400" />
-          <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">{t('autotrading.strategy.selector.activeHours', 'Active Hours')}</span>
+      <div className="p-3 border border-blue-500/20 bg-blue-500/5 rounded-sm space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-blue-400" />
+            <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">{t('autotrading.strategy.selector.activeHours', 'Active Hours')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="09:00"
+              value={currentHours.start}
+              disabled={disabled}
+              onChange={e => handleHoursChange('start', e.target.value)}
+              className={cn(
+                'w-14 bg-black/40 text-[10px] text-blue-300 font-mono text-center border-b px-1 py-0.5 transition-colors',
+                hoursError ? 'border-red-500/60' : 'border-blue-500/30 focus:border-blue-400',
+                'outline-none disabled:opacity-40',
+              )}
+            />
+            <span className="text-[8px] text-blue-500/50">{t('autotrading.common.to', 'TO')}</span>
+            <input
+              type="text"
+              placeholder="13:30"
+              value={currentHours.end}
+              disabled={disabled}
+              onChange={e => handleHoursChange('end', e.target.value)}
+              className={cn(
+                'w-14 bg-black/40 text-[10px] text-blue-300 font-mono text-center border-b px-1 py-0.5 transition-colors',
+                hoursError ? 'border-red-500/60' : 'border-blue-500/30 focus:border-blue-400',
+                'outline-none disabled:opacity-40',
+              )}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input 
-            type="text" 
-            placeholder="09:00" 
-            value="09:00" 
-            readOnly
-            className="w-12 bg-transparent text-[10px] text-blue-300 font-mono text-center border-b border-blue-500/30" 
-          />
-          <span className="text-[8px] text-blue-500/50">{t('autotrading.common.to', 'TO')}</span>
-          <input 
-            type="text" 
-            placeholder="13:30" 
-            value="13:30" 
-            readOnly
-            className="w-12 bg-transparent text-[10px] text-blue-300 font-mono text-center border-b border-blue-500/30" 
-          />
-        </div>
+        {hoursError && (
+          <p className="text-[9px] text-red-400 text-right">{hoursError}</p>
+        )}
+        {!onTradingHoursChange && (
+          <p className="text-[8px] text-blue-400/40 text-right">時段設定需連接上層配置</p>
+        )}
       </div>
     </div>
   );

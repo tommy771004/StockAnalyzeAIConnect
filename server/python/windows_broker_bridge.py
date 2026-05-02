@@ -349,11 +349,37 @@ class KGISession:
     def get_balance(self) -> dict[str, Any]:
         if not self.state.connected:
             fail("kgi not connected", 409)
-        # SKCOM balance query requires additional account libs; expose a stable shape now.
+
+        # --- simulation / dry-run ---
+        if self.state.simulation:
+            return {
+                "totalAssets": 10_000_000.0,
+                "availableMargin": 10_000_000.0,
+                "usedMargin": 0.0,
+                "dailyPnl": 0.0,
+                "currency": "TWD",
+            }
+
+        # --- real SKCOM: try SKQuoteLib / SKReplyLib for account info ---
+        total_assets = 0.0
+        available = 0.0
+        try:
+            import win32com.client  # type: ignore
+            sk_reply = win32com.client.Dispatch(
+                os.getenv("KGI_SKREPLY_PROGID", "SKCOMLib.SKReplyLib")
+            )
+            # SKReplyLib_GetStockAccount returns margin / available; shape depends on SKCOM version
+            if hasattr(sk_reply, "SKReplyLib_GetStockAccount"):
+                info = sk_reply.SKReplyLib_GetStockAccount(self.state.account_id)
+                total_assets = float(getattr(info, "nTotalAssets", 0) or 0)
+                available = float(getattr(info, "nAvailableFund", 0) or 0)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[KGI] get_balance SKCOM error (non-fatal): {exc}")
+
         return {
-            "totalAssets": 0.0,
-            "availableMargin": 0.0,
-            "usedMargin": 0.0,
+            "totalAssets": round(total_assets, 2),
+            "availableMargin": round(available, 2),
+            "usedMargin": round(max(0.0, total_assets - available), 2),
             "dailyPnl": 0.0,
             "currency": "TWD",
         }
@@ -363,27 +389,69 @@ class KGISession:
             fail("kgi not connected", 409)
 
         order_id = f"KGI-{uuid.uuid4().hex[:12]}"
-        status = "FILLED" if self.state.simulation else "PENDING"
-        filled_price = float(order.price or 0)
-        filled_qty = int(order.qty if status == "FILLED" else 0)
+        now_ms = int(time.time() * 1000)
 
-        self.state.open_orders[order_id] = {
-            "orderId": order_id,
-            "status": status,
-            "symbol": order.symbol,
-            "side": order.side,
-            "qty": order.qty,
-            "price": order.price,
-        }
+        # --- simulation / dry-run ---
+        if self.state.simulation:
+            self.state.open_orders[order_id] = {
+                "orderId": order_id, "status": "FILLED",
+                "symbol": order.symbol, "side": order.side,
+                "qty": order.qty, "price": order.price,
+            }
+            return {
+                "orderId": order_id, "status": "FILLED",
+                "filledQty": int(order.qty),
+                "filledPrice": float(order.price or 0),
+                "timestamp": now_ms, "message": "kgi_simulation_fill",
+            }
 
-        return {
-            "orderId": order_id,
-            "status": status,
-            "filledQty": filled_qty,
-            "filledPrice": filled_price,
-            "timestamp": int(time.time() * 1000),
-            "message": ("kgi_simulation_fill" if self.state.simulation else "kgi_order_submitted"),
-        }
+        # --- real SKCOM: SKOrderLib ---
+        try:
+            import win32com.client  # type: ignore
+            sk_order = win32com.client.Dispatch(
+                os.getenv("KGI_SKORDER_PROGID", "SKCOMLib.SKOrderLib")
+            )
+            code = normalize_tw_symbol(order.symbol)
+
+            # Build SKCOM order object — field names match SKCOM 3.x API
+            # BSFlag: 'B' = Buy, 'S' = Sell
+            bs_flag = "B" if order.side.upper() == "BUY" else "S"
+            # PriceFlag: 0=LMT, 2=MKT
+            price_flag = 2 if str(order.orderType).upper() == "MARKET" else 0
+
+            ret_code = None
+            broker_order_id = order_id
+            if hasattr(sk_order, "SKOrderLib_SendStockOrder"):
+                ret_code = sk_order.SKOrderLib_SendStockOrder(
+                    self.state.account_id,
+                    code,
+                    bs_flag,
+                    int(order.qty),
+                    float(order.price or 0),
+                    price_flag,
+                )
+                # SKCOM returns the broker order id or error code (negative = error)
+                if isinstance(ret_code, str):
+                    broker_order_id = ret_code or order_id
+                elif isinstance(ret_code, int) and ret_code < 0:
+                    fail(f"KGI SKOrderLib_SendStockOrder error code {ret_code}", 502)
+
+            status = "PENDING"  # real orders start as PENDING until confirmed
+            self.state.open_orders[broker_order_id] = {
+                "orderId": broker_order_id, "status": status,
+                "symbol": order.symbol, "side": order.side,
+                "qty": order.qty, "price": order.price,
+            }
+            return {
+                "orderId": broker_order_id, "status": status,
+                "filledQty": 0,
+                "filledPrice": float(order.price or 0),
+                "timestamp": now_ms, "message": f"kgi_skcom_submitted:{ret_code}",
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            fail(f"KGI SKOrderLib place_order failed: {exc}", 502)
 
     def cancel_order(self, order_id: str) -> bool:
         if not self.state.connected:
@@ -391,12 +459,48 @@ class KGISession:
         order = self.state.open_orders.get(order_id)
         if not order:
             return False
+        # Attempt real COM cancellation
+        if not self.state.simulation:
+            try:
+                import win32com.client  # type: ignore
+                sk_order = win32com.client.Dispatch(
+                    os.getenv("KGI_SKORDER_PROGID", "SKCOMLib.SKOrderLib")
+                )
+                if hasattr(sk_order, "SKOrderLib_CancelOrder"):
+                    sk_order.SKOrderLib_CancelOrder(self.state.account_id, order_id)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[KGI] cancel_order SKCOM error (non-fatal): {exc}")
         order["status"] = "CANCELLED"
         return True
 
     def get_positions(self) -> list[dict[str, Any]]:
         if not self.state.connected:
             fail("kgi not connected", 409)
+        if self.state.simulation:
+            return list(self.state.positions.values())
+        # Real: try SKReplyLib for position snapshot
+        try:
+            import win32com.client  # type: ignore
+            sk_reply = win32com.client.Dispatch(
+                os.getenv("KGI_SKREPLY_PROGID", "SKCOMLib.SKReplyLib")
+            )
+            if hasattr(sk_reply, "SKReplyLib_GetStockPosition"):
+                raw = sk_reply.SKReplyLib_GetStockPosition(self.state.account_id)
+                if raw:
+                    result = []
+                    for p in (raw if hasattr(raw, "__iter__") else [raw]):
+                        result.append({
+                            "symbol": str(getattr(p, "bstrStockNo", "") or "") + ".TW",
+                            "qty": int(getattr(p, "nQty", 0) or 0),
+                            "avgCost": float(getattr(p, "dAvgPrice", 0) or 0),
+                            "currentPrice": float(getattr(p, "dCurrentPrice", 0) or 0),
+                            "unrealizedPnl": float(getattr(p, "dProfitLoss", 0) or 0),
+                            "marketType": "TW_STOCK",
+                        })
+                    self.state.positions = {r["symbol"]: r for r in result}
+                    return result
+        except Exception as exc:  # noqa: BLE001
+            print(f"[KGI] get_positions SKCOM error (non-fatal): {exc}")
         return list(self.state.positions.values())
 
     def get_open_orders(self) -> list[dict[str, Any]]:

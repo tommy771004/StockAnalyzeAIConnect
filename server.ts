@@ -639,6 +639,21 @@ app.post('/api/autotrading/kill-switch', authMiddleware, (_req, res) => {
   res.json(result);
 });
 
+// Telegram Webhook for quick liquidation
+app.post('/api/webhook/telegram', async (req, res) => {
+  try {
+    const { callback_query } = req.body;
+    if (callback_query && callback_query.data === 'action_kill_switch') {
+      const result = emergencyKillSwitch();
+      console.log('[TelegramWebhook] 收到強平指令:', result);
+    }
+    res.status(200).send('OK');
+  } catch (e) {
+    console.error('[TelegramWebhook] Error:', e);
+    res.status(500).send('Error');
+  }
+});
+
 app.post('/api/autotrading/kill-switch/release', authMiddleware, (_req, res) => {
   const result = deactivateKillSwitch();
   res.json(result);

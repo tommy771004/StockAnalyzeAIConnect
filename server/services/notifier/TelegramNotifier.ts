@@ -17,7 +17,16 @@ export const telegramNotifier: NotifierChannel = {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
+      body: JSON.stringify({ 
+        chat_id: chatId, 
+        text, 
+        parse_mode: 'Markdown',
+        reply_markup: (subject.includes('Kill Switch') || subject.includes('強制平倉')) ? {
+          inline_keyboard: [
+            [{ text: '🚨 執行全域強平 (Kill Switch)', callback_data: 'action_kill_switch' }]
+          ]
+        } : undefined
+      }),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return { ok: false, message: `Telegram ${res.status}` };

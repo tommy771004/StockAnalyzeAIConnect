@@ -11,6 +11,8 @@
  * 後續整合台股交易日曆 API 後再加強。
  */
 
+import { isTwHoliday, getEarlyCloseTime } from './twCalendar.js';
+
 export type MarketKind = 'TW' | 'US' | 'OTHER';
 
 export function classifySymbol(symbol: string): MarketKind {
@@ -63,7 +65,11 @@ export function isTradingSession(
 
   let win: SessionWindow;
   if (market === 'TW') {
-    win = { start: override?.start ?? TW_DEFAULT.start, end: override?.end ?? TW_DEFAULT.end };
+    if (isTwHoliday(now)) {
+      return { open: false, reason: '台股國定假日或休市', market };
+    }
+    const earlyClose = getEarlyCloseTime(now);
+    win = { start: override?.start ?? TW_DEFAULT.start, end: override?.end ?? (earlyClose ?? TW_DEFAULT.end) };
     const startM = toMinutes(win.start);
     const endM = toMinutes(win.end);
     const open = minutes >= startM && minutes < endM;

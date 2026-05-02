@@ -41,6 +41,7 @@ export function AutoTradingPage() {
   const [mainTab, setMainTab] = React.useState('LIVE_VIEW');
   const [defaults, setDefaults] = React.useState<{ config: AgentConfig } | null>(null);
   const [sidebarWidth, setSidebarWidth] = React.useState<number>(readStoredSidebarWidth);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
 
   React.useEffect(() => {
     api.getAutotradingDefaults().then((d: any) => setDefaults(d)).catch(() => {/* 未登入時跳過 */});
@@ -108,6 +109,9 @@ export function AutoTradingPage() {
               </button>
             ))}
           </nav>
+        </div>
+        <div className="flex lg:hidden">
+          <button onClick={() => setIsMobileDrawerOpen(true)} className="px-3 py-1 text-[10px] border border-(--color-term-border) text-(--color-term-accent) rounded focus-ring">CONTROLS</button>
         </div>
         <div className="flex items-center gap-2">
           {/* Connection indicator */}
@@ -201,11 +205,15 @@ export function AutoTradingPage() {
           ariaLabel={t('autotrading.layout.resizeSidebar', '調整側欄寬度')}
         />
 
+        {isMobileDrawerOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsMobileDrawerOpen(false)} />}
         {/* Right sidebar */}
         <div
-          className="autotrading-sidebar flex flex-col gap-2 overflow-y-auto shrink-0"
+          className={`autotrading-sidebar flex flex-col gap-2 overflow-y-auto shrink-0 bg-(--color-term-surface) p-4 lg:p-0 lg:bg-transparent fixed lg:relative inset-y-0 right-0 z-50 transition-transform ${isMobileDrawerOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}
           style={{ ['--autotrading-sidebar-width' as string]: `${sidebarWidth}px` }}
         >
+          <div className="lg:hidden flex justify-end mb-2">
+            <button onClick={() => setIsMobileDrawerOpen(false)} className="text-(--color-term-muted) hover:text-white px-3 py-1 border border-(--color-term-border) rounded text-[10px] focus-ring">CLOSE</button>
+          </div>
           <AgentControlPanel
             status={ws.status}
             config={ws.config}

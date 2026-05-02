@@ -18,9 +18,11 @@ interface Props {
   onParamsChange: (p: StrategyParams) => void;
   isRunning: boolean;
   activeHeat?: number;
+  tradingHours?: { start: string; end: string };
+  onTradingHoursChange?: (hours: { start: string; end: string }) => void;
 }
 
-export function StrategyTab({ strategies, params, onStrategiesChange, onParamsChange, isRunning, activeHeat }: Props) {
+export function StrategyTab({ strategies, params, onStrategiesChange, onParamsChange, isRunning, activeHeat, tradingHours, onTradingHoursChange }: Props) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 
@@ -56,7 +58,9 @@ export function StrategyTab({ strategies, params, onStrategiesChange, onParamsCh
           selected={strategies} 
           params={params} 
           onChange={(s, p) => { onStrategiesChange(s); onParamsChange(p); }} 
-          disabled={isRunning} 
+          disabled={isRunning}
+          tradingHours={tradingHours}
+          onTradingHoursChange={onTradingHoursChange}
         />
       )}
 

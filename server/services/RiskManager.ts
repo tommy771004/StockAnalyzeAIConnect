@@ -98,6 +98,20 @@ class RiskManager {
 
   isKillSwitchActive(): boolean { return this.killSwitchActive; }
 
+  /**
+   * 依據 Monte Carlo 破產機率計算動態倉位縮放比例
+   * 如果機率 >= 10%，則完全阻擋下單 (回傳 0)
+   * 如果機率 >= 5%，則倉位減半 (回傳 0.5)
+   * 如果機率 >= 3%，則倉位減少 20% (回傳 0.8)
+   */
+  getDynamicPositionScaling(): number {
+    const ruin = this.monteCarlo.ruinProbability;
+    if (ruin >= 0.1) return 0;
+    if (ruin >= 0.05) return 0.5;
+    if (ruin >= 0.03) return 0.8;
+    return 1;
+  }
+
   resetDaily() {
     this.currentDailyLoss = 0;
     this.currentDailyTrade = 0;
@@ -126,6 +140,19 @@ class RiskManager {
         reason: `單筆部位 ${orderValue.toLocaleString()} TWD 超過上限 ${this.config.maxSinglePositionTWD.toLocaleString()} TWD`,
         level: 'BLOCK',
       };
+    }
+
+    // 1.5 期貨保證金驗證 (Futures Margin Validation)
+    const isFutures = order.symbol.startsWith('TX') || order.symbol.endsWith('.F');
+    if (isFutures) {
+      const initialMargin = order.price * order.quantity * 0.1; // 假設 10% 初始保證金
+      if (initialMargin > totalAssets) {
+        return {
+          allowed: false,
+          reason: `期貨初始保證金不足: 需要 ${initialMargin.toLocaleString()} TWD，目前權益 ${totalAssets.toLocaleString()} TWD`,
+          level: 'BLOCK',
+        };
+      }
     }
 
     // 2. 佔比上限

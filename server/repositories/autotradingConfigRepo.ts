@@ -31,6 +31,7 @@ export const autotradingConfigRepo = {
       status: row.status as any,
       lossStreakCount: row.lossStreakCount,
       posTrack: (row.posTrack as any) || {},
+      equityHistory: (row.equityHistory as any) || [],
       ...((row.params as any)?.extra || {})
     };
   },
@@ -72,7 +73,7 @@ export const autotradingConfigRepo = {
    * 僅儲存運行狀態與計數 (P1)
    * 含 3 次指數退避重試，應對 Neon HTTP 瞬斷問題。
    */
-  async saveState(userId: string, state: { status: string; lossStreakCount: number; posTrack: any }) {
+  async saveState(userId: string, state: { status: string; lossStreakCount: number; posTrack: any; equityHistory?: any }) {
     const MAX_RETRIES = 3;
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -82,6 +83,7 @@ export const autotradingConfigRepo = {
             status: state.status as any,
             lossStreakCount: state.lossStreakCount,
             posTrack: state.posTrack,
+            equityHistory: state.equityHistory,
             updatedAt: new Date(),
           })
           .where(eq(autotradingConfigs.userId, userId));

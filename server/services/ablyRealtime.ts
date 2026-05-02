@@ -90,7 +90,7 @@ export async function createAutotradingToken(clientId?: string) {
 
 // High-frequency event types that would overwhelm Ably REST if published individually.
 // Clients retrieve logs via the REST polling endpoint instead.
-const SKIP_ABLY_TYPES = new Set(['agent_log', 'log_history']);
+const SKIP_ABLY_TYPES = new Set(['log_history']);
 
 let _lastPublishErrorAt = 0;
 function logAblyPublishError(message: string) {

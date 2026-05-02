@@ -247,6 +247,7 @@ export const autotradingConfigs = pgTable('autotrading_configs', {
   status:          text('status').notNull().default('stopped'),
   lossStreakCount: bigint('loss_streak_count', { mode: 'number' }).notNull().default(0),
   posTrack:        jsonb('pos_track'),
+  equityHistory:   jsonb('equity_history'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 });
 
