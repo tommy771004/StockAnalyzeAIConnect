@@ -18,11 +18,12 @@ interface Props {
   positions: Position[];
   symbols: string[];
   decisionFusions: Record<string, DecisionFusion>;
+  highlightedSymbols?: Set<string>;
 }
 
 const fmt = (n: number, d = 2) => n.toLocaleString('zh-TW', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-export function AssetMonitor({ positions, symbols, decisionFusions }: Props) {
+export function AssetMonitor({ positions, symbols, decisionFusions, highlightedSymbols }: Props) {
   const { t } = useTranslation();
   const [liveQuotes, setLiveQuotes] = useState<Map<string, LiveQuote>>(new Map());
   const busyRef = useRef(false);
@@ -132,7 +133,13 @@ export function AssetMonitor({ positions, symbols, decisionFusions }: Props) {
                 const isSell = action === 'SELL';
 
                 return (
-                  <tr key={symbol} className="border-b border-(--color-term-border)/50 hover:bg-white/3 transition-colors">
+                  <tr
+                    key={symbol}
+                    className={cn(
+                      'border-b border-(--color-term-border)/50 transition-colors duration-700',
+                      highlightedSymbols?.has(symbol) ? 'bg-cyan-500/15' : 'hover:bg-white/3'
+                    )}
+                  >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <span className={cn(
