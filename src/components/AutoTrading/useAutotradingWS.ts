@@ -99,6 +99,7 @@ interface AutotradingState {
   decisionFusions: Record<string, DecisionFusion>;
   globalSentiment: number;
   equityHistory: EquitySnapshot[];
+  orderEvents: OrderLifecycleEvent[];
   connected: boolean;
   transport: RealtimeTransport;
   offlineReason: string;
@@ -116,6 +117,7 @@ export function useAutotradingWS() {
     decisionFusions: {},
     globalSentiment: 50,
     equityHistory: [],
+    orderEvents: [],
     connected: false,
     transport: 'none',
     offlineReason: '',
@@ -175,6 +177,12 @@ export function useAutotradingWS() {
               ...prev.decisionFusions,
               [msg.data.symbol]: msg.data as DecisionFusion,
             },
+          };
+        case 'order_lifecycle':
+          setTimeout(() => void pollSnapshotRef.current(), 0);
+          return {
+            ...prev,
+            orderEvents: [...prev.orderEvents, msg.data as OrderLifecycleEvent].slice(-50),
           };
         case 'trade_executed':
           setTimeout(() => void pollSnapshotRef.current(), 0);

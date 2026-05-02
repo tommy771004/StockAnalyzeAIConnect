@@ -23,7 +23,7 @@ import { webhookNotifier } from './WebhookNotifier.js';
 import { emailNotifier } from './EmailNotifier.js';
 
 export type NotifyEvent = 'kill_switch' | 'risk_block' | 'fill' | 'daily_report';
-export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation';
+export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation' | 'margin_call';
 
 export interface NotifierChannel {
   channel: string;
@@ -76,6 +76,16 @@ function formatMessage(event: ExtendedNotifyEvent, payload: Record<string, unkno
       return {
         subject: `⚛️ 量子強制平倉 ${payload.symbol ?? ''}`.trim(),
         body: `標的：${payload.symbol ?? 'UNKNOWN'}\n原因：${payload.reason ?? 'quantum risk gate'}\n信心度：${payload.confidence ?? '-'}\nregime_flip_prob：${payload.regimeFlipProb ?? '-'}`,
+      };
+    case 'margin_call':
+      return {
+        subject: `⚠️ 期貨保證金警示 ${payload.symbol ?? ''}`.trim(),
+        body: [
+          `「${payload.symbol ?? '期貨'}${payload.contractCount ? ` ×${payload.contractCount}口` : ''}」`,
+          `維持保證金缺口：${payload.shortfallTwd ? `${Number(payload.shortfallTwd).toLocaleString()} TWD` : '-'}`,
+          `缺口比例：${payload.shortfallPct ? `${Number(payload.shortfallPct).toFixed(1)}%` : '-'}`,
+          payload.autoReduced ? `✅ 已自動減碼 ${payload.autoReduced} 口` : `⚠️ 建議手動減碼或補足保證金`,
+        ].join('\n'),
       };
   }
 }

@@ -126,7 +126,37 @@ class RiskManager {
     }
   }
 
-  validateOrder(order: OrderRequest, totalAssets: number): RiskCheckResult {
+checkMaintenanceMargin(
+      positions: Array<{ symbol: string; qty: number; avgCost: number; currentPrice?: number }>,
+      totalAssets: number,
+    ): { symbol: string; shortfallTwd: number; shortfallPct: number; autoReduceContracts: number }[] {
+      const INITIAL_MARGIN_PCT    = 0.10;
+      const MAINT_MARGIN_PCT      = 0.07;
+      const AUTO_REDUCE_THRESHOLD = 0.50;
+      const alerts: { symbol: string; shortfallTwd: number; shortfallPct: number; autoReduceContracts: number }[] = [];
+      for (const pos of positions) {
+        const isFutures = pos.symbol.startsWith('TX') || pos.symbol.endsWith('.F');
+        if (!isFutures || pos.qty <= 0) continue;
+        const price         = pos.currentPrice ?? pos.avgCost;
+        const contractValue = price * pos.qty;
+        const maintRequired = contractValue * MAINT_MARGIN_PCT;
+        const marginUsed    = contractValue * INITIAL_MARGIN_PCT;
+        const available     = totalAssets - marginUsed;
+        const shortfall     = maintRequired - available;
+        if (shortfall <= 0) continue;
+        const shortfallPct = (shortfall / maintRequired) * 100;
+        let autoReduceContracts = 0;
+        if (shortfallPct > AUTO_REDUCE_THRESHOLD * 100) {
+          const marginPerContract = price * INITIAL_MARGIN_PCT;
+          autoReduceContracts = marginPerContract > 0
+            ? Math.min(Math.ceil(shortfall / marginPerContract), pos.qty) : 0;
+        }
+        alerts.push({ symbol: pos.symbol, shortfallTwd: shortfall, shortfallPct, autoReduceContracts });
+      }
+      return alerts;
+    }
+  
+    validateOrder(order: OrderRequest, totalAssets: number): RiskCheckResult {
     if (this.killSwitchActive) {
       return { allowed: false, reason: '緊急停機開關已啟動，所有交易已暫停', level: 'KILL' };
     }

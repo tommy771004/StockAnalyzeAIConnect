@@ -28,8 +28,10 @@ import type { RawQuantumOutput } from './quantum/quantumPolicy.js';
 import { applyQuantumPolicy } from './quantum/quantumPolicy.js';
 import { getQuantumSignal, timesFmPredict } from '../utils/scienceService.js';
 import { notifier } from './notifier/index.js';
+import * as tradesRepo from '../repositories/tradesRepo.js';
 
 import { autotradingConfigRepo } from '../repositories/autotradingConfigRepo.js';
+import type { OrderLifecycleEvent } from './orderExecutor.js';
 
 interface TaiwanSkillRules {
   settlementCycle: 'T+2';
@@ -229,10 +231,26 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-let executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
+function handleOrderLifecycle(event: OrderLifecycleEvent) {
+  if (wsBroadcast) {
+    wsBroadcast({ type: 'order_lifecycle', data: event });
+  }
+  if (event.status === 'FILLED') {
+    tradesRepo.createTrade('system', {
+      symbol: event.symbol,
+      type: event.side === 'BUY' ? 'BUY' : 'SELL',
+      shares: event.qty.toString(),
+      price: event.price.toString(),
+      strategy: 'AI_AGENT',
+      notes: `Auto-traded by AI agent`,
+    }).catch(e => console.error('[Agent] Failed to persist trade:', e));
+  }
+}
+
+let executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log), handleOrderLifecycle);
 
 function refreshExecutor() {
-  executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log));
+  executor = new OrderExecutor(activeBroker, hedgeBroker, (log) => emitLog(log), handleOrderLifecycle);
 }
 
 function resolveBrokerById(brokerId: string): IBrokerAdapter {
@@ -710,6 +728,38 @@ async function agentTick() {
   try {
     // 定期推送帳戶與持倉狀態並同步內部狀態 (P1)
     const { balance, positions } = await broadcastAccountUpdate();
+
+    // ── 期貨維持保證金掃描 (Margin Call Monitoring) ─────────────────────────
+    {
+      const posArr = Array.from(posTrack.entries()).map(([symbol, v]) => ({
+        symbol, qty: v.qty, avgCost: v.avgCost,
+      }));
+      const marginAlerts = riskManager.checkMaintenanceMargin(posArr, balance.totalAssets);
+      for (const alert of marginAlerts) {
+        const logMsg = `⚠️ 保證金警示 ${alert.symbol}: 缺口 ${alert.shortfallTwd.toFixed(0)} TWD (${alert.shortfallPct.toFixed(1)}%)`;
+        emitLog({ level: 'RISK_CHK', source: 'MARGIN', symbol: alert.symbol, message: logMsg });
+        if (alert.autoReduceContracts > 0) {
+          emitLog({ level: 'RISK_CHK', source: 'MARGIN', symbol: alert.symbol,
+            message: `🔻 自動減碼 ${alert.autoReduceContracts} 口以補足保證金` });
+          const tracked = posTrack.get(alert.symbol);
+          if (tracked) {
+            const sellQty = Math.min(alert.autoReduceContracts, tracked.qty);
+            void executor.executeTrade(agentConfig, {
+              symbol: alert.symbol, side: 'SELL', qty: sellQty, price: tracked.avgCost,
+            });
+          }
+          void notifier.dispatch(agentConfig.userId ?? '', 'margin_call', {
+            symbol: alert.symbol, shortfallTwd: alert.shortfallTwd,
+            shortfallPct: alert.shortfallPct, autoReduced: alert.autoReduceContracts,
+          });
+        } else {
+          void notifier.dispatch(agentConfig.userId ?? '', 'margin_call', {
+            symbol: alert.symbol, shortfallTwd: alert.shortfallTwd,
+            shortfallPct: alert.shortfallPct,
+          });
+        }
+      }
+    }
 
     // 盤前盤後守門：若所有監控標的皆收盤，僅同步狀態，不發出 LLM 分析請求
     if (!anyMarketOpen(agentConfig.symbols, agentConfig.tradingHours)) {

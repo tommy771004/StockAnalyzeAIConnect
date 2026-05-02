@@ -14,6 +14,8 @@ import { StrategyTab } from '../../components/AutoTrading/StrategyTab';
 import { BacktestPanel } from '../../components/AutoTrading/BacktestPanel';
 import { StrategySandbox } from '../../components/AutoTrading/StrategySandbox';
 import { Splitter } from '../../components/AutoTrading/Splitter';
+import { OrderBookPanel } from '../../components/AutoTrading/OrderBookPanel';
+import { PerformanceDashboard } from '../../components/AutoTrading/PerformanceDashboard';
 import type { AgentConfig } from '../../components/AutoTrading/types';
 import * as api from '../../services/api';
 import '../../components/AutoTrading/autotrading.css';
@@ -93,7 +95,8 @@ export function AutoTradingPage() {
               { id: 'LIVE_VIEW', label: t('autotrading.tabs.liveView') },
               { id: 'STRATEGY', label: t('autotrading.tabs.strategy') },
               { id: 'BACKTEST', label: t('autotrading.tabs.backtest') },
-              { id: 'SIMULATION', label: t('autotrading.tabs.simulation') }
+              { id: 'SIMULATION', label: t('autotrading.tabs.simulation') },
+              { id: 'PERFORMANCE', label: 'PERFORMANCE' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -156,13 +159,19 @@ export function AutoTradingPage() {
                   }}
                 />
               </div>
-              {/* Asset Monitor */}
-              <div className="h-52 border border-(--color-term-border) rounded-sm overflow-hidden shrink-0">
-                <AssetMonitor
-                  positions={ws.positions}
-                  symbols={currentSymbols}
-                  decisionFusions={ws.decisionFusions}
-                />
+              <div className="flex gap-2 h-52 shrink-0">
+                {/* Asset Monitor */}
+                <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
+                  <AssetMonitor
+                    positions={ws.positions}
+                    symbols={currentSymbols}
+                    decisionFusions={ws.decisionFusions}
+                  />
+                </div>
+                {/* Order Book Panel */}
+                <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
+                  <OrderBookPanel events={ws.orderEvents} />
+                </div>
               </div>
             </>
           )}
@@ -196,6 +205,12 @@ export function AutoTradingPage() {
                 onPromote={p => handleUpdateConfig({ params: p })}
                 onDelete={n => { const next = { ...ws.config?.shadowConfigs }; delete next[n]; handleUpdateConfig({ shadowConfigs: next }); }}
               />
+            </div>
+          )}
+
+          {mainTab === 'PERFORMANCE' && (
+            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
+              <PerformanceDashboard />
             </div>
           )}
         </div>

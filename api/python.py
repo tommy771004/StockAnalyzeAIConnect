@@ -222,3 +222,91 @@ def get_options_greeks(S: float, K: float, r: float, sigma: float, T: float, opt
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
 
+
+def _bs_price(S: float, K: float, r: float, sigma: float, T: float, is_call: bool) -> float:
+    """Internal Black-Scholes price for IV solver."""
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    if is_call:
+        return S * norm_cdf(d1) - K * math.exp(-r * T) * norm_cdf(d2)
+    return K * math.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1)
+
+
+def _bs_vega(S: float, K: float, r: float, sigma: float, T: float) -> float:
+    """Vega (dPrice/dSigma) — same sign for call and put."""
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    return S * norm_pdf(d1) * math.sqrt(T)
+
+
+@app.get("/api/python/options_iv")
+def get_options_iv(
+    market_price: float,
+    S: float,
+    K: float,
+    r: float,
+    T: float,
+    option_type: str = "call",
+    tol: float = 1e-7,
+    max_iter: int = 100,
+) -> Dict[str, Any]:
+    """
+    Newton-Raphson implied volatility solver.
+
+    Parameters
+    ----------
+    market_price : observed option market price
+    S            : underlying spot price
+    K            : strike price
+    r            : risk-free rate (annualised, e.g. 0.05)
+    T            : time to expiry in years (e.g. 30 days → 30/365)
+    option_type  : 'call' | 'put'
+    tol          : convergence tolerance (default 1e-7)
+    max_iter     : maximum Newton-Raphson iterations (default 100)
+    """
+    try:
+        if T <= 0 or S <= 0 or K <= 0 or market_price <= 0:
+            return {"status": "error", "message": "Parameters S, K, T, market_price must be positive."}
+
+        is_call = option_type.lower() == "call"
+
+        # Intrinsic value check — IV is undefined below intrinsic
+        intrinsic = max(0.0, (S - K) if is_call else (K - S)) * math.exp(-r * T)
+        if market_price < intrinsic - 1e-6:
+            return {
+                "status": "error",
+                "message": f"Market price {market_price:.4f} is below intrinsic value {intrinsic:.4f}.",
+            }
+
+        # Initial sigma guess (Brenner & Subrahmanyam approximation)
+        sigma = math.sqrt(2 * math.pi / T) * market_price / S
+
+        for i in range(max_iter):
+            price = _bs_price(S, K, r, sigma, T, is_call)
+            vega  = _bs_vega(S, K, r, sigma, T)
+
+            diff = price - market_price
+
+            if abs(diff) < tol:
+                break
+
+            if abs(vega) < 1e-12:
+                return {"status": "error", "message": "Vega too small — cannot converge (deep in/out of money)."}
+
+            sigma = sigma - diff / vega
+            if sigma <= 0:
+                sigma = 1e-6   # clamp to positive
+
+        else:
+            return {"status": "error", "message": f"IV did not converge after {max_iter} iterations."}
+
+        return {
+            "status": "success",
+            "data": {
+                "iv": sigma,
+                "iv_pct": sigma * 100.0,
+                "iterations": i + 1,
+                "final_price_error": abs(price - market_price),
+            },
+        }
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}

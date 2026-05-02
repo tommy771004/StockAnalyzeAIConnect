@@ -108,3 +108,45 @@ export function nextTradingDay(date: Date = new Date()): Date {
 export function getMaintainedYears(): number[] {
   return Object.keys(HOLIDAYS_BY_YEAR).map(n => parseInt(n, 10)).sort();
 }
+
+/** 
+ * 從 TWSE OpenAPI 動態載入休假日曆
+ * 可在 Server 啟動時呼叫一次 
+ */
+export async function initCalendar(): Promise<void> {
+  try {
+    const res = await fetch('https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule');
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data: Array<{ Name: string; Date: string; Weekday: string; Description: string }> = await res.json();
+    
+    // Filter out rows that are actually trading days
+    const holidays = data.filter(d => !d.Name.includes('開始交易') && !d.Name.includes('最後交易'));
+
+    const newHolidaysByYear: Record<number, string[]> = {};
+    for (const h of holidays) {
+      if (h.Date && h.Date.length === 7) {
+        const rocYear = parseInt(h.Date.substring(0, 3), 10);
+        const year = rocYear + 1911;
+        const month = h.Date.substring(3, 5);
+        const day = h.Date.substring(5, 7);
+        const iso = `${year}-${month}-${day}`;
+        if (!newHolidaysByYear[year]) newHolidaysByYear[year] = [];
+        newHolidaysByYear[year].push(iso);
+      }
+    }
+
+    // Merge into HOLIDAYS_BY_YEAR
+    for (const [yearStr, dates] of Object.entries(newHolidaysByYear)) {
+      const year = parseInt(yearStr, 10);
+      if (!HOLIDAYS_BY_YEAR[year]) {
+        HOLIDAYS_BY_YEAR[year] = { holidays: dates, earlyClose: {} };
+      } else {
+        // Merge and deduplicate
+        HOLIDAYS_BY_YEAR[year].holidays = Array.from(new Set([...HOLIDAYS_BY_YEAR[year].holidays, ...dates]));
+      }
+    }
+    console.log('[twCalendar] Dynamic calendar loaded from TWSE OpenAPI');
+  } catch (err) {
+    console.warn('[twCalendar] Failed to load dynamic calendar, using fallback:', (err as Error).message);
+  }
+}

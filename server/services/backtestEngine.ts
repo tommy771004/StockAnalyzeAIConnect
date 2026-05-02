@@ -191,6 +191,7 @@ export async function runAdvancedBacktest(
         if (estShares > 0) {
           shares = estShares;
           const tradeValue = shares * currentPrice;
+
           const commission = Math.max(20, tradeValue * 0.001425);
           
           balance -= (tradeValue + commission);
@@ -214,15 +215,35 @@ export async function runAdvancedBacktest(
   // 計算指標
   const roi = equityCurve[equityCurve.length - 1]?.portfolio || 0;
   const winRate = trades.length > 0 ? (trades.filter(t => t.pnl > 0).length / trades.length) * 100 : 0;
-  
+
+  // Sharpe ratio：從權益曲線日報酬率計算，年化 √252
+  const dailyReturns: number[] = [];
+  for (let i = 1; i < equityCurve.length; i++) {
+    const prev = equityCurve[i - 1].portfolio + 100;
+    const curr = equityCurve[i].portfolio + 100;
+    if (prev > 0) dailyReturns.push((curr - prev) / prev);
+  }
+  let sharpe = 0;
+  if (dailyReturns.length >= 2) {
+    const mean = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
+    const variance = dailyReturns.reduce((acc, r) => acc + (r - mean) ** 2, 0) / (dailyReturns.length - 1);
+    const std = Math.sqrt(variance);
+    sharpe = std > 0 ? (mean / std) * Math.sqrt(252) : 0;
+  }
+
+  // Profit Factor：正 PnL 總和 / |負 PnL 總和|
+  const grossWin = trades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
+  const grossLoss = Math.abs(trades.filter(t => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
+  const profitFactor = grossLoss === 0 ? (grossWin > 0 ? Infinity : 0) : grossWin / grossLoss;
+
   return {
     metrics: {
       roi,
-      sharpe: 1.8, // 簡化計算
+      sharpe: Math.round(sharpe * 100) / 100,
       maxDrawdown: calculateMDD(equityCurve),
       winRate,
       totalTrades: trades.length,
-      profitFactor: 1.5
+      profitFactor: Number.isFinite(profitFactor) ? Math.round(profitFactor * 100) / 100 : profitFactor,
     },
     equityCurve,
     trades

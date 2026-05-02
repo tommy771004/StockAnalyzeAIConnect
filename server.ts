@@ -9,6 +9,8 @@ import * as TV from './server/services/TradingViewService.js';
 import * as TWSE from './server/services/TWSeService.js';
 import * as Sectors from './server/services/SectorService.js';
 import * as WantGoo from './server/services/WantGooService.js';
+import { initCalendar } from './server/services/twCalendar.js';
+import { startDailySettlementSchedule } from './server/services/dailySettlement.js';
 import { parseSymbol, toYahoo } from './src/utils/symbolParser.js';
 import { authMiddleware, setTokenCookie, clearTokenCookie, type AuthRequest } from './server/middleware/auth.js';
 import * as usersRepo from './server/repositories/usersRepo.js';
@@ -714,6 +716,45 @@ app.get('/api/autotrading/balance', authMiddleware, async (_req, res) => {
   try {
     const balance = await simulatedAdapter.getBalance();
     res.json(balance);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId ?? 'mock-user-id';
+    const openOnly = req.query.open === '1';
+    const list = openOnly 
+      ? await ordersRepo.listOpenByUser(userId)
+      : await ordersRepo.listByUser(userId, 50);
+    res.json({ ok: true, orders: list });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId ?? 'mock-user-id';
+    const period = (req.query.period as PerformancePeriod) || '1m';
+    const result = await getPerformance(userId, period);
+    res.json(result);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const userId = req.userId ?? 'mock-user-id';
+    const order = await ordersRepo.findByIdForUser(id, userId);
+    if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
+    
+    // In a real system, we would call broker.cancelOrder() here.
+    await ordersRepo.cancel(id, 'User requested cancellation');
+    res.json({ ok: true });
   } catch (e) {
     handleApiError(res, e);
   }
@@ -2130,6 +2171,9 @@ if (!process.env.VERCEL) {
 }
 
 if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  initCalendar().catch(e => console.error('[twCalendar] Init error:', e));
+  startDailySettlementSchedule();
+
   if (process.env.NODE_ENV !== 'production') {
     import('vite').then(async ({ createServer: createViteServer }) => {
       const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
