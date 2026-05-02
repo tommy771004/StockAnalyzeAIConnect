@@ -65,9 +65,9 @@ export function DecisionLog({ logs, autoScroll = true, quantumEnabled = false, h
           logs.map(log => (
             <React.Fragment key={log.id}>
               <div className={cn(
-  'flex gap-2 leading-relaxed px-1 rounded transition-colors duration-700',
-  log.symbol && highlightedSymbols?.has(log.symbol) ? 'bg-cyan-500/15' : 'hover:bg-white/3'
-)}>
+                'flex gap-2 leading-relaxed px-1 rounded transition-colors duration-700',
+                log.symbol && highlightedSymbols?.has(log.symbol) ? 'bg-cyan-500/15' : 'hover:bg-white/3'
+              )}>
               <span className="text-(--color-term-muted) shrink-0">[{formatTs(log.timestamp)}]</span>
               <span className={cn('font-bold shrink-0', LOG_LEVEL_COLORS[log.level])}>
                 [{log.level}]
