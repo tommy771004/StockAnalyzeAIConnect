@@ -5,11 +5,15 @@ import { formatPct, toneClass } from '../ui/format';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Panel } from '../ui/Panel';
+import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
 
 export function MarketPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { sectors, indices, loading } = useMarketData();
+  const { sectors, indices, loading, lastUpdated } = useMarketData();
+  const marketDataMode: DataMode = loading && sectors.length === 0 && indices.length === 0
+    ? 'MOCK'
+    : (lastUpdated ? 'LIVE' : 'DELAYED');
 
   if (loading && sectors.length === 0) {
     return (
@@ -22,7 +26,11 @@ export function MarketPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
       <div className="col-span-12">
-        <Panel title={t('market.sectorTitle')} collapsible>
+        <Panel
+          title={t('market.sectorTitle')}
+          collapsible
+          actions={<DataStatusBadge mode={marketDataMode} lastUpdated={lastUpdated || null} />}
+        >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1">
             {sectors.map((s) => (
               <div
@@ -53,7 +61,11 @@ export function MarketPage() {
       </div>
 
       <div className="col-span-12 min-h-[260px]">
-        <Panel title={t('market.indicesTitle')} collapsible>
+        <Panel
+          title={t('market.indicesTitle')}
+          collapsible
+          actions={<DataStatusBadge mode={marketDataMode} lastUpdated={lastUpdated || null} />}
+        >
           <table className="w-full text-[12px]">
             <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) z-10 sticky top-0">
               <tr className="border-b border-(--color-term-border)">

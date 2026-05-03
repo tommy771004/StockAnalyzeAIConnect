@@ -21,7 +21,7 @@
  * 参考文件：https://developers.ecpay.com.tw/
  */
 
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import crypto from 'crypto';
 import { db } from '../../src/db/index.js';
 import { paymentOrders } from '../../src/db/schema.js';
@@ -33,11 +33,52 @@ export const ecpayRouter = Router();
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const ECPAY_MERCHANT_ID = process.env.ECPAY_MERCHANT_ID ?? '2000132'; // 測試商店代號
-const ECPAY_HASH_KEY    = process.env.ECPAY_HASH_KEY    ?? '5294y06JbISpM5x9';
-const ECPAY_HASH_IV     = process.env.ECPAY_HASH_IV     ?? 'v77hoKGq4kWxNNIS';
+const ECPAY_MERCHANT_ID = (process.env.ECPAY_MERCHANT_ID ?? '').trim();
+const ECPAY_HASH_KEY    = (process.env.ECPAY_HASH_KEY ?? '').trim();
+const ECPAY_HASH_IV     = (process.env.ECPAY_HASH_IV ?? '').trim();
 const IS_SANDBOX        = (process.env.ECPAY_ENV ?? 'sandbox') !== 'production';
-const APP_BASE_URL      = (process.env.APP_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const APP_BASE_URL      = (process.env.APP_BASE_URL ?? '').replace(/\/$/, '');
+
+const MISSING_ECPAY_VARS = [
+  !ECPAY_MERCHANT_ID ? 'ECPAY_MERCHANT_ID' : null,
+  !ECPAY_HASH_KEY ? 'ECPAY_HASH_KEY' : null,
+  !ECPAY_HASH_IV ? 'ECPAY_HASH_IV' : null,
+].filter(Boolean) as string[];
+
+const ECPAY_CONFIG_OK = MISSING_ECPAY_VARS.length === 0;
+if (!ECPAY_CONFIG_OK) {
+  console.warn(`[ECPay] Missing required env vars: ${MISSING_ECPAY_VARS.join(', ')}`);
+}
+
+function ensureEcpayConfigured(res: Response, mode: 'json' | 'notify' | 'html' = 'json') {
+  if (ECPAY_CONFIG_OK) return true;
+  const message = `ECPay configuration missing: ${MISSING_ECPAY_VARS.join(', ')}`;
+  if (mode === 'notify') {
+    res.status(500).send('0|ErrorMessage');
+    return false;
+  }
+  if (mode === 'html') {
+    res.status(500).send(`<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="UTF-8"><title>付款服務暫停</title></head>
+<body style="font-family:sans-serif;text-align:center;padding:60px">
+  <h2 style="color:#ef4444">付款服務暫停</h2>
+  <p>系統設定尚未完成，請稍後再試或聯繫客服。</p>
+  <p style="color:#6b7280;font-size:12px">${message}</p>
+  <a href="/" style="color:#3b82f6">返回首頁</a>
+</body></html>`);
+    return false;
+  }
+  res.status(500).json({ error: message });
+  return false;
+}
+
+function resolveAppBaseUrl(req: AuthRequest): string {
+  if (APP_BASE_URL) return APP_BASE_URL;
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const proto = forwardedProto || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  return host ? `${proto}://${host}` : 'http://localhost:3000';
+}
 
 const ECPAY_ENDPOINT = IS_SANDBOX
   ? 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckout/V5'
@@ -117,6 +158,7 @@ function buildAutoPostForm(endpoint: string, params: Record<string, string>): st
 // ─── POST /api/payment/ecpay/checkout ────────────────────────────────────────
 
 ecpayRouter.post('/checkout', async (req: AuthRequest, res) => {
+  if (!ensureEcpayConfigured(res)) return;
   const userId = req.userId;
   if (!userId) { res.status(401).json({ error: '未授權' }); return; }
 
@@ -148,6 +190,7 @@ ecpayRouter.post('/checkout', async (req: AuthRequest, res) => {
     .replace(/\//g, '/')         // ECPay format: 2024/01/15 14:30:00
     .replace(',', '');
 
+  const appBaseUrl = resolveAppBaseUrl(req);
   const params: Record<string, string> = {
     MerchantID:        ECPAY_MERCHANT_ID,
     MerchantTradeNo:   tradeNo,
@@ -156,8 +199,8 @@ ecpayRouter.post('/checkout', async (req: AuthRequest, res) => {
     TotalAmount:       String(plan.priceNtd),
     TradeDesc:         encodeURIComponent(`Quantum AI ${plan.nameTw}`),
     ItemName:          plan.nameTw,
-    ReturnURL:         `${APP_BASE_URL}/api/payment/ecpay/notify`,
-    OrderResultURL:    `${APP_BASE_URL}/api/payment/ecpay/return`,
+    ReturnURL:         `${appBaseUrl}/api/payment/ecpay/notify`,
+    OrderResultURL:    `${appBaseUrl}/api/payment/ecpay/return`,
     ChoosePayment:     'Credit',
     EncryptType:       '1',
   };
@@ -171,6 +214,7 @@ ecpayRouter.post('/checkout', async (req: AuthRequest, res) => {
 // ─── POST /api/payment/ecpay/notify  (Server-to-server by ECPay) ─────────────
 
 ecpayRouter.post('/notify', async (req, res) => {
+  if (!ensureEcpayConfigured(res, 'notify')) return;
   const params = req.body as Record<string, string>;
 
   // 1. Verify signature
@@ -235,6 +279,7 @@ ecpayRouter.post('/notify', async (req, res) => {
 // ─── GET /api/payment/ecpay/return  (User return page) ───────────────────────
 
 ecpayRouter.get('/return', async (req, res) => {
+  if (!ensureEcpayConfigured(res, 'html')) return;
   const params = req.query as Record<string, string>;
 
   if (!verifyCheckMacValue(params)) {

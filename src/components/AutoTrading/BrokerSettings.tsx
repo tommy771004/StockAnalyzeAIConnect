@@ -105,11 +105,16 @@ export function BrokerSettings({ onConnect, disabled }: Props) {
           <button
             key={b.id}
             type="button"
-            onClick={() => { setSelectedBroker(b.id); setStatus({ type: 'idle', msg: '' }); }}
-            disabled={disabled}
+            onClick={() => {
+              if (stub) return;
+              setSelectedBroker(b.id);
+              setStatus({ type: 'idle', msg: '' });
+            }}
+            disabled={disabled || stub}
             className={cn(
               "focus-ring text-left p-3 border rounded-sm motion-safe:transition-all flex items-center gap-4",
-              selectedBroker === b.id ? "border-cyan-500/40 bg-cyan-500/5" : "border-(--color-term-border) bg-white/2 hover:bg-white/3"
+              selectedBroker === b.id ? "border-cyan-500/40 bg-cyan-500/5" : "border-(--color-term-border) bg-white/2 hover:bg-white/3",
+              stub && "opacity-70 cursor-not-allowed"
             )}
           >
             <div className={cn(

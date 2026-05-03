@@ -8,6 +8,7 @@ import type { CandlePoint } from '../types';
 import { PersonaSelector } from '../ui/PersonaSelector';
 import { SecFilingsPanel } from '../ui/SecFilingsPanel';
 import { CongressTradesPanel } from '../ui/CongressTradesPanel';
+import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
 import { getFreeModels } from '../../services/aiService';
 import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
 import * as api from '../../services/api';
@@ -25,6 +26,7 @@ export function ResearchPage() {
   const [timeRange, setTimeRange] = useState('1M');
   const { data, loading, error } = useResearchData(activeSymbol, timeRange);
   const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [researchUpdatedAt, setResearchUpdatedAt] = useState<string | null>(null);
 
   // Pick up symbol navigated from Dashboard "深入研究" button
   useEffect(() => {
@@ -79,6 +81,10 @@ export function ResearchPage() {
     if (activeSymbol) fetchSummary();
   }, [activeSymbol, persona, selectedModel]);
 
+  useEffect(() => {
+    if (data) setResearchUpdatedAt(new Date().toISOString());
+  }, [data]);
+
   // Live quote polling: when 1D is selected during Taiwan market hours, poll every 2 s
   // and patch the last history candle so the chart reflects the real-time price.
   useEffect(() => {
@@ -89,7 +95,10 @@ export function ResearchPage() {
       try {
         const quotes = await api.getBatchQuotes([activeSymbol]);
         const p: number | undefined = quotes[0]?.regularMarketPrice;
-        if (p && p > 0) setLivePrice(p);
+        if (p && p > 0) {
+          setLivePrice(p);
+          setResearchUpdatedAt(new Date().toISOString());
+        }
       } catch {}
     };
     void poll();
@@ -134,6 +143,12 @@ export function ResearchPage() {
   const tvIndicators = data?.tvIndicators || {};
   const news = data?.tvNews || [];
   const chip = data?.wantGooChip;
+  const hasResearchPayload = !!quote || history.length > 0 || news.length > 0;
+  const researchDataMode: DataMode = livePrice
+    ? 'LIVE'
+    : hasResearchPayload
+      ? 'DELAYED'
+      : 'MOCK';
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-10">
@@ -199,6 +214,7 @@ export function ResearchPage() {
           </div>
 
           {loading ? <Loader2 className="h-4 w-4 animate-spin text-(--color-term-accent)" /> : null}
+          <DataStatusBadge mode={researchDataMode} lastUpdated={researchUpdatedAt} />
         </header>
 
         <QuoteHeader symbol={activeSymbol} quote={quote} tv={tv} />
@@ -210,7 +226,14 @@ export function ResearchPage() {
         )}
 
         {viewMode === 'standard' ? (
-          <ChartPanel symbol={activeSymbol} history={liveHistory} range={timeRange} setRange={setTimeRange} isLive={!!livePrice} />
+          <ChartPanel
+            symbol={activeSymbol}
+            history={liveHistory}
+            range={timeRange}
+            setRange={setTimeRange}
+            dataMode={researchDataMode}
+            lastUpdated={researchUpdatedAt}
+          />
         ) : (
           <div className="flex flex-col gap-3 min-h-0 overflow-auto">
             <SecFilingsPanel symbol={activeSymbol} />
@@ -281,7 +304,21 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 import { useTranslation } from 'react-i18next';
 import ChartWidget from '../../components/ChartWidget';
 
-function ChartPanel({ symbol, history, range, setRange, isLive }: { symbol: string, history: any[], range: string, setRange: (r: string) => void, isLive?: boolean }) {
+function ChartPanel({
+  symbol,
+  history,
+  range,
+  setRange,
+  dataMode,
+  lastUpdated,
+}: {
+  symbol: string;
+  history: any[];
+  range: string;
+  setRange: (r: string) => void;
+  dataMode: DataMode;
+  lastUpdated: string | null;
+}) {
   const { t } = useTranslation();
   return (
     <Panel
@@ -289,12 +326,7 @@ function ChartPanel({ symbol, history, range, setRange, isLive }: { symbol: stri
       collapsible
       className="flex-1 min-h-[450px]"
       bodyClassName="flex min-h-0 flex-col"
-      actions={isLive ? (
-        <span className="flex items-center gap-1 text-[10px] tracking-widest text-emerald-400">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          LIVE
-        </span>
-      ) : undefined}
+      actions={<DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />}
     >
       <div className="relative flex-1 min-h-0">
         {history.length > 0 ? (

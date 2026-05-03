@@ -20,6 +20,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
   const [prompt, setPrompt] = useState('當 RSI(14) 低於 30 且 MACD 黃金交叉時買入，RSI 高於 70 賣出');
   const [isRunning, setIsRunning] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const handleDynamicRun = async () => {
     if (!history || history.length === 0) return;
@@ -81,6 +82,23 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
        equity: d.equity
     }));
   }, [result]);
+
+  const handleCopyGeneratedCode = async () => {
+    if (!generatedCode) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) {
+        throw new Error('Clipboard API is unavailable');
+      }
+      await navigator.clipboard.writeText(generatedCode);
+      setCopyState('copied');
+      pushLog('success', 'AGENT', 'Strategy source code copied to clipboard.');
+    } catch (error) {
+      setCopyState('failed');
+      pushLog('error', 'AGENT', `Failed to copy strategy source: ${(error as Error).message}`);
+    } finally {
+      setTimeout(() => setCopyState('idle'), 1600);
+    }
+  };
 
   return (
     <motion.div 
@@ -155,11 +173,11 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
              <div className="grid grid-cols-2 gap-2 mt-auto relative">
                 {/* Code overlay button */}
                 {generatedCode && (
-                  <button type="button" onClick={() => { console.log('[BacktestPanel] Generated strategy code:\n', generatedCode); }}
+                  <button type="button" onClick={handleCopyGeneratedCode}
                      className="absolute -top-6 right-0 text-[10px] text-zinc-400 hover:text-indigo-400 flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded"
-                     title="View Code in DevTools Console"
+                     title="Copy generated strategy source"
                   >
-                     <Code size={10} /> VIEW SOURCE
+                     <Code size={10} /> {copyState === 'copied' ? 'COPIED' : copyState === 'failed' ? 'COPY FAILED' : 'COPY SOURCE'}
                   </button>
                 )}
                <div className="bg-black/30 border border-white/5 p-2 rounded-xl">

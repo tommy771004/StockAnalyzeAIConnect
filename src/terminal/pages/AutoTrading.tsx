@@ -22,6 +22,7 @@ import '../../components/AutoTrading/autotrading.css';
 import { cn } from '../../lib/utils';
 import { DecisionAnalysisPanel } from '../../components/AutoTrading/DecisionAnalysisPanel';
 import { TradeToast } from '../../components/AutoTrading/TradeToast';
+import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
 
 const SIDEBAR_WIDTH_KEY = 'autotrading.sidebarWidthPx';
 const SIDEBAR_MIN_PX = 260;
@@ -115,6 +116,25 @@ export function AutoTradingPage() {
 
   // 監控標的優先序：WS 載入 > /defaults > 空陣列
   const currentSymbols = ws.config?.symbols ?? defaults?.config.symbols ?? [];
+  const autoTradingDataMode: DataMode = ws.connected
+    ? 'LIVE'
+    : ws.transport === 'polling'
+      ? 'DELAYED'
+      : 'MOCK';
+  const autoTradingLastUpdated = React.useMemo(() => {
+    const candidates = [
+      ws.orderEvents[ws.orderEvents.length - 1]?.timestamp,
+      ws.logs[ws.logs.length - 1]?.timestamp,
+      ws.equityHistory[ws.equityHistory.length - 1]?.timestamp,
+    ].filter(Boolean) as string[];
+
+    let latest = 0;
+    for (const c of candidates) {
+      const ts = new Date(c).getTime();
+      if (!Number.isNaN(ts) && ts > latest) latest = ts;
+    }
+    return latest > 0 ? new Date(latest).toISOString() : null;
+  }, [ws.orderEvents, ws.logs, ws.equityHistory]);
   const connectionLabel = ws.connected
     ? (ws.transport === 'ably'
       ? t('autotrading.statusLabels.connectedViaAbly', '● Ably Realtime')
@@ -157,12 +177,8 @@ export function AutoTradingPage() {
           <button onClick={() => setIsMobileDrawerOpen(true)} className="px-3 py-1 text-[10px] border border-(--color-term-border) text-(--color-term-accent) rounded focus-ring">CONTROLS</button>
         </div>
         <div className="flex items-center gap-2">
-          {/* Connection indicator */}
-          <span className={`text-[9px] uppercase tracking-widest px-2 py-1 rounded border ${
-            ws.connected
-              ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-              : 'text-(--color-term-muted) border-(--color-term-border)'
-          }`}>
+          <DataStatusBadge mode={autoTradingDataMode} lastUpdated={autoTradingLastUpdated} />
+          <span className="text-[9px] uppercase tracking-widest px-2 py-1 rounded border text-(--color-term-muted) border-(--color-term-border)">
             {connectionLabel}
           </span>
           <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border ${

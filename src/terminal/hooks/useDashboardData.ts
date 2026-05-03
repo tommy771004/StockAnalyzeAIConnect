@@ -15,12 +15,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '../../services/api';
 import { isTaiwanTradingHours } from '../../services/cache';
 import type { WatchlistRow, Mover, CandlePoint, DashboardNews } from '../types';
+import { dashboardNews as mockDashboardNews, topGainers as mockTopGainers, topLosers as mockTopLosers, watchlistRows as mockWatchlistRows } from '../mockData';
 
 // ─── Shape returned by the hook ────────────────────────────────────────────────
 export interface DashboardData {
   loading: boolean;
   /** true = data is live from API, false = using mock data */
   isLive: boolean;
+  /** Source fidelity: LIVE (real-time), DELAYED (stale/partial), MOCK (fallback) */
+  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
   watchlist: WatchlistRow[];
   gainers: Mover[];
   losers: Mover[];
@@ -101,6 +104,7 @@ const DEFAULT_SYMBOLS = ['SPY', 'NVDA', 'AAPL', 'MSFT', 'TSLA'];
 export function useDashboardData(range: ChartRange = '1W'): DashboardData {
   const [loading, setLoading]       = useState(true);
   const [isLive, setIsLive]         = useState(false);
+  const [dataMode, setDataMode]     = useState<'LIVE' | 'DELAYED' | 'MOCK'>('MOCK');
   const [watchlist, setWatchlist]   = useState<WatchlistRow[]>([]);
   const [gainers, setGainers]       = useState<Mover[]>([]);
   const [losers, setLosers]         = useState<Mover[]>([]);
@@ -118,15 +122,22 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
 
     setLoading(true);
     try {
+      let usedDefaultSymbols = false;
+      let quotesOk = false;
+      let historyOk = false;
+      let newsOk = false;
+
       // ── 1. Watchlist symbols ─────────────────────────────────────────────────
       let symbols: string[] = [...DEFAULT_SYMBOLS];
       try {
         const wl = await api.getWatchlist();
         if (Array.isArray(wl) && wl.length > 0) {
           symbols = wl.map((item: { symbol: string }) => item.symbol);
+        } else {
+          usedDefaultSymbols = true;
         }
       } catch {
-        /* fetch failed, use defaults */
+        usedDefaultSymbols = true;
       }
 
       // Ensure selected symbol is included
@@ -136,8 +147,9 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
       let quotes: any[] = [];
       try {
         quotes = await api.getBatchQuotes(symbols);
+        quotesOk = Array.isArray(quotes) && quotes.length > 0;
       } catch {
-        // network failure, empty state
+        quotesOk = false;
       }
 
       const qMap = new Map<string, any>(quotes.filter(Boolean).map((q: any) => [q.symbol as string, q]));
@@ -145,15 +157,26 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
         const q = qMap.get(s);
         return q ? mapQuote(q, s) : { symbol: s, last: 0, changePct: 0, volume: '—' };
       });
+      const hasPricedRows = liveRows.some((row) => row.last > 0);
+      const shouldUseMock = !hasPricedRows && !quotesOk;
 
-      setWatchlist(liveRows);
-      setIsLive(true);
+      if (shouldUseMock) {
+        setWatchlist(mockWatchlistRows);
+        setGainers(mockTopGainers);
+        setLosers(mockTopLosers);
+      } else {
+        setWatchlist(liveRows);
+      }
 
       // Derive top movers from live data (top 3 gainers / losers)
-      const sorted = [...liveRows].sort((a, b) => b.changePct - a.changePct);
-      setGainers(sorted.slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
-      setLosers([...sorted].reverse().slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
-      setLastUpdated(new Date().toISOString());
+      if (!shouldUseMock) {
+        const sorted = [...liveRows].sort((a, b) => b.changePct - a.changePct);
+        setGainers(sorted.slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
+        setLosers([...sorted].reverse().slice(0, 3).map((r) => ({ symbol: r.symbol, name: r.name, changePct: r.changePct })));
+      }
+      if (quotesOk && hasPricedRows) {
+        setLastUpdated(new Date().toISOString());
+      }
 
       // ── 3. Chart history for selected symbol ─────────────────────────────────
       try {
@@ -172,8 +195,12 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
             ];
           }
         }
-        if (mapped.length > 0) setCandles(mapped);
-        else setCandles([]);
+        if (mapped.length > 0) {
+          historyOk = true;
+          setCandles(mapped);
+        } else {
+          setCandles([]);
+        }
       } catch {
         setCandles([]);
       }
@@ -181,6 +208,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
       // ── 4. Market News for selected symbol ───────────────────────────────────
       try {
         const rawNews = await api.getNews(sym);
+        newsOk = Array.isArray(rawNews) && rawNews.length > 0;
         const mappedNews: DashboardNews[] = rawNews.slice(0, 5).map(n => {
           let catDesc = 'TECH';
           if (n.title?.toLowerCase().includes('earn')) catDesc = 'EARNINGS';
@@ -197,12 +225,33 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
             tickers: [sym, n.publisher].filter(Boolean) as string[],
           };
         });
-        setNews(mappedNews);
+        if (mappedNews.length > 0) {
+          setNews(mappedNews);
+        } else if (shouldUseMock) {
+          setNews(mockDashboardNews);
+        } else {
+          setNews([]);
+        }
       } catch {
-        setNews([]);
+        setNews(shouldUseMock ? mockDashboardNews : []);
       }
+
+      const mode: 'LIVE' | 'DELAYED' | 'MOCK' = shouldUseMock
+        ? 'MOCK'
+        : (quotesOk && hasPricedRows)
+          ? 'LIVE'
+          : (historyOk || newsOk || !usedDefaultSymbols)
+            ? 'DELAYED'
+            : 'MOCK';
+      setDataMode(mode);
+      setIsLive(mode === 'LIVE');
     } catch {
-      /* Silently fall back — UI already has mock data */
+      setDataMode('MOCK');
+      setIsLive(false);
+      setWatchlist(mockWatchlistRows);
+      setGainers(mockTopGainers);
+      setLosers(mockTopLosers);
+      setNews(mockDashboardNews);
     } finally {
       setLoading(false);
     }
@@ -277,6 +326,7 @@ export function useDashboardData(range: ChartRange = '1W'): DashboardData {
   return {
     loading,
     isLive,
+    dataMode,
     watchlist,
     gainers,
     losers,

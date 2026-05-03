@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X, Microscope } from 'lucide-react';
+import { Filter, RefreshCw, Plus, Trash2, X, Microscope } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
@@ -9,6 +9,7 @@ import type { NewsCategory, WatchlistRow, Mover, CandlePoint, DashboardNews } fr
 import { useDashboardData, type ChartRange } from '../hooks/useDashboardData';
 import { executeTrade } from '../../services/api';
 import ChartWidget from '../../components/ChartWidget';
+import { DataStatusBadge } from '../ui/DataStatusBadge';
 
 const CATEGORY_STYLE: Record<NewsCategory['id'], { label: string; className: string }> = {
   EARNINGS: { label: 'EARNINGS', className: 'text-(--color-term-accent) border-(--color-term-accent)' },
@@ -24,7 +25,7 @@ export function DashboardPage() {
   const [range, setRange] = useState<ChartRange>('1W');
   const data = useDashboardData(range);
   const { 
-    loading, isLive, watchlist, gainers, losers, candles, news, 
+    loading, isLive, dataMode, watchlist, gainers, losers, candles, news, lastUpdated,
     selected, setSelected, selectedRow, refresh,
     addToWatchlist, removeFromWatchlist 
   } = data;
@@ -37,7 +38,8 @@ export function DashboardPage() {
           rows={watchlist}
           selected={selected}
           onSelect={setSelected}
-          isLive={isLive}
+          dataMode={dataMode}
+          lastUpdated={lastUpdated}
           loading={loading}
           onRefresh={refresh}
           onAdd={addToWatchlist}
@@ -53,7 +55,7 @@ export function DashboardPage() {
 
       {/* Center column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-6 md:min-h-0 shrink-0 md:shrink">
-        <MarketPulsePanel watchlist={watchlist} onSelect={setSelected} />
+        <MarketPulsePanel watchlist={watchlist} onSelect={setSelected} dataMode={dataMode} lastUpdated={lastUpdated} />
         <SelectedChartPanel
           row={selectedRow}
           candles={candles}
@@ -61,6 +63,8 @@ export function DashboardPage() {
           setRange={setRange}
           loading={loading}
           isLive={isLive}
+          dataMode={dataMode}
+          lastUpdated={lastUpdated}
         />
       </div>
 
@@ -78,7 +82,8 @@ export function WatchlistPanel({
   rows,
   selected,
   onSelect,
-  isLive,
+  dataMode,
+  lastUpdated,
   loading,
   onRefresh,
   onAdd,
@@ -87,7 +92,8 @@ export function WatchlistPanel({
   rows: WatchlistRow[];
   selected: string;
   onSelect: (s: string) => void;
-  isLive: boolean;
+  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
+  lastUpdated: string | null;
   loading: boolean;
   onRefresh: () => void;
   onAdd: (s: string) => Promise<void>;
@@ -118,19 +124,7 @@ export function WatchlistPanel({
           >
             <Plus className="h-4 w-4" />
           </button>
-          {/* Live / Offline badge */}
-          <span
-            className={cn(
-              'flex items-center gap-1 text-[10px] tracking-widest',
-              isLive ? 'text-(--color-term-positive)' : 'text-(--color-term-muted)',
-            )}
-          >
-            {isLive ? (
-              <><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--color-term-positive)" /><Wifi className="h-3 w-3" /></>
-            ) : (
-              <WifiOff className="h-3 w-3" />
-            )}
-          </span>
+          <DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />
           {/* Manual refresh */}
           <button
             type="button"
@@ -300,17 +294,22 @@ export function TopMoversPanel({
 }
 
 // ─── MarketPulsePanel ──────────────────────────────────────────────────────────
-export function MarketPulsePanel({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
+export function MarketPulsePanel({
+  watchlist,
+  onSelect,
+  dataMode,
+  lastUpdated,
+}: {
+  watchlist: WatchlistRow[];
+  onSelect: (s: string) => void;
+  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
+  lastUpdated: string | null;
+}) {
   const { t } = useTranslation();
   return (
     <Panel
       title={t('dashboard.marketPulse', 'MARKET PULSE')}
-      actions={
-        <span className="flex items-center gap-1 text-[11px] tracking-widest text-(--color-term-positive)">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--color-term-positive)" />
-          LIVE
-        </span>
-      }
+      actions={<DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />}
       className="h-[240px]"
       bodyClassName="p-2"
     >
@@ -402,6 +401,8 @@ export function SelectedChartPanel({
   setRange,
   loading,
   isLive,
+  dataMode,
+  lastUpdated,
 }: {
   row: WatchlistRow;
   candles: CandlePoint[];
@@ -409,6 +410,8 @@ export function SelectedChartPanel({
   setRange: (r: ChartRange) => void;
   loading: boolean;
   isLive: boolean;
+  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
+  lastUpdated: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -440,12 +443,7 @@ export function SelectedChartPanel({
           {row.name && /\.(TW|TWO)$/i.test(row.symbol) && (
             <span className="text-[11px] text-(--color-term-muted) tracking-normal">{row.name}</span>
           )}
-          {isLive && (
-            <span className="flex items-center gap-1 text-[9px] tracking-widest text-(--color-term-positive)">
-              <span className="h-1 w-1 animate-pulse rounded-full bg-(--color-term-positive)" />
-              LIVE
-            </span>
-          )}
+          <DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} compact />
         </div>
         <button
           onClick={() => {
