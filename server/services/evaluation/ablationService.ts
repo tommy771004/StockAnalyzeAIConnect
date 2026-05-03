@@ -3,7 +3,7 @@
  * Ablation 分析：技術指標 only vs +AI vs +AI+Quantum。
  * 每次優化任務都附帶此報告，決定是否 promote 進 live。
  */
-import { runBacktestWithBestEngine } from '../backtestEngine.js';
+import { runBacktestWithBestEngine, riskAdjustedScore } from '../backtestEngine.js';
 
 export type AblationVariant = 'technical_only' | 'technical_plus_ai' | 'full';
 
@@ -27,16 +27,6 @@ export interface AblationReport {
   summary: string;
 }
 
-/** Risk-adjusted score: Sharpe * (1 - MDD/100) * winRate/100 */
-function riskAdjustedScore(metrics: {
-  roi: number;
-  sharpe: number;
-  maxDrawdown: number;
-  winRate: number;
-}): number {
-  const mddPenalty = Math.max(0, 1 - metrics.maxDrawdown / 100);
-  return metrics.sharpe * mddPenalty * (metrics.winRate / 100);
-}
 
 function buildConfig(base: any, variant: AblationVariant): any {
   const cfg = JSON.parse(JSON.stringify(base));

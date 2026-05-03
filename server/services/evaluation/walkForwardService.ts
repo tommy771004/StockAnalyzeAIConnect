@@ -3,7 +3,7 @@
  * Walk-forward + regime split 評估。
  * 每個 window: train → 回測; test → 評分。Regime: 牛/熊/震盪。
  */
-import { runBacktestWithBestEngine } from '../backtestEngine.js';
+import { runBacktestWithBestEngine, detectRegime } from '../backtestEngine.js';
 
 export type Regime = 'bull' | 'bear' | 'sideways';
 
@@ -35,13 +35,6 @@ export interface WalkForwardReport {
   };
 }
 
-function detectRegime(prices: number[]): Regime {
-  if (prices.length < 2) return 'sideways';
-  const ret = (prices[prices.length - 1] - prices[0]) / Math.max(Math.abs(prices[0]), 1e-6);
-  if (ret > 0.1) return 'bull';
-  if (ret < -0.1) return 'bear';
-  return 'sideways';
-}
 
 function avg(vals: number[]): number {
   return vals.length === 0 ? 0 : vals.reduce((a, b) => a + b, 0) / vals.length;

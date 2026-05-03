@@ -117,6 +117,11 @@ class RiskManager {
     this.currentDailyTrade = 0;
   }
 
+  restoreDailyState(state: { dailyLoss?: number; killSwitchActive?: boolean }) {
+    if (state.dailyLoss !== undefined) this.currentDailyLoss = state.dailyLoss;
+    if (state.killSwitchActive) this.killSwitchActive = true;
+  }
+
   recordPnl(pnl: number) {
     if (pnl < 0) {
       this.currentDailyLoss += Math.abs(pnl);

@@ -128,8 +128,10 @@ export async function runAdvancedBacktest(
 
     // 2. 策略掃描 (簡化版技術指標)
     if (shares === 0) {
+      const ablationQuantum: boolean = config._ablation_quantumEnabled !== false && isQuantumSignalEnabled();
+      const ablationAI: boolean = config._ablation_aiEnabled !== false;
       const observations: SignalObservation[] = [];
-      
+
       if (config.strategies.includes('RSI_REVERSION')) {
         const rsi = calcRSI(slice);
         if (rsi < config.params.RSI_REVERSION.oversold) {
@@ -166,16 +168,49 @@ export async function runAdvancedBacktest(
         }
       }
 
-      if (isQuantumSignalEnabled()) {
+      if (config.strategies.includes('BOLLINGER_BREAKOUT')) {
+        const bbPeriod = config.params?.BOLLINGER_BREAKOUT?.period ?? 20;
+        const bbStdDev = config.params?.BOLLINGER_BREAKOUT?.stdDev ?? 2;
+        const bb = calcBB(slice, bbPeriod, bbStdDev);
+        if (bb.upper > 0 && bb.lower > 0 && currentPrice > 0) {
+          const bbRange = bb.upper - bb.lower;
+          const bbPct = bbRange > 0 ? (currentPrice - bb.lower) / bbRange : 0.5;
+          let bbAction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+          let bbConf = 45;
+          if (bbPct <= 0.1) {
+            bbAction = 'BUY';
+            bbConf = Math.min(85, 60 + (0.1 - bbPct) * 250);
+          } else if (bbPct >= 0.9) {
+            bbAction = 'SELL';
+            bbConf = Math.min(85, 60 + (bbPct - 0.9) * 250);
+          }
+          if (bbAction !== 'HOLD') {
+            observations.push({
+              source: 'technical',
+              action: bbAction,
+              confidence: bbConf,
+              weight: config.params?.BOLLINGER_BREAKOUT?.weight ?? 0.8,
+              reason: `BB% ${(bbPct * 100).toFixed(1)}% (upper=${bb.upper.toFixed(2)}, lower=${bb.lower.toFixed(2)})`,
+            });
+          }
+        }
+      }
+
+      if (ablationQuantum) {
         observations.push(buildQuantumProxyObservation(slice));
       }
 
+      // ablation_aiEnabled=false: zero-weight all AI observations so they don't influence fusion
+      const fusionObservations = ablationAI
+        ? observations
+        : observations.map(o => o.source === 'ai' ? { ...o, weight: 0 } : o);
+
       const fused = fuseSignals({
         symbol,
-        observations,
+        observations: fusionObservations,
         minConfidence: 60,
         preferSource: 'technical',
-        quantumEnabled: isQuantumSignalEnabled(),
+        quantumEnabled: ablationQuantum,
       });
 
       if (fused.action === 'BUY' && fused.confidence >= 60) {
@@ -250,13 +285,33 @@ export async function runAdvancedBacktest(
   };
 }
 
-function calcRSI(p: number[], n = 14) {
-  let g = 0, l = 0;
-  for (let i = p.length - n; i < p.length; i++) {
+function calcRSI(p: number[], n = 14): number {
+  if (p.length < n + 1) return 50;
+  // Wilder's smoothed RSI: seed with simple average of first n changes, then EMA(α=1/n)
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i <= n; i++) {
     const d = p[i] - p[i - 1];
-    if (d >= 0) g += d; else l -= d;
+    if (d >= 0) avgGain += d; else avgLoss -= d;
   }
-  return l === 0 ? 100 : 100 - (100 / (1 + (g / n) / (l / n)));
+  avgGain /= n;
+  avgLoss /= n;
+  const alpha = 1 / n;
+  for (let i = n + 1; i < p.length; i++) {
+    const d = p[i] - p[i - 1];
+    avgGain = (d >= 0 ? d : 0) * alpha + avgGain * (1 - alpha);
+    avgLoss = (d < 0 ? -d : 0) * alpha + avgLoss * (1 - alpha);
+  }
+  return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+}
+
+function calcBB(p: number[], n = 20, k = 2): { upper: number; lower: number; basis: number } {
+  const window = p.slice(-n);
+  if (window.length < n) return { upper: 0, lower: 0, basis: 0 };
+  const basis = window.reduce((a, b) => a + b, 0) / n;
+  const variance = window.reduce((acc, v) => acc + (v - basis) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  return { upper: basis + k * std, lower: basis - k * std, basis };
 }
 
 function calculateMDD(curve: any[]) {
@@ -269,6 +324,14 @@ function calculateMDD(curve: any[]) {
     if (dd > mdd) mdd = dd;
   }
   return Number(mdd.toFixed(2));
+}
+
+/** Sharpe × (1 − MDD/100) × winRate/100 — shared by optimizer and ablation. */
+export function riskAdjustedScore(metrics: {
+  roi: number; sharpe: number; maxDrawdown: number; winRate: number;
+}): number {
+  const mddPenalty = Math.max(0, 1 - metrics.maxDrawdown / 100);
+  return metrics.sharpe * mddPenalty * (metrics.winRate / 100);
 }
 
 /**

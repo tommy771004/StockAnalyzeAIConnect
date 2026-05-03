@@ -24,6 +24,8 @@ export interface SignalFusionInput {
   minConfidence?: number;
   preferSource?: SignalSource;
   quantumEnabled?: boolean;
+  /** Score dead zone for HOLD: |score| < holdThreshold → HOLD. Default 0.15. */
+  holdThreshold?: number;
 }
 
 export interface SignalComponent {

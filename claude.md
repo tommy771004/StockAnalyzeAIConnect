@@ -182,3 +182,13 @@ npm run build
 - **`posTrack` 重啟恢復需要查詢 `cooldown` 狀態**：`getAllActiveConfigs()` 查詢範圍為 `status IN ('running', 'cooldown')`。若縮減為只查 `running` 會導致 cooldown 重啟後 `avgCost` 歸零，損益計算和連損計數永久錯誤。
 - **對沖方向由 `hedgeConfig.hedgeType` 決定**：`hedgeType: 'direct'`（正向標的）時，對沖方向與主單相反（BUY→SELL, SELL→BUY）；`'inverse_etf'`（預設，如 00632R）永遠 BUY。新增 `hedgeSymbol` 時必須同時指定 `hedgeType`，否則正向標的會被錯誤地加碼而非對沖。
 - **所有 broker adapter（KGI / Sinopac / Yuanta）均為架構佔位**：`mode: 'real'` 在 UI 存在但 `activeBroker` 硬編碼為 `simulatedAdapter`。勿替換為真實 adapter，除非 adapter 已通過完整沙盒驗證並簽署風險預告書。
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

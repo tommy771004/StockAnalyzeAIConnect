@@ -52,9 +52,9 @@ function normalizeObservation(o: SignalObservation): SignalComponent {
   };
 }
 
-function actionFromScore(score: number): SignalAction {
-  if (score > 0.15) return 'BUY';
-  if (score < -0.15) return 'SELL';
+function actionFromScore(score: number, holdThreshold = 0.15): SignalAction {
+  if (score > holdThreshold) return 'BUY';
+  if (score < -holdThreshold) return 'SELL';
   return 'HOLD';
 }
 
@@ -85,7 +85,8 @@ export function fuseSignals(input: SignalFusionInput): SignalFusionResult {
   const avgConfidence = components.reduce((acc, c) => acc + c.confidence, 0) / components.length;
   const aggregateConfidence = clamp(Math.abs(score) * 100 * 0.7 + avgConfidence * 0.3, 0, 100);
 
-  let action = actionFromScore(score);
+  const holdThreshold = clamp(input.holdThreshold ?? 0.15, 0.01, 0.5);
+  let action = actionFromScore(score, holdThreshold);
   let confidence = aggregateConfidence;
   let reason = `Fused ${components.length} signals`;
 

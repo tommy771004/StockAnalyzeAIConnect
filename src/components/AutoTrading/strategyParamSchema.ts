@@ -22,6 +22,7 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   MACD_CROSS: { fast: 12, slow: 26, signal: 9, weight: 0.25 },
   AI_LLM: { confidenceThreshold: 65, weight: 0.25 },
   TIMESFM_FORECAST: { horizonTicks: 8, minEdgePct: 0.2, weight: 0.35 },
+  INST_FLOW: { weight: 0.5 },
   stopLossPct: 5,
   takeProfitPct: 10,
   trailingStopPct: 3,

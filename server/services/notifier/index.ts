@@ -23,7 +23,7 @@ import { webhookNotifier } from './WebhookNotifier.js';
 import { emailNotifier } from './EmailNotifier.js';
 
 export type NotifyEvent = 'kill_switch' | 'risk_block' | 'fill' | 'daily_report';
-export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation' | 'margin_call';
+export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation' | 'margin_call' | 'take_profit';
 
 export interface NotifierChannel {
   channel: string;
@@ -86,6 +86,11 @@ function formatMessage(event: ExtendedNotifyEvent, payload: Record<string, unkno
           `缺口比例：${payload.shortfallPct ? `${Number(payload.shortfallPct).toFixed(1)}%` : '-'}`,
           payload.autoReduced ? `✅ 已自動減碼 ${payload.autoReduced} 口` : `⚠️ 建議手動減碼或補足保證金`,
         ].join('\n'),
+      };
+    case 'take_profit':
+      return {
+        subject: `🎯 停利出場 ${payload.symbol ?? ''}`.trim(),
+        body: `標的：${payload.symbol ?? 'UNKNOWN'}\n原因：${payload.reason ?? 'take profit triggered'}\n價格：${payload.price ?? '-'}`,
       };
   }
 }

@@ -26,6 +26,7 @@ export interface StrategyParams {
   MACD_CROSS?: { fast: number; slow: number; signal: number; weight: number };
   AI_LLM?: { confidenceThreshold: number; weight: number };
   TIMESFM_FORECAST?: { horizonTicks: number; minEdgePct: number; weight: number };
+  INST_FLOW?: { weight: number };
   stopLossPct?: number;
   takeProfitPct?: number;
   trailingStopPct?: number;

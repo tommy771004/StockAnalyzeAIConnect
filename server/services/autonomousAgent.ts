@@ -47,6 +47,7 @@ interface AnalysisSignal {
   prevClose?: number;
   quantumForcedLiquidation?: boolean;
   defensiveMode?: boolean;
+  _analysisError?: boolean;
   timesFmMeta?: {
     action: 'BUY' | 'SELL' | 'HOLD';
     confidence: number;
@@ -88,11 +89,15 @@ let activeBrokerId: 'simulated' | 'sinopac' | 'kgi' | 'yuanta' = 'simulated';
 const logBuffer: AgentLog[] = [];
 const recentPriceSeries = new Map<string, number[]>();
 let posTrack = new Map<string, { avgCost: number; qty: number }>(); // 追蹤各標的平均成本 (P1)
+const peakPriceTrack = new Map<string, number>(); // 追蹤各標的持倉期間最高價，用於追蹤停損
 let wsBroadcast: ((msg: any) => void) | null = null;
 let tickTimeout: NodeJS.Timeout | null = null;
 let lossStreakCount = 0;
 let isTickRunning = false;
 let syncInProgress = false;
+let lastMonteCarloCapital = 0;
+let lastMonteCarloTs = 0;
+let cachedMonteCarlo: ReturnType<typeof riskManager.runMonteCarloRuinAssessment> | null = null;
 
 const WARN_LOG_COOLDOWN_MS = 60_000;
 const warnLogTimestamps = new Map<string, number>();
@@ -236,13 +241,14 @@ function handleOrderLifecycle(event: OrderLifecycleEvent) {
     wsBroadcast({ type: 'order_lifecycle', data: event });
   }
   if (event.status === 'FILLED') {
-    tradesRepo.createTrade('system', {
-      symbol: event.symbol,
-      type: event.side === 'BUY' ? 'BUY' : 'SELL',
-      shares: event.qty.toString(),
-      price: event.price.toString(),
-      strategy: 'AI_AGENT',
-      notes: `Auto-traded by AI agent`,
+    tradesRepo.createTrade(agentConfig.userId || 'system', {
+      date: new Date().toISOString().slice(0, 10),
+      ticker: event.symbol,
+      side: event.side,
+      entry: event.filledPrice.toString(),
+      qty: event.filledQty.toString(),
+      notes: 'Auto-traded by AI agent',
+      aiGenerated: true,
     }).catch(e => console.error('[Agent] Failed to persist trade:', e));
   }
 }
@@ -317,8 +323,13 @@ async function broadcastAccountUpdate() {
     });
 
     // 移除已不在券商持倉中的標的 (P1)
-    for (const sym of posTrack.keys()) {
-      if (!currentSymbols.includes(sym)) posTrack.delete(sym);
+    // 防禦：若券商回傳空陣列但本地有持倉，視為 API 異常，跳過清除以保護停損監控
+    if (positions.length > 0 || posTrack.size === 0) {
+      for (const sym of posTrack.keys()) {
+        if (!currentSymbols.includes(sym)) posTrack.delete(sym);
+      }
+    } else {
+      warnWithCooldown('empty-positions', '[Agent] ⚠️ 券商回傳空持倉但本地有持倉紀錄，跳過清除（可能為 API 短暫異常）');
     }
 
     wsBroadcast?.({ type: 'account_update', data: balance });
@@ -327,7 +338,9 @@ async function broadcastAccountUpdate() {
     // 權益曲線：每次 tick 推一筆，前端 useAutotradingWS 會留 100 筆 ring buffer
     const nowTs = Date.now();
     if (nowTs - lastEquityBroadcast > 5000) {
-      wsBroadcast?.({ type: 'equity_update', data: { timestamp: new Date(nowTs).toISOString(), equity: balance.totalAssets } });
+      const equityPoint = { timestamp: new Date(nowTs).toISOString(), equity: balance.totalAssets };
+      wsBroadcast?.({ type: 'equity_update', data: equityPoint });
+      equityHistory.push(equityPoint);
       lastEquityBroadcast = nowTs;
     }
 
@@ -353,11 +366,17 @@ async function syncStateToDb() {
   if (!agentConfig.userId || syncInProgress) return;
   syncInProgress = true;
   try {
+    const today = new Date().toISOString().slice(0, 10);
+    const riskStats = riskManager.getStats();
+    const posTrackWithRisk = {
+      ...Object.fromEntries(posTrack),
+      __riskDaily: { dailyLoss: riskStats.dailyLoss, killSwitchActive: riskStats.killSwitchActive, date: today },
+    };
     await autotradingConfigRepo.saveState(agentConfig.userId, {
       status: agentStatus,
       lossStreakCount,
-      posTrack: Object.fromEntries(posTrack), // Map 轉 JSON
-      equityHistory
+      posTrack: posTrackWithRisk,
+      equityHistory: equityHistory.slice(-500),
     });
   } catch (e) {
     console.error('[Agent] 狀態同步失敗:', e);
@@ -464,40 +483,25 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
     let quantumMeta: AnalysisSignal['quantumMeta'];
     let quantumRaw: RawQuantumOutput | null = null;
     
-    // 信心度過低時，觸發「深度研究任務」(Parallel-Web)
-    if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65) {
-      emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `信心度 (${dec.confidence}) 過低，觸發 parallel-web 深度研究反向觀點...` });
+    // 信心度過低時，透過已有的新聞服務補充上下文後重新決策
+    if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65 && news && news.length > 50) {
+      emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `信心度 (${dec.confidence}) 過低，以新聞摘要補充上下文後重新評估...` });
       try {
-        const { scrapeUrls } = await import('../utils/scienceService.js');
-        // 假設我們有預設的幾個新聞網址來針對這檔股票，或者用 LLM 生出網址
-        // 這裡作為展示，直接輸入相關的查詢或知名外部網址
-        const researchUrls = [
-          `https://news.google.com/search?q=${symbol}+stock&hl=zh-TW`,
-          `https://finance.yahoo.com/quote/${symbol}/news`
-        ];
-        const webData = await scrapeUrls(researchUrls);
-        let deepContext = '';
-        if (webData && webData.data) {
-           deepContext = Object.values(webData.data).join('\\n').substring(0, 1000);
-        }
-        
-        if (deepContext) {
-           const { text: newText } = await callLLM({
-             systemPrompt: ORCHESTRATOR_PROMPT,
-             prompt: orchestratorPrompt + `\\n\\n[Deep Research Context]:\\n${deepContext}\\n\\n請重新評估並產出 JSON 決策。`,
-             forceModel: primaryModel,
-             jsonMode: true,
-             symbol,
-             userId: config.userId || 'default'
-           });
-           const newDec = JSON.parse(newText.match(/\{[\s\S]*\}/)?.[0] || '{}');
-           if (newDec.confidence) {
-              emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `深度研究完成。新信心度: ${newDec.confidence}, 新動作: ${newDec.action}` });
-              dec = newDec;
-           }
+        const { text: newText } = await callLLM({
+          systemPrompt: ORCHESTRATOR_PROMPT,
+          prompt: orchestratorPrompt + `\n\n[補充新聞上下文]:\n${news.substring(0, 800)}\n\n請重新評估並產出 JSON 決策。`,
+          forceModel: primaryModel,
+          jsonMode: true,
+          symbol,
+          userId: config.userId || 'default',
+        });
+        const newDec = JSON.parse(newText.match(/\{[\s\S]*\}/)?.[0] || '{}');
+        if (newDec.confidence && Number(newDec.confidence) > (dec.confidence || 0)) {
+          emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `補充研究完成：信心度 ${dec.confidence} → ${newDec.confidence}，動作: ${newDec.action}` });
+          dec = newDec;
         }
       } catch (e) {
-        console.warn('[Agent] Deep research failed:', e);
+        warnWithCooldown(`deep-research:${symbol}`, `[Agent] 補充研究失敗 ${symbol}: ${(e as Error).message}`);
       }
     }
     
@@ -580,7 +584,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
         source: 'macro',
         action: macroAction,
         confidence: macroConfidence,
-        weight: 0.5,
+        weight: Number(sParams.INST_FLOW?.weight ?? 0.5),
         reason: 'Institutional flow bias',
       },
     ];
@@ -595,6 +599,34 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
         reason: `TimesFM ${timesFmMeta.model} edge=${timesFmMeta.edgePct.toFixed(3)}% horizon=${timesFmMeta.horizonTicks}`,
         sourceVersion: timesFmMeta.model,
       });
+    }
+
+    // Bollinger Band signal — 僅在 BOLLINGER_BREAKOUT 策略啟用且 TV 指標可用時加入
+    if (config.strategies.includes('BOLLINGER_BREAKOUT') && indicators && currentPrice > 0) {
+      const bbUpper = Number(indicators['BB.upper'] || 0);
+      const bbLower = Number(indicators['BB.lower'] || 0);
+      if (bbUpper > 0 && bbLower > 0 && bbUpper > bbLower) {
+        const bbRange = bbUpper - bbLower;
+        const bbPct = (currentPrice - bbLower) / bbRange; // 0 = at lower, 1 = at upper
+        let bbAction: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+        let bbConfidence = 45;
+        if (bbPct <= 0.1) {
+          bbAction = 'BUY';
+          bbConfidence = Math.min(85, 60 + (0.1 - bbPct) * 250);
+        } else if (bbPct >= 0.9) {
+          bbAction = 'SELL';
+          bbConfidence = Math.min(85, 60 + (bbPct - 0.9) * 250);
+        }
+        if (bbAction !== 'HOLD') {
+          observations.push({
+            source: 'technical',
+            action: bbAction,
+            confidence: bbConfidence,
+            weight: Number(sParams.BOLLINGER_BREAKOUT?.weight ?? 0.6),
+            reason: `BB% ${(bbPct * 100).toFixed(1)}% (upper=${bbUpper.toFixed(2)}, lower=${bbLower.toFixed(2)})`,
+          });
+        }
+      }
     }
 
     if (isQuantumSignalEnabled()) {
@@ -644,10 +676,15 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
       }
     }
 
+    // AI_LLM 未啟用時使用較低的預設門檻（技術指標信心值天花板較低）
+    const aiLlmActive = config.strategies.includes('AI_LLM') && (sParams.AI_LLM?.weight ?? 1) > 0;
+    const fusionMinConfidence = aiLlmActive
+      ? Number(sParams.AI_LLM?.confidenceThreshold ?? 65)
+      : Number(sParams.AI_LLM?.confidenceThreshold ?? 55);
     const fused = fuseSignals({
       symbol,
       observations,
-      minConfidence: Number(sParams.AI_LLM?.confidenceThreshold ?? 65),
+      minConfidence: fusionMinConfidence,
       preferSource: 'ai',
       quantumEnabled: isQuantumSignalEnabled(),
     });
@@ -708,7 +745,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[Agent] Analysis failed for ${symbol}: ${msg}`);
-    return { action: 'HOLD', confidence: 0 }; 
+    return { action: 'HOLD', confidence: 0, _analysisError: true };
   }
 }
 
@@ -790,14 +827,21 @@ async function agentTick() {
     const taiwanSkillRules = await loadTaiwanSkillRules();
     const driftFromSentiment = ((lastSentimentScore - 50) / 50) * 0.0015;
     const pnlPressure = Math.max(-0.001, Math.min(0.001, (balance.dailyPnl / Math.max(balance.totalAssets, 1)) * 0.35));
-    const monteCarlo = riskManager.runMonteCarloRuinAssessment({
-      capitalTWD: balance.totalAssets,
-      paths: 1000,
-      horizonSteps: 30,
-      driftPerStep: driftFromSentiment + pnlPressure,
-      volatilityPerStep: 0.012 + Math.min(0.02, lossStreakCount * 0.0025),
-      ruinThresholdTWD: Math.max(balance.totalAssets * 0.65, balance.totalAssets - agentConfig.maxDailyLossTWD * 5),
-    });
+    const capitalChangedSignificantly = Math.abs(balance.totalAssets - lastMonteCarloCapital) / Math.max(lastMonteCarloCapital, 1) > 0.01;
+    const monteCarloStale = Date.now() - lastMonteCarloTs > 300_000;
+    if (!cachedMonteCarlo || monteCarloStale || capitalChangedSignificantly) {
+      cachedMonteCarlo = riskManager.runMonteCarloRuinAssessment({
+        capitalTWD: balance.totalAssets,
+        paths: 1000,
+        horizonSteps: 30,
+        driftPerStep: driftFromSentiment + pnlPressure,
+        volatilityPerStep: 0.012 + Math.min(0.02, lossStreakCount * 0.0025),
+        ruinThresholdTWD: Math.max(balance.totalAssets * 0.65, balance.totalAssets - agentConfig.maxDailyLossTWD * 5),
+      });
+      lastMonteCarloCapital = balance.totalAssets;
+      lastMonteCarloTs = Date.now();
+    }
+    const monteCarlo = cachedMonteCarlo;
     wsBroadcast?.({
       type: 'status',
       data: {
@@ -818,24 +862,59 @@ async function agentTick() {
       )
     );
 
-    // 主動停損：Phase 2 前先掃描所有持倉，達停損門檻則強制注入 SELL（繞過 LLM 信心度）
-    const stopLossPct = agentConfig.params.stopLossPct ?? 0.05;
+    // 主動停損 / 追蹤停損 / 停利：Phase 2 前先掃描所有持倉，達門檻則強制注入 SELL（繞過 LLM 信心度）
+    const stopLossPct = (agentConfig.params.stopLossPct ?? 5) / 100;
+    const trailingStopPct = (agentConfig.params.trailingStopPct ?? 3) / 100;
+    const takeProfitPct = (agentConfig.params.takeProfitPct ?? 10) / 100;
     for (const settled of analysisResults) {
       if (settled.status !== 'fulfilled') continue;
       const { symbol, signal } = settled.value;
       const track = posTrack.get(symbol);
       if (!track || track.qty <= 0 || !signal.price || signal.price <= 0 || track.avgCost <= 0) continue;
+
+      // 更新追蹤停損的峰值價格（持倉存在時持續更新）
+      const currentPeak = peakPriceTrack.get(symbol) ?? signal.price;
+      if (signal.price > currentPeak) peakPriceTrack.set(symbol, signal.price);
+      const peak = peakPriceTrack.get(symbol)!;
+
       if (signal.action !== 'SELL') {
-        const lossFraction = (signal.price - track.avgCost) / track.avgCost;
-        if (lossFraction <= -stopLossPct) {
+        const pnlFraction = (signal.price - track.avgCost) / track.avgCost;
+        const trailingDrawdown = (peak - signal.price) / peak;
+
+        // 固定停損
+        if (pnlFraction <= -stopLossPct) {
           signal.action = 'SELL';
           signal.confidence = 100;
-          emitLog({ level: 'RISK_CHK', source: 'STOP_LOSS', symbol, message: `🛑 主動停損觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 虧損 ${(lossFraction * 100).toFixed(2)}%，強制出場` });
+          emitLog({ level: 'RISK_CHK', source: 'STOP_LOSS', symbol, message: `🛑 主動停損觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 虧損 ${(pnlFraction * 100).toFixed(2)}%，強制出場` });
           if (agentConfig.userId) {
             void notifier.dispatch(agentConfig.userId, 'stop_loss_intercept', {
               symbol,
               price: signal.price.toFixed(2),
-              reason: `loss ${(lossFraction * 100).toFixed(2)}% <= stopLoss ${((stopLossPct || 0) * 100).toFixed(2)}%`,
+              reason: `loss ${(pnlFraction * 100).toFixed(2)}% <= stopLoss ${(stopLossPct * 100).toFixed(2)}%`,
+            });
+          }
+        // 追蹤停損（僅在已有獲利時才有意義：峰值超過均成本才啟用）
+        } else if (peak > track.avgCost && trailingDrawdown >= trailingStopPct) {
+          signal.action = 'SELL';
+          signal.confidence = 100;
+          emitLog({ level: 'RISK_CHK', source: 'TRAILING_STOP', symbol, message: `📉 追蹤停損觸發：現價 ${signal.price.toFixed(2)} / 峰值 ${peak.toFixed(2)} / 回撤 ${(trailingDrawdown * 100).toFixed(2)}%，強制出場` });
+          if (agentConfig.userId) {
+            void notifier.dispatch(agentConfig.userId, 'stop_loss_intercept', {
+              symbol,
+              price: signal.price.toFixed(2),
+              reason: `trailing drawdown ${(trailingDrawdown * 100).toFixed(2)}% >= trailingStop ${(trailingStopPct * 100).toFixed(2)}%`,
+            });
+          }
+        // 停利
+        } else if (pnlFraction >= takeProfitPct) {
+          signal.action = 'SELL';
+          signal.confidence = 100;
+          emitLog({ level: 'RISK_CHK', source: 'TAKE_PROFIT', symbol, message: `🎯 停利觸發：現價 ${signal.price.toFixed(2)} / 均成本 ${track.avgCost.toFixed(2)} / 獲利 ${(pnlFraction * 100).toFixed(2)}%，強制出場` });
+          if (agentConfig.userId) {
+            void notifier.dispatch(agentConfig.userId, 'take_profit', {
+              symbol,
+              price: signal.price.toFixed(2),
+              reason: `gain ${(pnlFraction * 100).toFixed(2)}% >= takeProfit ${(takeProfitPct * 100).toFixed(2)}%`,
             });
           }
         }
@@ -884,12 +963,21 @@ async function agentTick() {
 
       const { symbol, signal } = settled.value;
 
+      if (signal._analysisError) {
+        emitLog({ level: 'ERROR', source: 'AGENT', symbol, message: `⚠️ 分析例外，跳過本輪決策（非真實 HOLD）` });
+        continue;
+      }
+
       if (agentStatus === 'running' && signal.action !== 'HOLD') {
         const threshold = agentConfig.params.AI_LLM?.confidenceThreshold || 65;
         const signalConfidence = Number(signal.confidence ?? 0);
         const signalPrice = Number(signal.price ?? 0);
         const defensiveThreshold = signal.defensiveMode ? threshold + 12 : threshold;
-        if (signalConfidence > defensiveThreshold) {
+        if (signalConfidence <= defensiveThreshold) {
+          emitLog({ level: 'MONITOR', source: 'AGENT', symbol, message: `📊 ${signal.action} 被攔截：信心度 ${signalConfidence.toFixed(1)} ≤ 門檻 ${defensiveThreshold}，跳過下單` });
+          continue;
+        }
+        {
           if (signal.defensiveMode && signal.action === 'BUY') {
             emitLog({
               level: 'MONITOR',
@@ -899,11 +987,22 @@ async function agentTick() {
             });
             continue;
           }
-          // 動態計算委託數量：預設每次投入可用資金的 10% 或配置的 maxAllocationPerTrade
-          const allocation = agentConfig.params.maxAllocationPerTrade || 0.1;
+          // 動態計算委託數量：取可用資金 10% 與 maxAllocationPerTrade 上限的較小值
+          const maxAlloc = agentConfig.params.maxAllocationPerTrade ?? 100_000;
           const defensiveScale = signal.defensiveMode ? 0.4 : 1;
           const monteCarloScale = riskManager.getDynamicPositionScaling();
-          const tradeAmount = availableMargin * allocation * defensiveScale * monteCarloScale;
+          const sizingMethod = agentConfig.params.sizingMethod ?? 'fixed';
+          let baseTradeAmount: number;
+          if (sizingMethod === 'risk_base' && signalPrice > 0) {
+            // 固定風險法：每筆可承受虧損 = totalAssets × riskPerTradePct%；除以每股停損距離得到股數後再換算金額
+            const riskPerTrade = balance.totalAssets * ((agentConfig.params.riskPerTradePct ?? 1) / 100);
+            const stopPerShare = signalPrice * stopLossPct;
+            const riskQty = stopPerShare > 0 ? riskPerTrade / stopPerShare : 0;
+            baseTradeAmount = riskQty * signalPrice;
+          } else {
+            baseTradeAmount = availableMargin * 0.1;
+          }
+          const tradeAmount = Math.min(baseTradeAmount, maxAlloc) * defensiveScale * monteCarloScale;
           const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
 
           // 台股使用整張(1000股)；美股允許零股(小數股)
@@ -1025,8 +1124,14 @@ async function agentTick() {
 
               // 更新剩餘持倉
               const remainQty = Math.max(0, track.qty - tradeResult.filledQty);
-              if (remainQty === 0) posTrack.delete(symbol);
-              else posTrack.set(symbol, { ...track, qty: remainQty });
+              if (remainQty === 0) {
+                posTrack.delete(symbol);
+                peakPriceTrack.delete(symbol); // 平倉後清除峰值紀錄
+              } else {
+                posTrack.set(symbol, { ...track, qty: remainQty });
+              }
+              // 釋放已出售部位資金，供同 tick 後續標的使用
+              availableMargin += tradeResult.filledQty * tradeResult.filledPrice;
             }
             void syncStateToDb();
             // 成交後立即更新 UI (P1)
@@ -1088,8 +1193,9 @@ export function startAgent(c?: any) {
     const incomingUserId = c.userId as string | undefined;
     if (incomingUserId && incomingUserId !== agentConfig.userId) {
       posTrack = new Map<string, { avgCost: number; qty: number }>();
+      peakPriceTrack.clear();
       lossStreakCount = 0;
-      console.log(`[Agent] userId 切換 ${agentConfig.userId ?? 'none'} → ${incomingUserId}，清空 posTrack 與 lossStreakCount`);
+      console.log(`[Agent] userId 切換 ${agentConfig.userId ?? 'none'} → ${incomingUserId}，清空 posTrack / peakPriceTrack / lossStreakCount`);
     }
     const v = updateAgentConfig(c, true); // silent=true: status broadcast happens after agentStatus = 'running'
     if (!v.ok) return v;
@@ -1114,6 +1220,11 @@ export function updateAgentConfig(patch: any, silent = false) {
   const result = AgentConfigPatchSchema.safeParse(patch);
   if (!result.success) {
     return { ok: false, error: `Invalid configuration: ${result.error.message}` };
+  }
+
+  const incomingUserId = result.data.userId as string | undefined;
+  if (agentConfig.userId && incomingUserId && incomingUserId !== agentConfig.userId && agentStatus !== 'stopped') {
+    console.warn(`[Agent] ⚠️ 配置覆蓋警告：引擎運行中 (userId=${agentConfig.userId})，被 ${incomingUserId} 覆蓋。多用戶並發污染風險（已知 P2 技術債）。`);
   }
 
   agentConfig = { ...agentConfig, ...result.data };
@@ -1221,10 +1332,22 @@ export async function startAutonomousAgent() {
         agentConfig = { ...agentConfig, ...savedConfig };
         agentStatus = savedConfig.status || 'stopped';
         lossStreakCount = savedConfig.lossStreakCount || 0;
+
+        const rawPosTrack: Record<string, any> = savedConfig.posTrack || {};
+        const riskDaily = rawPosTrack.__riskDaily as { dailyLoss?: number; killSwitchActive?: boolean; date?: string } | undefined;
+        const today = new Date().toISOString().slice(0, 10);
+        if (riskDaily?.date === today) {
+          riskManager.restoreDailyState({ dailyLoss: riskDaily.dailyLoss, killSwitchActive: riskDaily.killSwitchActive });
+          console.log(`[AutoAgent] 當日風控狀態已恢復：dailyLoss=${riskDaily.dailyLoss}, killSwitch=${riskDaily.killSwitchActive}`);
+        }
         posTrack = new Map<string, { avgCost: number; qty: number }>(
-          Object.entries(savedConfig.posTrack || {}) as [string, { avgCost: number; qty: number }][]
+          Object.entries(rawPosTrack).filter(([k]) => !k.startsWith('__')) as [string, { avgCost: number; qty: number }][]
         );
-        
+
+        if (Array.isArray(savedConfig.equityHistory) && savedConfig.equityHistory.length > 0) {
+          equityHistory = savedConfig.equityHistory.slice(-500);
+        }
+
         if (agentStatus === 'running' || agentStatus === 'cooldown') {
           agentTick();
         }

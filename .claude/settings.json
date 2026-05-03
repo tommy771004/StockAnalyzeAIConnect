@@ -12,7 +12,45 @@
       "Bash(node -e \"console.log\\('Tailwind v4 default colors:'\\); console.log\\('cyan-400: rgb\\(34, 211, 238\\)'\\); console.log\\('cyan-500: rgb\\(6, 182, 212\\)'\\); console.log\\('Hex equivalents:'\\); console.log\\('cyan-400: #22d3ee'\\); console.log\\('cyan-500: #06b6d4'\\);\")",
       "Bash(git -C \"d:/Project/github/StockAnalyzeAIConnect\" log --oneline -6)",
       "Bash(git -C \"d:/Project/github/StockAnalyzeAIConnect\" log --oneline -8)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(graphify . --update)",
+      "Bash(graphify --help)",
+      "Bash(graphify update *)",
+      "Bash(graphify query *)",
+      "Bash(graphify explain *)",
+      "Bash(cd /d \"d:\\\\Project\\\\github\\\\StockAnalyzeAIConnect\")",
+      "Bash(npm run *)",
+      "Bash(graphify path *)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); console.log\\('Total lines:', lines.length\\); console.log\\('=== FIRST 80 ==='\\); lines.slice\\(0,80\\).forEach\\(\\(l,i\\)=>console.log\\(i+1,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(80,160\\).forEach\\(\\(l,i\\)=>console.log\\(i+81,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(340,460\\).forEach\\(\\(l,i\\)=>console.log\\(i+341,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(460,600\\).forEach\\(\\(l,i\\)=>console.log\\(i+461,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(600,760\\).forEach\\(\\(l,i\\)=>console.log\\(i+601,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(760,920\\).forEach\\(\\(l,i\\)=>console.log\\(i+761,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(920,1100\\).forEach\\(\\(l,i\\)=>console.log\\(i+921,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(1100,1269\\).forEach\\(\\(l,i\\)=>console.log\\(i+1101,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); const hits=[]; lines.forEach\\(\\(l,i\\)=>{if\\(l.includes\\('broadcastAccountUpdate'\\)||l.includes\\('equityHistory'\\)||l.includes\\('validateTaiwanOrder'\\)||l.includes\\('trailingStop'\\)||l.includes\\('takeProfit'\\)||l.includes\\('sizingMethod'\\)||l.includes\\('riskPerTrade'\\)\\)hits.push\\(i+1+': '+l\\);}\\); console.log\\(hits.join\\('\\\\n'\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(172,310\\).forEach\\(\\(l,i\\)=>console.log\\(i+173,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(310,355\\).forEach\\(\\(l,i\\)=>console.log\\(i+311,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(160,175\\).forEach\\(\\(l,i\\)=>console.log\\(i+161,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(238,255\\).forEach\\(\\(l,i\\)=>console.log\\(i+239,l\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(306,345\\).forEach\\(\\(l,i\\)=>console.log\\(i+307,l\\)\\);\")",
+      "Bash(git stash *)",
+      "Bash(ls server/python/)",
+      "Bash(dir server\\\\python /b)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CMD=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',d).get('command',''))\" 2>/dev/null || true); case \"$CMD\" in *grep*|*rg\\ *|*ripgrep*|*find\\ *|*fd\\ *|*ack\\ *|*ag\\ *)   [ -f graphify-out/graph.json ] &&   echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"graphify: Knowledge graph exists. Read graphify-out/GRAPH_REPORT.md for god nodes and community structure before searching raw files.\"}}'   || true ;; esac"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
