@@ -1,4 +1,4 @@
-import type { BacktestMetrics, BacktestResult, BacktestTrade } from '../types';
+import type { BacktestForecast, BacktestMetrics, BacktestResult, BacktestTrade } from '../types';
 
 export type BacktestStrategyId = 'ma_crossover' | 'neural' | 'rsi' | 'macd';
 
@@ -225,6 +225,16 @@ export function normalizeBacktestResult(
     profitFactor: toNumber(rawMetrics.profitFactor),
   };
 
+  const rawForecast = raw.forecast as BacktestForecast | null | undefined;
+  const forecast: BacktestForecast | null = rawForecast && typeof rawForecast === 'object'
+    ? rawForecast
+    : null;
+
+  const rawRegime = raw.regime;
+  const regime = (rawRegime === 'bull' || rawRegime === 'bear' || rawRegime === 'sideways')
+    ? rawRegime
+    : undefined;
+
   return {
     initialCapital,
     finalEquity,
@@ -235,5 +245,7 @@ export function normalizeBacktestResult(
     equityCurve,
     metrics: safeMetrics,
     strategy,
+    forecast,
+    regime,
   };
 }

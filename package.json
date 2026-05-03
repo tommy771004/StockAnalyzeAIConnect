@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "generate:og": "node scripts/generate-og.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -42,6 +43,7 @@
     "react-helmet-async": "^3.0.0",
     "react-i18next": "^17.0.4",
     "react-is": "^19.2.5",
+    "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
     "three": "^0.184.0",
@@ -51,6 +53,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",

@@ -37,7 +37,14 @@
       "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('server/services/autonomousAgent.ts','utf8'\\).split\\('\\\\n'\\); lines.slice\\(306,345\\).forEach\\(\\(l,i\\)=>console.log\\(i+307,l\\)\\);\")",
       "Bash(git stash *)",
       "Bash(ls server/python/)",
-      "Bash(dir server\\\\python /b)"
+      "Bash(dir server\\\\python /b)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('seo',{}\\), ensure_ascii=False, indent=2\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({deps:Object.keys\\(p.dependencies||{}\\), devDeps:Object.keys\\(p.devDependencies||{}\\)}, null, 2\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('sharp:', p.dependencies?.sharp, p.devDependencies?.sharp\\); console.log\\('satori:', p.dependencies?.satori, p.devDependencies?.satori\\); console.log\\('canvas:', p.dependencies?.canvas, p.devDependencies?.canvas\\);\")",
+      "Bash(node -e \"try{require\\('sharp'\\);console.log\\('sharp: available'\\)}catch{console.log\\('sharp: not installed'\\)}\")",
+      "Bash(npm install *)",
+      "Bash(node scripts/generate-og.mjs)"
     ]
   },
   "hooks": {

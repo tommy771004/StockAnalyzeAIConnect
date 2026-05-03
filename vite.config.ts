@@ -81,6 +81,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
+      // Required for BrowserRouter: serve index.html for all non-asset paths in dev
+      historyApiFallback: true,
     },
   };
 });

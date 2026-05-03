@@ -74,7 +74,6 @@ export function TopNav({
 
   function selectResult(result: SearchResult) {
     const sym = result.symbol.toUpperCase();
-    window.location.hash = 'dashboard';
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     setQuery('');
     setShowDropdown(false);
@@ -88,7 +87,6 @@ export function TopNav({
     }
     const sym = await resolveSymbolWithLookup(rawInput, results);
     if (!sym) return;
-    window.location.hash = 'dashboard';
     window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     setQuery('');
     setShowDropdown(false);

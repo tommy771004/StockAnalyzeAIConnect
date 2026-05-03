@@ -18,11 +18,15 @@
 
 ## 路由架構（`src/App.tsx`）
 
-路由採 **hash-based**，無 React Router。
+路由採 **path-based**，使用 React Router v7（`react-router-dom`）。
 
 ```
-window.location.hash  →  TerminalView  →  對應頁面元件
+URL path (/dashboard, /backtest …)  →  useLocation()  →  parsePathView()  →  TerminalView  →  對應頁面元件
 ```
+
+**Router 選擇（`src/main.tsx`）：**
+- Web：`BrowserRouter`（`/dashboard`、`/backtest` 等真實路徑，SEO 可索引）
+- Electron production（`file://` 協定）：`HashRouter`（自動偵測 `window.location.protocol === 'file:'`）
 
 `TerminalView` 聯合型別定義於 `src/terminal/types.ts`：
 
@@ -34,9 +38,15 @@ backtest | news | alerts | screener | autotrading | settings
 **新增頁面的正確流程：**
 1. 在 `src/terminal/types.ts` 的 `TerminalView` 聯合型別加入新值
 2. 在 `src/App.tsx` 的 `VALID_VIEWS` 陣列加入新值
-3. 在 `SEARCH_PLACEHOLDER` map 加入對應佔位文字
+3. 在 `SEARCH_PLACEHOLDER` 與 `VIEW_DESCRIPTIONS` map 加入對應文字
 4. 在 `Layout` render 區塊加入 `{view === 'xxx' && <XxxPage />}`
 5. 在 `src/terminal/shell/Sidebar.tsx` 加入導覽項目
+6. 在兩份 locale 檔案（`public/locales/{zh,en}/translation.json`）補上 `nav.xxx` 翻譯
+
+**頁面內導航：**
+- 元件內請用 `useNavigate()` from `react-router-dom`，呼叫 `navigate('/view')`
+- **不要**直接寫 `window.location.hash = 'xxx'`（已全面移除）
+- 若有 `onNavigate` prop（如 ScreenerPage），優先用 prop 以保持元件可測試性
 
 ---
 
@@ -166,7 +176,7 @@ npm run build
 
 ## 常見陷阱
 
-- **不要**在 `src/App.tsx` 以外的地方讀寫 `window.location.hash`，路由邏輯集中於此
+- **不要**直接讀寫 `window.location.hash`；路由現在由 React Router 管理，請用 `useNavigate()` 或傳遞 `onNavigate` prop
 - **不要**在前端 localStorage 儲存 JWT 或任何認證 token
 - **不要**在頁面元件內自行呼叫 `/api/auth/me`，使用 `useAuth()` context
 - Electron 打包後 `app.getAppPath()` 可能指向 `.asar`，避免用它解析靜態資源路徑

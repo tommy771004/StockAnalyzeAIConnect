@@ -443,6 +443,7 @@ function runBacktestLogic(
   const trades: any[] = [];
   const equityCurve: any[] = [];
   let entryPrice = 0;
+  let entryCost = 0;
   let entryTime = '';
   const benchStart = closes[0];
 
@@ -450,23 +451,34 @@ function runBacktestLogic(
     const price = closes[i];
     const date = dates[i];
     if (signals[i] === 1 && shares === 0) {
-      shares = Math.floor(balance / price);
-      balance -= shares * price;
-      entryPrice = price;
-      entryTime = date;
+      const maxShares = Math.floor(balance / (price * 1.001425));
+      if (maxShares > 0) {
+        const tradeValue = maxShares * price;
+        const commission = Math.max(20, tradeValue * 0.001425);
+        shares = maxShares;
+        balance -= tradeValue + commission;
+        entryPrice = price;
+        entryCost = tradeValue + commission;
+        entryTime = date;
+      }
     } else if (signals[i] === -1 && shares > 0) {
-      const pnl = (price - entryPrice) * shares;
+      const tradeValue = shares * price;
+      const commission = Math.max(20, tradeValue * 0.001425);
+      const tax = tradeValue * 0.003;
+      const proceeds = tradeValue - commission - tax;
+      const pnl = proceeds - entryCost;
       const pnlPct = ((price / entryPrice) - 1) * 100;
       trades.push({
         entryTime, exitTime: date,
         entryPrice, exitPrice: price,
         amount: shares,
         holdDays: Math.floor((new Date(date).getTime() - new Date(entryTime).getTime()) / 86400000),
-        pnl, pnlPct: Number(pnlPct.toFixed(2)),
+        pnl: Number(pnl.toFixed(2)), pnlPct: Number(pnlPct.toFixed(2)),
         result: pnl > 0 ? 'WIN' : 'LOSS'
       });
-      balance += shares * price;
+      balance += proceeds;
       shares = 0;
+      entryCost = 0;
     }
     const currentEquity = balance + (shares * price);
     equityCurve.push({
@@ -478,6 +490,7 @@ function runBacktestLogic(
 
   const roi = Number((((balance + shares * closes[closes.length - 1]) / initialCapital - 1) * 100).toFixed(2));
   const winRate = trades.length > 0 ? Number(((trades.filter(t => t.pnl > 0).length / trades.length) * 100).toFixed(2)) : 0;
+
   let maxEquity = -Infinity;
   let maxDD = 0;
   const drawdownCurve = equityCurve.map(e => {
@@ -488,8 +501,34 @@ function runBacktestLogic(
     return { date: e.date, value: Number(dd.toFixed(2)) };
   });
 
+  // Sharpe ratio from daily equity returns, annualised √252
+  let sharpe = 0;
+  if (equityCurve.length >= 2) {
+    const dailyRets: number[] = [];
+    for (let i = 1; i < equityCurve.length; i++) {
+      const prev = equityCurve[i - 1].portfolio + 100;
+      const curr = equityCurve[i].portfolio + 100;
+      if (prev > 0) dailyRets.push((curr - prev) / prev);
+    }
+    if (dailyRets.length >= 2) {
+      const mean = dailyRets.reduce((a, b) => a + b, 0) / dailyRets.length;
+      const variance = dailyRets.reduce((a, r) => a + (r - mean) ** 2, 0) / (dailyRets.length - 1);
+      const std = Math.sqrt(variance);
+      sharpe = std > 0 ? Number(((mean / std) * Math.sqrt(252)).toFixed(2)) : 0;
+    }
+  }
+
+  // Profit factor and avg win/loss
+  const winPnls = trades.filter(t => t.pnl > 0).map(t => t.pnl);
+  const lossPnls = trades.filter(t => t.pnl < 0).map(t => t.pnl);
+  const grossWin = winPnls.reduce((a, b) => a + b, 0);
+  const grossLoss = Math.abs(lossPnls.reduce((a, b) => a + b, 0));
+  const profitFactor = grossLoss === 0 ? (grossWin > 0 ? 99 : 0) : Number((grossWin / grossLoss).toFixed(2));
+  const avgWin = winPnls.length > 0 ? Number((grossWin / winPnls.length / initialCapital * 100).toFixed(2)) : 0;
+  const avgLoss = lossPnls.length > 0 ? Number((grossLoss / lossPnls.length / initialCapital * 100).toFixed(2)) : 0;
+
   return {
-    metrics: { roi, sharpe: 1.5, maxDrawdown: Number(maxDD.toFixed(2)), winRate, totalTrades: trades.length, avgWin: 0, avgLoss: 0, profitFactor: 1.2 },
+    metrics: { roi, sharpe, maxDrawdown: Number(maxDD.toFixed(2)), winRate, totalTrades: trades.length, avgWin, avgLoss, profitFactor },
     equityCurve, drawdownCurve, trades
   };
 }
@@ -2139,7 +2178,132 @@ app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const data = await NativeYahooApi.chart(symbol, { period1, period2 });
     if (data.quotes.length < 50) throw new Error('Insufficient data for backtest');
-    res.json(runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1000000, paramPack));
+
+    const closes = data.quotes.map((q: any) => q.close);
+    const lastPrice = closes[closes.length - 1] ?? 0;
+
+    // Helper: parse paramPack string → object
+    const parsedParams = (() => {
+      if (typeof paramPack === 'string' && paramPack.trim()) {
+        try { return JSON.parse(paramPack); } catch { return {}; }
+      }
+      return (paramPack && typeof paramPack === 'object') ? paramPack : {};
+    })();
+
+    let btResult: any;
+
+    if (strategy === 'neural') {
+      // Neural strategy → advanced multi-signal engine with SL/TP/trailing stop
+      const { runBacktestWithBestEngine } = await import('./server/services/backtestEngine.js');
+      const history = data.quotes.map((q: any) => ({
+        close: q.close,
+        date: q.date instanceof Date ? q.date.toISOString().split('T')[0] : String(q.date),
+      }));
+      const config = {
+        strategies: ['RSI_REVERSION', 'MACD_CROSS', 'BOLLINGER_BREAKOUT'],
+        params: parsedParams,
+        _ablation_quantumEnabled: true,
+        _ablation_aiEnabled: false, // no live LLM in backtest
+      };
+      const advanced = await runBacktestWithBestEngine(symbol, history, config);
+      const initialCap = Number(initialCapital) || 1_000_000;
+
+      // Compute drawdown inline and enrich equityCurve
+      let maxVal = -Infinity;
+      const enrichedCurve = (advanced.equityCurve || []).map((p: any) => {
+        const val = (p.portfolio ?? 0) + 100;
+        if (val > maxVal) maxVal = val;
+        const dd = maxVal > 0 ? ((maxVal - val) / maxVal) * 100 : 0;
+        return { ...p, drawdown: Number(dd.toFixed(2)) };
+      });
+
+      // Compute avgWin/avgLoss from trade PnLs
+      const advTrades = advanced.trades || [];
+      const winPnls: number[] = advTrades.filter((t: any) => t.pnl > 0).map((t: any) => t.pnl as number);
+      const lossPnls: number[] = advTrades.filter((t: any) => t.pnl < 0).map((t: any) => Math.abs(t.pnl as number));
+      const grossWin = winPnls.reduce((a, b) => a + b, 0);
+      const grossLoss = lossPnls.reduce((a, b) => a + b, 0);
+      const avgWin = winPnls.length > 0 ? Number((grossWin / winPnls.length / initialCap * 100).toFixed(2)) : 0;
+      const avgLoss = lossPnls.length > 0 ? Number((grossLoss / lossPnls.length / initialCap * 100).toFixed(2)) : 0;
+
+      const roi = advanced.metrics.roi ?? 0;
+      btResult = {
+        initialCapital: initialCap,
+        finalEquity: initialCap * (1 + roi / 100),
+        totalReturn: roi,
+        maxDrawdown: advanced.metrics.maxDrawdown,
+        trades: advTrades.map((t: any) => ({
+          entryTime: t.entryDate ?? '',
+          exitTime:  t.exitDate  ?? '',
+          entryPrice: t.entryPrice ?? 0,
+          exitPrice:  t.exitPrice  ?? 0,
+          amount:   t.shares ?? 0,
+          holdDays: (t.entryDate && t.exitDate)
+            ? Math.floor((new Date(t.exitDate).getTime() - new Date(t.entryDate).getTime()) / 86_400_000)
+            : 0,
+          pnl:    Number((t.pnl    ?? 0).toFixed(2)),
+          pnlPct: Number((t.pnlPct ?? 0).toFixed(2)),
+          result: t.type === 'WIN' ? 'WIN' : 'LOSS',
+        })),
+        totalTrades: advTrades.length,
+        equityCurve: enrichedCurve,
+        drawdownCurve: enrichedCurve.map((p: any) => ({ date: p.date, value: p.drawdown })),
+        metrics: { ...advanced.metrics, avgWin, avgLoss },
+      };
+    } else {
+      btResult = runBacktestLogic(data.quotes, strategy, Number(initialCapital) || 1_000_000, parsedParams);
+    }
+
+    // Market regime detection
+    const { detectRegime } = await import('./server/services/backtestEngine.js');
+    const regime = detectRegime(closes);
+
+    // 30-trading-day (≈1 month) price forecast
+    let forecast = null;
+    try {
+      const { timesFmPredict } = await import('./server/utils/scienceService.js');
+      const historyWindow = closes.slice(-60);
+      const predResult = await timesFmPredict(symbol, 22, historyWindow);
+      if (predResult?.data?.prediction?.length) {
+        const preds: number[] = predResult.data.prediction;
+        const baseTarget = preds[preds.length - 1];
+        const spread = preds.reduce((mx, v) => Math.max(mx, Math.abs(v - lastPrice)), 0);
+        forecast = {
+          predictions: preds.map((p: number) => Number(p.toFixed(2))),
+          lastPrice: Number(lastPrice.toFixed(2)),
+          targetPrice: Number(baseTarget.toFixed(2)),
+          bearTarget: Number((baseTarget - spread * 0.5).toFixed(2)),
+          bullTarget: Number((baseTarget + spread * 0.5).toFixed(2)),
+          changesPct: Number(((baseTarget - lastPrice) / lastPrice * 100).toFixed(2)),
+          model: predResult.data.model ?? 'fallback',
+        };
+      }
+    } catch { /* science service unavailable — omit forecast */ }
+
+    res.json({ ...btResult, forecast, regime });
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.post('/api/backtest/optimize', authMiddleware, async (req: AuthRequest, res) => {
+  const { symbol, period1, period2, strategy, paramPack } = req.body;
+  try {
+    const data = await NativeYahooApi.chart(symbol, { period1, period2 });
+    if (data.quotes.length < 50) throw new Error('Insufficient data for optimization');
+
+    const history = data.quotes.map((q: any) => ({
+      close: q.close,
+      date: q.date instanceof Date ? q.date.toISOString().split('T')[0] : String(q.date),
+    }));
+    const parsedParams = (() => {
+      if (typeof paramPack === 'string' && paramPack.trim()) {
+        try { return JSON.parse(paramPack); } catch { return {}; }
+      }
+      return (paramPack && typeof paramPack === 'object') ? paramPack : {};
+    })();
+
+    const { runExplicitOptimizationScan } = await import('./server/services/optimizerService.js');
+    const proposal = await runExplicitOptimizationScan(symbol, history, strategy || 'neural', parsedParams);
+    res.json({ proposal });
   } catch (e) { handleApiError(res, e); }
 });
 

@@ -10,7 +10,8 @@
     "news": "新聞",
     "alerts": "預警",
     "settings": "設定",
-    "login": "登入"
+    "login": "登入",
+    "autotrading": "自動交易"
   },
   "seo": {
     "title": "量化交易平台",
@@ -731,4 +732,3 @@
     "noResults": "找不到「{{query}}」相關股票"
   }
 }
-

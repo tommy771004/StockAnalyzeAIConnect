@@ -183,9 +183,8 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
       window.dispatchEvent(new CustomEvent('symbol-search', { detail: sym }));
     }, 100);
     
-    // 使用 hash 導航以符合 user 範例並確保 App.tsx 偵測到
-    window.location.hash = 'research';
-  }, []);
+    onNavigate('research');
+  }, [onNavigate]);
 
   const hasMoreResults = results.length > visibleCount;
 

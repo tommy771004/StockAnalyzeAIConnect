@@ -109,3 +109,60 @@ export async function runOptimizationScan(symbol: string, history: any[]): Promi
 
   return null;
 }
+
+/**
+ * 回測頁面專用優化器：直接接受明確的策略參數，不依賴 getAgentConfig()
+ */
+export async function runExplicitOptimizationScan(
+  symbol: string,
+  history: any[],
+  strategyId: string,
+  currentParams: any,
+): Promise<OptimizationProposal | null> {
+  const strategyMap: Record<string, string[]> = {
+    neural:       ['RSI_REVERSION', 'MACD_CROSS', 'BOLLINGER_BREAKOUT'],
+    rsi:          ['RSI_REVERSION'],
+    macd:         ['MACD_CROSS'],
+    ma_crossover: ['BOLLINGER_BREAKOUT'],
+  };
+  const strategies = strategyMap[strategyId] ?? ['BOLLINGER_BREAKOUT'];
+  const baseConfig = { strategies, params: currentParams, _ablation_quantumEnabled: false, _ablation_aiEnabled: false };
+
+  const CANDIDATES = 5;
+  const candidateParamsList = Array.from({ length: CANDIDATES }, () => mutateParams(currentParams));
+
+  const [baseSettled, ...candidateSettled] = await Promise.allSettled([
+    runBacktestWithBestEngine(symbol, history, baseConfig),
+    ...candidateParamsList.map(p => runBacktestWithBestEngine(symbol, history, { ...baseConfig, params: p })),
+  ]);
+
+  if (baseSettled.status === 'rejected') return null;
+  const baseResult = baseSettled.value;
+  const baseScore = riskAdjustedScore(baseResult.metrics);
+
+  let bestParams = currentParams;
+  let bestScore = baseScore;
+  let bestMetrics = baseResult.metrics;
+
+  candidateSettled.forEach((settled, idx) => {
+    if (settled.status === 'rejected') return;
+    const score = riskAdjustedScore(settled.value.metrics);
+    if (score > bestScore) {
+      bestScore = score;
+      bestParams = candidateParamsList[idx];
+      bestMetrics = settled.value.metrics;
+    }
+  });
+
+  if (bestScore > baseScore * 1.05) {
+    return {
+      originalParams: currentParams,
+      betterParams: bestParams,
+      improvementPct: Number((bestMetrics.roi - baseResult.metrics.roi).toFixed(2)),
+      riskAdjustedScore: Number(bestScore.toFixed(4)),
+      reason: `在 ${symbol} 的歷史數據中，新參數風險調整後績效提升了 ${((bestScore / Math.max(baseScore, 1e-9) - 1) * 100).toFixed(1)}%（Sharpe×(1-MDD)×勝率）。`,
+    };
+  }
+
+  return null;
+}

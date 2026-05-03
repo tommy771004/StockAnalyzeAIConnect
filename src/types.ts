@@ -236,6 +236,16 @@ export interface BacktestMetrics {
   profitFactor: number;
 }
 
+export interface BacktestForecast {
+  predictions: number[];
+  lastPrice: number;
+  targetPrice: number;
+  bearTarget: number;
+  bullTarget: number;
+  changesPct: number;
+  model: string;
+}
+
 /** 回測引擎回傳的完整結果 */
 export interface BacktestResult {
   initialCapital: number;
@@ -247,6 +257,17 @@ export interface BacktestResult {
   equityCurve: { date: string; equity: number; benchmark?: number; drawdown?: number }[];
   metrics?: BacktestMetrics;
   strategy?: string;
+  forecast?: BacktestForecast | null;
+  regime?: 'bull' | 'bear' | 'sideways';
+}
+
+/** 參數優化器回傳的改進建議 */
+export interface OptimizationProposal {
+  originalParams: Record<string, unknown>;
+  betterParams: Record<string, unknown>;
+  improvementPct: number;
+  riskAdjustedScore: number;
+  reason: string;
 }
 
 /** 回測參數 */

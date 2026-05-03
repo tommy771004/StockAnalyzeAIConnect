@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
@@ -11,6 +12,7 @@ const CRYPTO_SYMBOLS = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'AVAX-USD', 'DOGE-USD',
 
 export function CryptoPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +64,7 @@ export function CryptoPage() {
                   key={c.symbol} 
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('symbol-search', { detail: c.symbol }));
-                    window.location.hash = 'dashboard';
+                    navigate('/dashboard');
                   }}
                   className="border-b border-(--color-term-border)/60 hover:bg-white/5 transition-colors cursor-pointer group"
                 >

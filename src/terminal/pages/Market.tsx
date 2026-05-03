@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useMarketData } from '../hooks/useMarketData';
 import { formatPct, toneClass } from '../ui/format';
 import { Loader2 } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Panel } from '../ui/Panel';
 
 export function MarketPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { sectors, indices, loading } = useMarketData();
 
   if (loading && sectors.length === 0) {
@@ -27,7 +29,7 @@ export function MarketPage() {
                 key={s.symbol}
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('symbol-search', { detail: s.symbol }));
-                  window.location.hash = 'dashboard';
+                  navigate('/dashboard');
                 }}
                 className={cn(
                   'flex flex-col items-start justify-between p-3 text-[12px] h-24 cursor-pointer hover:brightness-125 hover:scale-[1.01] active:scale-[0.98] transition-all',
@@ -69,7 +71,7 @@ export function MarketPage() {
                   className="border-b border-(--color-term-border)/40 hover:bg-white/5 transition-colors cursor-pointer group"
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('symbol-search', { detail: r.symbol }));
-                    window.location.hash = 'dashboard';
+                    navigate('/dashboard');
                   }}
                 >
                   <td className="px-4 py-3.5">

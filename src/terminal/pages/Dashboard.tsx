@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Filter, RefreshCw, Wifi, WifiOff, Plus, Trash2, X, Microscope } from 'lucide-react';
 import { Panel } from '../ui/Panel';
@@ -410,6 +411,7 @@ export function SelectedChartPanel({
   isLive: boolean;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const last = candles[candles.length - 1];
   const first = candles[0];
   const close   = last?.close  ?? row.last;
@@ -448,7 +450,7 @@ export function SelectedChartPanel({
         <button
           onClick={() => {
             sessionStorage.setItem('research-symbol', row.symbol);
-            window.location.hash = 'research';
+            navigate('/research');
           }}
           className="focus-ring flex items-center gap-1 px-2 py-1 text-[10px] font-bold tracking-widest text-(--color-term-accent) border border-(--color-term-accent)/40 rounded-sm hover:bg-(--color-term-accent)/10 motion-safe:transition-colors"
           title="深入研究"

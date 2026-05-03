@@ -10,7 +10,8 @@
     "news": "News",
     "alerts": "Alerts",
     "settings": "Settings",
-    "login": "Login"
+    "login": "Login",
+    "autotrading": "Auto Trading"
   },
   "seo": {
     "title": "Quantitative trading platform",
@@ -730,4 +731,3 @@
     "noResults": "No matches for \"{{query}}\""
   }
 }
-

@@ -190,6 +190,9 @@ export const runBacktest   = (p: BacktestParams): Promise<BacktestResult> =>
   IS_ELECTRON ? E().runBacktest(p)
     : fetchJ<BacktestResult>('/api/backtest', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
 
+export const optimizeBacktest = (p: BacktestParams): Promise<{ proposal: import('../types').OptimizationProposal | null }> =>
+  fetchJ('/api/backtest/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
+
 // ── Watchlist ─────────────────────────────────────────────────────────────────
 export const getWatchlist  = (): Promise<WatchlistItem[]> =>
   IS_ELECTRON ? E().getWatchlist() : fetchJ<WatchlistItem[]>('/api/watchlist');

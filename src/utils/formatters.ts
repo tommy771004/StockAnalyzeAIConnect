@@ -73,3 +73,10 @@ export function formatNumber(value: number, decimals: number = 2, locale: string
     maximumFractionDigits: decimals,
   }).format(value);
 }
+
+/** Safely extracts the YYYY-MM-DD portion from a Date object or date string. */
+export function dateOnly(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  if (date instanceof Date) return date.toISOString().slice(0, 10);
+  return String(date).slice(0, 10);
+}

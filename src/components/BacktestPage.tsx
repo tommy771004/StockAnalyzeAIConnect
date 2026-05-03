@@ -1,10 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { AlertCircle, Play, Trophy } from 'lucide-react';
+import { AlertCircle, Play, Trophy, Zap, CheckCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { runBacktest } from '../services/api';
+import { runBacktest, optimizeBacktest } from '../services/api';
 import { pushLog } from './TradeLogger';
-import type { BacktestMetrics, BacktestResult } from '../types';
+import type { BacktestMetrics, BacktestResult, OptimizationProposal } from '../types';
 import type { StrategyParams } from './AutoTrading/types';
 import {
   DEFAULT_STRATEGY_PARAMS,
@@ -20,6 +20,7 @@ import { buildBacktestPdf } from '../utils/exportPdf';
 import { BacktestHeaderSection } from './backtest/BacktestHeaderSection';
 import { BacktestChartSection } from './backtest/BacktestChartSection';
 import { BacktestTradesSection } from './backtest/BacktestTradesSection';
+import { PriceForecastPanel } from './backtest/PriceForecastPanel';
 import { normalizeSymbolInput, searchStockSymbols } from '../utils/stockSymbolLookup';
 
 type StratId = typeof STRATEGIES[number]['id'];
@@ -45,6 +46,8 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
   const [compareMode, setCompareMode] = useState(false);
   const [compareResults, setCompareResults] = useState<Record<string, BacktestResult & { strategy: string }>>({});
   const [strategyParams, setStrategyParams] = useState<StrategyParams>(() => ({ ...DEFAULT_STRATEGY_PARAMS }));
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeProposal, setOptimizeProposal] = useState<OptimizationProposal | null | 'none'>(null);
 
   const running = runState === 'running';
   const comparing = runState === 'comparing';
@@ -170,6 +173,20 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
     void handleCompare();
   };
 
+  const handleOptimize = async () => {
+    if (!result) return;
+    setOptimizing(true);
+    setOptimizeProposal(null);
+    try {
+      const res = await optimizeBacktest({ symbol, strategy, initialCapital: cap, period1, period2: period2 || undefined, paramPack: strategyParamPack });
+      setOptimizeProposal(res.proposal ?? 'none');
+    } catch {
+      setOptimizeProposal('none');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   const metrics: BacktestMetrics = result?.metrics || DEFAULT_BACKTEST_METRICS;
   const equityData = result?.equityCurve || [];
   const benchEnd = equityData.at(-1)?.benchmark ?? 0;
@@ -265,7 +282,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
           </div>
 
           <div className="overflow-x-auto custom-scrollbar -mx-2 px-2">
-            <table className="w-full text-sm mb-6 min-w-[800px]">
+            <table className="w-full text-sm mb-6 min-w-[1040px]">
               <thead>
                 <tr className="border-b label-meta font-black uppercase tracking-[0.2em]" style={{ borderColor: 'var(--md-outline-variant)', color: 'var(--md-outline)' }}>
                   <th className="pb-6 text-left pl-4">策略名稱</th>
@@ -273,6 +290,9 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   <th className="pb-6 text-right">夏普比率 (Sharpe)</th>
                   <th className="pb-6 text-right">最大回撤 (MDD)</th>
                   <th className="pb-6 text-right">勝率 (Win Rate)</th>
+                  <th className="pb-6 text-right">平均盈%</th>
+                  <th className="pb-6 text-right">平均虧%</th>
+                  <th className="pb-6 text-right">獲利因子 (PF)</th>
                   <th className="pb-6 text-right pr-4">交易次數</th>
                 </tr>
               </thead>
@@ -308,6 +328,15 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                       <td className="py-6 text-right font-mono font-bold text-base" style={{ color: (m?.winRate ?? 0) >= 50 ? 'var(--color-down)' : 'var(--color-up)' }}>
                         {m?.winRate ?? 0}%
                       </td>
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: 'var(--color-down)' }}>
+                        +{m?.avgWin ?? 0}%
+                      </td>
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: 'var(--color-up)' }}>
+                        -{m?.avgLoss ?? 0}%
+                      </td>
+                      <td className="py-6 text-right font-mono font-bold text-base" style={{ color: (m?.profitFactor ?? 0) >= 1.5 ? 'var(--color-down)' : (m?.profitFactor ?? 0) >= 1 ? 'var(--md-tertiary)' : 'var(--color-up)' }}>
+                        {m?.profitFactor ?? 0}
+                      </td>
                       <td className="py-6 text-right font-mono font-bold pr-4" style={{ color: 'var(--md-on-surface-variant)' }}>
                         {m?.totalTrades ?? 0}
                       </td>
@@ -322,6 +351,64 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
 
       {result ? (
         <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
+          {/* Regime badge + Optimize button row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            {result.regime && (() => {
+              const regimeCfg = {
+                bull:     { icon: <TrendingUp size={13} />, label: '多頭行情', bg: 'rgba(82,196,26,0.08)', border: 'rgba(82,196,26,0.25)', color: 'var(--color-down)' },
+                bear:     { icon: <TrendingDown size={13} />, label: '空頭行情', bg: 'rgba(255,77,79,0.08)', border: 'rgba(255,77,79,0.25)', color: 'var(--color-up)' },
+                sideways: { icon: <Minus size={13} />, label: '震盪整理', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', color: '#f59e0b' },
+              }[result.regime];
+              return (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest"
+                  style={{ background: regimeCfg.bg, border: `1px solid ${regimeCfg.border}`, color: regimeCfg.color }}>
+                  {regimeCfg.icon}
+                  <span>市場狀態：{regimeCfg.label}</span>
+                </div>
+              );
+            })()}
+            <button type="button" onClick={() => void handleOptimize()} disabled={optimizing}
+              className="flex items-center gap-2 px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition active:scale-95 disabled:opacity-50"
+              style={{ background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.25)', color: 'var(--md-primary)' }}>
+              <Zap size={13} />
+              {optimizing ? '優化中…' : '自動優化參數'}
+            </button>
+          </div>
+
+          {/* Optimization result panel */}
+          {optimizeProposal && optimizeProposal !== 'none' && (
+            <div className="glass-card rounded-[2.5rem] p-6 shadow-xl animate-in fade-in slide-in-from-top-2 duration-500 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--md-primary-container)] to-transparent opacity-50" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)', color: 'var(--md-primary)' }}>
+                    <Zap size={18} />
+                  </div>
+                  <div>
+                    <div className="font-black tracking-tight" style={{ color: 'var(--md-on-surface)' }}>找到更優參數</div>
+                    <div className="text-[10px] font-bold mt-0.5" style={{ color: 'var(--color-down)' }}>
+                      ROI 預計改善 +{optimizeProposal.improvementPct}%，風險評分 {optimizeProposal.riskAdjustedScore}
+                    </div>
+                  </div>
+                </div>
+                <button type="button"
+                  onClick={() => { setStrategyParams(optimizeProposal.betterParams as StrategyParams); setOptimizeProposal(null); }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition active:scale-95"
+                  style={{ background: 'rgba(82,196,26,0.1)', border: '1px solid rgba(82,196,26,0.3)', color: 'var(--color-down)' }}>
+                  <CheckCircle size={13} />
+                  套用參數
+                </button>
+              </div>
+              <p className="text-xs font-medium leading-relaxed" style={{ color: 'var(--md-outline)' }}>{optimizeProposal.reason}</p>
+            </div>
+          )}
+          {optimizeProposal === 'none' && (
+            <div className="rounded-2xl px-5 py-3 text-xs font-bold animate-in fade-in duration-300"
+              style={{ background: 'rgba(100,116,139,0.08)', border: '1px solid rgba(100,116,139,0.2)', color: 'var(--md-outline)' }}>
+              已掃描 5 組變異參數，當前配置已是最佳，無明顯改善空間。
+            </div>
+          )}
+
           <BacktestChartSection
             resultStrat={resultStrat}
             metrics={metrics}
@@ -347,8 +434,15 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
             onTradeSortChange={setTradeSort}
             onExportCSV={exportCSV}
           />
+          {result.forecast && (
+            <PriceForecastPanel symbol={symbol} forecast={result.forecast} />
+          )}
         </div>
-      ) : !running && (
+      ) : running ? (
+        strategy === 'neural' && (
+          <PriceForecastPanel symbol={symbol} loading />
+        )
+      ) : (
         <div className="flex-1 flex flex-col items-center justify-center gap-12 py-20 animate-in fade-in zoom-in-95 duration-1000">
           <div className="text-center space-y-6 max-w-2xl px-6">
             <div className="w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto relative" style={{ background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.25)' }}>
