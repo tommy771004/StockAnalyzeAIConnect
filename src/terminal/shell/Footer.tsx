@@ -9,6 +9,7 @@ interface FooterProps {
 
 export function Footer({ lastUpdated }: FooterProps) {
   const { t } = useTranslation();
+  const companyName = 'Stock AI Connect';
 
   // Live Taipei clock — ticks every second
   const [clock, setClock] = useState(() => formatTaipeiTime());
@@ -20,17 +21,17 @@ export function Footer({ lastUpdated }: FooterProps) {
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between border-t border-(--color-term-border) bg-(--color-term-bg) px-5 text-[11px] tracking-wider text-(--color-term-muted)">
       <div className="flex items-center gap-4">
-        <span className="text-(--color-term-accent) font-semibold">Stock AI Connect</span>
-        <span>© {new Date().getFullYear()} Stock AI Connect</span>
+        <span className="text-(--color-term-accent) font-semibold">{companyName}</span>
+        <span>© {new Date().getFullYear()} {companyName}</span>
         <span className="hidden sm:inline">|</span>
         <span className="hidden sm:inline">
-          {t('footer.status')}：
+          {t('footer.status')}{t('footer.statusDelimiter', ': ')}
           <span className="text-(--color-term-positive)">{t('footer.statusOk')}</span>
         </span>
         {/* Live Taiwan time clock */}
         <span className="hidden md:inline">|</span>
         <span className="hidden md:inline font-mono tabular-nums">
-          <span className="text-(--color-term-accent)/70 mr-1">TST</span>
+          <span className="text-(--color-term-accent)/70 mr-1">{t('footer.timezoneLabel', 'TST')}</span>
           {clock}
         </span>
       </div>
