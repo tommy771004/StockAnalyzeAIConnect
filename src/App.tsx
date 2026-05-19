@@ -7,6 +7,7 @@ import { DashboardPage } from './terminal/pages/Dashboard';
 import { PortfolioPage } from './terminal/pages/Portfolio';
 import { NewsPage } from './terminal/pages/News';
 import { ResearchPage } from './terminal/pages/Research';
+import { SmartMoneyPage } from './terminal/pages/SmartMoney';
 import { MarketPage } from './terminal/pages/Market';
 import { CryptoPage } from './terminal/pages/Crypto';
 import { SettingsPage } from './terminal/pages/Settings';
@@ -25,6 +26,7 @@ const VALID_VIEWS: readonly TerminalView[] = [
   'crypto',
   'portfolio',
   'research',
+  'smartmoney',
   'backtest',
   'news',
   'alerts',
@@ -48,6 +50,7 @@ const DEFAULT_VIEW_DESCRIPTIONS: Record<TerminalView, string> = {
   crypto:      '比特幣、以太坊等加密貨幣即時價格與趨勢分析。',
   portfolio:   '追蹤你的投資組合損益、持倉分佈與績效報告。',
   research:    '個股深度研究：財務指標、AI 評分、法說會行事曆。',
+  smartmoney:  '集中追蹤 13F 新建倉、內部人大額買入、基金 CIK 與 Smart Money 事件流。',
   backtest:    '用歷史數據回測 MA 交叉、RSI、MACD 與 AI 多因子交易策略，產生績效報告。',
   news:        '最新財經新聞、產業動態與市場情緒分析。',
   alerts:      '設定股價到價提醒，即時通知關鍵買賣訊號。',
@@ -62,6 +65,7 @@ const DEFAULT_SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
   crypto: '搜尋幣種...',
   portfolio: '搜尋持倉...',
   research: '搜尋 AAPL...',
+  smartmoney: '搜尋標的...',
   backtest: '搜尋回測...',
   news: '搜尋新聞...',
   alerts: '搜尋提醒...',
@@ -122,6 +126,7 @@ export default function App() {
             {view === 'crypto' && <CryptoPage />}
             {view === 'portfolio' && <PortfolioPage />}
             {view === 'research' && <ResearchPage />}
+            {view === 'smartmoney' && <SmartMoneyPage />}
             {view === 'backtest' && <BacktestTerminalPage />}
             {view === 'news' && <NewsPage />}
             {view === 'settings' && <SettingsPage />}
