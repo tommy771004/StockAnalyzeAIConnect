@@ -261,6 +261,76 @@ export const addAlert      = (a: Omit<Alert, 'id'>): Promise<Alert> =>
 export const deleteAlert   = (id: number): Promise<boolean> =>
   IS_ELECTRON ? E().deleteAlert(id) : fetchJ(`/api/alerts/${id}`, { method:'DELETE' }).then(() => true).catch(e => { apiWarn('deleteAlert', e); throw e; });
 
+export interface SmartMoneyManager {
+  id: string;
+  name: string;
+  cik: string;
+}
+
+export interface SmartMoneyManagerSearchResult extends SmartMoneyManager {
+  displayName: string;
+  form: string | null;
+  has13F: boolean;
+  last13FFilingDate: string | null;
+  verificationStatus: 'verified' | 'not_found' | 'unavailable';
+}
+
+export interface SmartMoneyAlertEvent {
+  id: string;
+  type: '13f_new_position' | 'insider_large_buy';
+  detectedAt: string;
+  eventDate: string;
+  title: string;
+  summary: string;
+  symbol: string | null;
+  issuer: string | null;
+  managerId: string | null;
+  managerName: string | null;
+  insiderName: string | null;
+  amountUsd: number | null;
+  sourceUrl: string;
+  autoAddedToWatchlist: boolean;
+}
+
+export interface SmartMoneySettingsPayload {
+  enabled: boolean;
+  trackedManagerIds: string[];
+  customManagers: SmartMoneyManager[];
+  useWatchlistForInsiderSymbols: boolean;
+  insiderSymbols: string[];
+  autoAddInsiderSignalsToWatchlist: boolean;
+  minInsiderBuyUsd: number;
+}
+
+export interface SmartMoneyConfigResponse {
+  ok: boolean;
+  settings: SmartMoneySettingsPayload;
+  availableManagers: SmartMoneyManager[];
+  recentEvents: SmartMoneyAlertEvent[];
+  lastScanAt: string | null;
+  watchlistSymbols: string[];
+}
+
+export const getSmartMoneyConfig = (): Promise<SmartMoneyConfigResponse> =>
+  fetchJ<SmartMoneyConfigResponse>('/api/smart-money/config');
+
+export const searchSmartMoneyManagers = (query: string) =>
+  fetchJ<{ query: string; results: SmartMoneyManagerSearchResult[] }>(
+    `/api/research/smart-money/managers/search?q=${encodeURIComponent(query)}`,
+  );
+
+export const updateSmartMoneyConfig = (settings: SmartMoneySettingsPayload) =>
+  fetchJ<{ ok: boolean; settings: SmartMoneySettingsPayload; availableManagers: SmartMoneyManager[] }>('/api/smart-money/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+
+export const scanSmartMoneySignals = () =>
+  fetchJ<{ ok: boolean; newEvents: SmartMoneyAlertEvent[]; recentEvents: SmartMoneyAlertEvent[]; lastScanAt: string | null }>('/api/smart-money/scan', {
+    method: 'POST',
+  });
+
 // ── App Settings ──────────────────────────────────────────────────────────────
 export const getSetting    = async <T>(key: string): Promise<T> => {
   if (IS_ELECTRON) return E().getSetting<T>(key);
