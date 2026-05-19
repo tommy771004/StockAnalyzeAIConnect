@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Panel } from './Panel';
 import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -47,12 +48,13 @@ const PARTY_COLOR: Record<string, string> = {
 };
 
 const ACTION_CONFIG = {
-  Buy:      { icon: TrendingUp,   color: 'text-emerald-400', label: '買入' },
-  Sell:     { icon: TrendingDown, color: 'text-rose-400',    label: '賣出' },
-  Exchange: { icon: Minus,        color: 'text-amber-400',   label: '交換' },
+  Buy:      { icon: TrendingUp,   color: 'text-emerald-400' },
+  Sell:     { icon: TrendingDown, color: 'text-rose-400' },
+  Exchange: { icon: Minus,        color: 'text-amber-400' },
 };
 
 export function CongressTradesPanel({ symbol }: Props) {
+  const { t } = useTranslation();
   const [data, setData]       = useState<CongressData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -78,23 +80,32 @@ export function CongressTradesPanel({ symbol }: Props) {
 
   useEffect(() => { load(); }, [symbol]);
 
+  const actionLabels: Record<CongressTrade['action'], string> = {
+    Buy: t('congress.actionBuy', '買入'),
+    Sell: t('congress.actionSell', '賣出'),
+    Exchange: t('congress.actionExchange', '交換'),
+  };
+
   const biasConfig = data?.summary.buyBias === 'bullish'
-    ? { label: '偏多', color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' }
+    ? { label: t('congress.biasBullish', '偏多'), color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' }
     : data?.summary.buyBias === 'bearish'
-    ? { label: '偏空', color: 'text-rose-400',    bg: 'bg-rose-400/10 border-rose-400/20' }
-    : { label: '中性', color: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/20' };
+    ? { label: t('congress.biasBearish', '偏空'), color: 'text-rose-400',    bg: 'bg-rose-400/10 border-rose-400/20' }
+    : { label: t('congress.biasNeutral', '中性'), color: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/20' };
 
   return (
     <Panel
-      title={symbol ? `🏛️ 國會議員交易 — ${symbol}` : '🏛️ 國會議員最新交易'}
+      title={symbol
+        ? t('congress.titleWithSymbol', '🏛️ 國會議員交易 — {{symbol}}', { symbol })
+        : t('congress.titleLatest', '🏛️ 國會議員最新交易')}
       className="min-h-[300px]"
       bodyClassName="flex flex-col"
       actions={
         <button
+          type="button"
           onClick={load}
           disabled={loading}
           className="text-(--color-term-muted) hover:text-(--color-term-text) transition-colors disabled:opacity-40"
-          title="重新整理"
+          title={t('congress.refresh', '重新整理')}
         >
           <RefreshCw size={13} className={cn(loading && 'animate-spin')} />
         </button>
@@ -103,7 +114,7 @@ export function CongressTradesPanel({ symbol }: Props) {
       {loading && !data && (
         <div className="flex flex-1 items-center justify-center gap-2 py-8 text-(--color-term-muted) text-[12px]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>正在載入國會申報資料...</span>
+          <span>{t('congress.loading', '正在載入國會申報資料...')}</span>
         </div>
       )}
 
@@ -117,27 +128,27 @@ export function CongressTradesPanel({ symbol }: Props) {
           <div className="flex items-center gap-4 border-b border-(--color-term-border) px-4 py-3">
             <div className={cn('rounded border px-3 py-1.5 text-center', biasConfig.bg)}>
               <div className={cn('text-[16px] font-bold', biasConfig.color)}>{biasConfig.label}</div>
-              <div className="text-[9px] text-(--color-term-muted) tracking-widest">議員倉位</div>
+              <div className="text-[9px] text-(--color-term-muted) tracking-widest">{t('congress.biasLabel', '議員倉位')}</div>
             </div>
             <div className="flex gap-5">
               <div className="text-center">
                 <div className="text-[18px] font-bold text-emerald-400 tabular-nums">{data.summary.buyCount}</div>
-                <div className="text-[9px] text-(--color-term-muted) tracking-widest">BUY</div>
+                <div className="text-[9px] text-(--color-term-muted) tracking-widest">{t('congress.buyStat', 'BUY')}</div>
               </div>
               <div className="text-center">
                 <div className="text-[18px] font-bold text-rose-400 tabular-nums">{data.summary.sellCount}</div>
-                <div className="text-[9px] text-(--color-term-muted) tracking-widest">SELL</div>
+                <div className="text-[9px] text-(--color-term-muted) tracking-widest">{t('congress.sellStat', 'SELL')}</div>
               </div>
               <div className="text-center">
                 <div className="text-[18px] font-bold text-(--color-term-text) tabular-nums">{data.summary.totalTrades}</div>
-                <div className="text-[9px] text-(--color-term-muted) tracking-widest">TOTAL</div>
+                <div className="text-[9px] text-(--color-term-muted) tracking-widest">{t('congress.totalStat', 'TOTAL')}</div>
               </div>
             </div>
 
             {/* Top traders */}
             {data.summary.topTraders.length > 0 && (
               <div className="ml-auto hidden lg:block">
-                <div className="text-[9px] text-(--color-term-muted) tracking-widest mb-1">最活躍議員</div>
+                <div className="text-[9px] text-(--color-term-muted) tracking-widest mb-1">{t('congress.topTraders', '最活躍議員')}</div>
                 {data.summary.topTraders.slice(0, 3).map(t => (
                   <div key={t.name} className="text-[10px] text-(--color-term-text) flex gap-2">
                     <span>{t.name}</span>
@@ -152,19 +163,24 @@ export function CongressTradesPanel({ symbol }: Props) {
 
           {/* Disclaimer */}
           <div className="border-b border-(--color-term-border) bg-amber-400/5 px-4 py-2 text-[10px] text-amber-400/80">
-            ⚠️ 資料來源：STOCK Act 公開申報（最長45天延遲）。並非投資建議，亦不構成內線交易指控。
+            {t('congress.disclaimer', '⚠️ 資料來源：STOCK Act 公開申報（最長45天延遲）。並非投資建議，亦不構成內線交易指控。')}
           </div>
 
           {/* Trades list */}
           <ul className="flex flex-col divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '360px' }}>
             {data.trades.length === 0 && (
               <li className="px-4 py-8 text-center text-[12px] text-(--color-term-muted)">
-                {symbol ? `尚無 ${symbol} 的國會議員申報交易` : '尚無最新交易資料'}
+                {symbol
+                  ? t('congress.emptyWithSymbol', '尚無 {{symbol}} 的國會議員申報交易', { symbol })
+                  : t('congress.emptyLatest', '尚無最新交易資料')}
               </li>
             )}
             {data.trades.map((t, i) => {
               const action = ACTION_CONFIG[t.action] ?? ACTION_CONFIG.Exchange;
               const Icon   = action.icon;
+              const chamberLabel = t.chamber === 'House'
+                ? t('congress.chamberHouse', 'House')
+                : t('congress.chamberSenate', 'Senate');
               return (
                 <li key={i} className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
                   {/* Party badge */}
@@ -181,7 +197,7 @@ export function CongressTradesPanel({ symbol }: Props) {
                       )}
                     </div>
                     <div className="text-[10px] text-(--color-term-muted) mt-0.5">
-                      {t.chamber} · {t.state} · 交易: {t.tradeDate} · 申報: {t.reportedDate}
+                      {chamberLabel} · {t.state} · {t('congress.tradeDate', '交易: {{date}}', { date: t.tradeDate })} · {t('congress.reportedDate', '申報: {{date}}', { date: t.reportedDate })}
                     </div>
                   </div>
 
@@ -189,7 +205,7 @@ export function CongressTradesPanel({ symbol }: Props) {
                   <div className="shrink-0 text-right">
                     <div className={cn('flex items-center gap-1 justify-end text-[12px] font-semibold', action.color)}>
                       <Icon size={12} />
-                      {action.label}
+                      {actionLabels[t.action] ?? actionLabels.Exchange}
                     </div>
                     <div className="text-[10px] text-(--color-term-muted) mt-0.5">{t.amountFormatted}</div>
                   </div>

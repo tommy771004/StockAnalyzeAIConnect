@@ -3,16 +3,16 @@ export function formatPct(value: number, digits = 2): string {
   return `${sign}${value.toFixed(digits)}%`;
 }
 
-export function formatNum(value: number, digits = 2): string {
-  return value.toLocaleString('en-US', {
+export function formatNum(value: number, digits = 2, locale = 'en-US'): string {
+  return value.toLocaleString(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 }
 
-export function formatSignedNum(value: number, digits = 2): string {
+export function formatSignedNum(value: number, digits = 2, locale = 'en-US'): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${formatNum(value, digits)}`;
+  return `${sign}${formatNum(value, digits, locale)}`;
 }
 
 export function toneFor(value: number): 'positive' | 'negative' | 'flat' {

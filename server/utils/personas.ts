@@ -12,6 +12,7 @@ export interface PersonaDef {
   nameZh:      string;
   emoji:       string;
   philosophy:  string; // 一行簡介
+  philosophyEn?: string;
   systemPrompt: string;
 }
 
@@ -24,6 +25,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: 'Hermes 通用分析師',
     emoji: '⚡',
     philosophy: '綜合量化與基本面的全方位分析師',
+    philosophyEn: 'A balanced analyst blending quantitative and fundamental research',
     systemPrompt: '', // use default buildSystemPrompt
   },
 
@@ -34,6 +36,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '華倫·巴菲特',
     emoji: '🎯',
     philosophy: '護城河、長期持有、內在價值',
+    philosophyEn: 'Moats, long-term holding, intrinsic value',
     systemPrompt: `你正在扮演華倫·巴菲特（Warren Buffett），奧馬哈先知，全球最成功的價值投資者。
 
 ## 核心投資哲學
@@ -64,6 +67,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '查理·芒格',
     emoji: '🧠',
     philosophy: '多元心智模型、逆向思考、理性決策',
+    philosophyEn: 'Mental models, inversion, rational decisions',
     systemPrompt: `你正在扮演查理·芒格（Charlie Munger），波克夏·海瑟威副主席，世界上最偉大的思想家之一。
 
 ## 核心投資哲學
@@ -93,6 +97,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '班傑明·葛拉漢',
     emoji: '📚',
     philosophy: '量化安全邊際、市場先生、防禦型投資',
+    philosophyEn: 'Margin of safety, Mr. Market, defensive investing',
     systemPrompt: `你正在扮演班傑明·葛拉漢（Benjamin Graham），現代證券分析之父，《聰明的投資人》作者。
 
 ## 核心投資哲學
@@ -114,6 +119,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '彼得·林區',
     emoji: '🔍',
     philosophy: '投資你所知道的、成長股、PEG 估值',
+    philosophyEn: 'Invest in what you know, growth stocks, PEG valuation',
     systemPrompt: `你正在扮演彼得·林區（Peter Lynch），麥哲倫基金傳奇經理人，年均報酬率 29.2%。
 
 ## 核心投資哲學
@@ -142,6 +148,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '喬治·索羅斯',
     emoji: '🌊',
     philosophy: '反身性理論、宏觀做空、打破均衡',
+    philosophyEn: 'Reflexivity, macro shorts, breaking equilibrium',
     systemPrompt: `你正在扮演喬治·索羅斯（George Soros），量子基金創辦人，「打垮英格蘭銀行的男人」。
 
 ## 核心投資哲學
@@ -168,6 +175,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '瑞·達利歐',
     emoji: '⚖️',
     philosophy: '全天候策略、宏觀機器、極度透明',
+    philosophyEn: 'All Weather, the macro machine, radical transparency',
     systemPrompt: `你正在扮演瑞·達利歐（Ray Dalio），橋水基金創辦人，管理全球最大對沖基金。
 
 ## 核心投資哲學
@@ -194,6 +202,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '吉姆·西蒙斯',
     emoji: '📊',
     philosophy: '量化交易、統計套利、數學模型',
+    philosophyEn: 'Quant trading, statistical arbitrage, mathematical models',
     systemPrompt: `你正在扮演吉姆·西蒙斯（Jim Simons），文藝復興科技創辦人，量化投資之神，大獎章基金年均報酬率 66%。
 
 ## 核心投資哲學
@@ -221,6 +230,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '凱西·伍德',
     emoji: '🚀',
     philosophy: '顛覆性創新、指數型成長、五年視野',
+    philosophyEn: 'Disruptive innovation, exponential growth, five-year horizon',
     systemPrompt: `你正在扮演凱西·伍德（Cathie Wood），Ark Invest 創辦人，顛覆性創新投資女王。
 
 ## 核心投資哲學
@@ -248,6 +258,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '美國國會交易追蹤',
     emoji: '🏛️',
     philosophy: '追蹤政治人物申報交易，發現政策前瞻信號',
+    philosophyEn: 'Track political disclosures to spot policy-leading signals',
     systemPrompt: `你是一位專門追蹤美國國會議員股票交易申報的分析師。
 
 ## 你的工作
@@ -277,6 +288,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '地緣政治分析師',
     emoji: '🌍',
     philosophy: '地理決定命運，地緣政治影響資本流動',
+    philosophyEn: 'Geography shapes destiny; geopolitics moves capital',
     systemPrompt: `你是一位精通地緣政治的投資分析師，深受《地理的復仇》（Tim Marshall）和亨利·基辛格著作的影響。
 
 ## 核心分析框架
@@ -302,6 +314,7 @@ export const PERSONAS: Record<string, PersonaDef> = {
     nameZh: '風險管理師',
     emoji: '🛡️',
     philosophy: '保本第一、最大回撤管理、尾部風險',
+    philosophyEn: 'Capital preservation first, drawdown control, tail risk',
     systemPrompt: `你是一位資深的風險管理師，你的首要職責是「不虧錢」，其次才是賺錢。
 
 ## 核心原則
@@ -326,8 +339,8 @@ export const PERSONAS: Record<string, PersonaDef> = {
 
 /** 取得所有 personas 的輕量列表（供前端選單用）*/
 export function getPersonaList() {
-  return Object.values(PERSONAS).map(({ id, name, nameZh, emoji, philosophy }) => ({
-    id, name, nameZh, emoji, philosophy,
+  return Object.values(PERSONAS).map(({ id, name, nameZh, emoji, philosophy, philosophyEn }) => ({
+    id, name, nameZh, emoji, philosophy, philosophyEn,
   }));
 }
 

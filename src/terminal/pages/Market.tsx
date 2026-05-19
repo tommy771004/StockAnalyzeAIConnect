@@ -8,9 +8,10 @@ import { Panel } from '../ui/Panel';
 import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
 
 export function MarketPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { sectors, indices, loading, lastUpdated } = useMarketData();
+  const numberLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
   const marketDataMode: DataMode = loading && sectors.length === 0 && indices.length === 0
     ? 'MOCK'
     : (lastUpdated ? 'LIVE' : 'DELAYED');
@@ -47,11 +48,13 @@ export function MarketPage() {
                 <div className="flex flex-col">
                   <span className="font-bold tracking-widest text-[13px]">{s.symbol}</span>
                   <span className="text-[10px] opacity-70 truncate">
-                    {s.shortName?.replace('Select Sector SPDR Fund', '') || 'Sector'}
+                    {s.shortName?.replace('Select Sector SPDR Fund', '').trim() || t('market.sectorFallback', 'Sector')}
                   </span>
                 </div>
                 <div className="flex w-full items-end justify-between tabular-nums">
-                  <span className="text-[14px] font-semibold">{s.regularMarketPrice?.toFixed(2)}</span>
+                  <span className="text-[14px] font-semibold">
+                    {s.regularMarketPrice?.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                   <span className="font-mono">{formatPct(s.regularMarketChangePercent || 0, 1)}</span>
                 </div>
               </div>
@@ -91,7 +94,7 @@ export function MarketPage() {
                     <div className="text-[10px] text-(--color-term-muted)">{r.shortName}</div>
                   </td>
                   <td className="px-4 py-3.5 text-right tabular-nums font-semibold">
-                    {r.regularMarketPrice?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    {r.regularMarketPrice?.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className={cn('px-4 py-3.5 text-right tabular-nums', toneClass(r.regularMarketChange))}>
                     {r.regularMarketChange >= 0 ? '+' : ''}{r.regularMarketChange?.toFixed(2)}
@@ -100,7 +103,7 @@ export function MarketPage() {
                     {formatPct(r.regularMarketChangePercent || 0)}
                   </td>
                   <td className="px-4 py-3.5 text-right text-(--color-term-muted) tabular-nums">
-                    {r.regularMarketDayHigh?.toFixed(0)} - {r.regularMarketDayLow?.toFixed(0)}
+                    {r.regularMarketDayHigh?.toLocaleString(numberLocale, { maximumFractionDigits: 0 })} - {r.regularMarketDayLow?.toLocaleString(numberLocale, { maximumFractionDigits: 0 })}
                   </td>
                 </tr>
               ))}

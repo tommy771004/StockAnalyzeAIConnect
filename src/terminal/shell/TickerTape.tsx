@@ -172,6 +172,8 @@ function TickerChip({
   onSelect?: (s: string) => void;
   flash?: PriceFlash;
 }) {
+  const { i18n } = useTranslation();
+  const numberLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
   const isClickable = onSelect
     && !item.symbol.startsWith('^')
     && !item.symbol.includes('=F')
@@ -200,10 +202,10 @@ function TickerChip({
   if (abs != null) {
     const sign = abs >= 0 ? '+' : '';
     const val  = Math.abs(abs) >= 100
-      ? abs.toFixed(0)
+      ? abs.toLocaleString(numberLocale, { maximumFractionDigits: 0 })
       : Math.abs(abs) >= 1
-      ? abs.toFixed(2)
-      : abs.toFixed(4);
+      ? abs.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : abs.toLocaleString(numberLocale, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
     absDisplay = `(${sign}${val})`;
   }
 
@@ -291,7 +293,13 @@ function TickerManager({
         <span className="text-[11px] font-bold tracking-widest text-(--color-term-accent) uppercase">
           {t('ticker.manage')}
         </span>
-        <button type="button" onClick={onClose} className="text-(--color-term-muted) hover:text-(--color-term-text)">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('common.close')}
+          title={t('common.close')}
+          className="text-(--color-term-muted) hover:text-(--color-term-text)"
+        >
           <X size={14} />
         </button>
       </div>

@@ -33,7 +33,7 @@ interface TopNavProps {
 export function TopNav({
   active,
   onChange,
-  searchPlaceholder = 'SEARCH...',
+  searchPlaceholder,
   onToggleAgent,
   onToggleSidebar,
 }: TopNavProps) {
@@ -110,7 +110,11 @@ export function TopNav({
   }
 
   function getDisplayName(r: SearchResult) {
-    return r.chineseName || r.shortname || r.longname || r.symbol;
+    if (i18n.language.startsWith('zh')) {
+      return r.chineseName || r.shortname || r.longname || r.symbol;
+    }
+
+    return r.shortname || r.longname || r.chineseName || r.symbol;
   }
 
   return (
@@ -123,7 +127,7 @@ export function TopNav({
         type="button"
         onClick={onToggleSidebar}
         className="flex md:hidden h-8 w-8 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors focus-ring rounded"
-        aria-label="Toggle sidebar"
+        aria-label={t('topnav.toggleSidebar', 'Toggle sidebar')}
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -186,7 +190,7 @@ export function TopNav({
             onKeyDown={handleKeyDown}
             onFocus={() => { if (query.trim()) setShowDropdown(true); }}
             className="h-8 w-48 xl:w-64 border border-(--color-term-border) bg-(--color-term-surface) pl-7 pr-7 text-[12px] tracking-widest text-(--color-term-text) placeholder:text-(--color-term-muted) focus:border-(--color-term-accent) focus:outline-none transition-colors"
-            placeholder={searchPlaceholder}
+            placeholder={searchPlaceholder ?? t('topnav.search', 'SEARCH...')}
             autoComplete="off"
             spellCheck={false}
           />
@@ -248,11 +252,11 @@ export function TopNav({
               {/* Footer keyboard hint */}
               <div className="border-t border-(--color-term-border) px-3 py-1.5 flex items-center gap-1 text-(--color-term-muted) text-[10px]">
                 <kbd className="px-1 border border-(--color-term-border) rounded text-[9px]">↑↓</kbd>
-                <span>選擇</span>
+                <span>{t('symbolSearch.keyboardSelect', 'Select')}</span>
                 <kbd className="px-1 border border-(--color-term-border) rounded text-[9px] ml-1">Enter</kbd>
-                <span>確認</span>
+                <span>{t('symbolSearch.keyboardConfirm', 'Confirm')}</span>
                 <kbd className="px-1 border border-(--color-term-border) rounded text-[9px] ml-1">Esc</kbd>
-                <span>關閉</span>
+                <span>{t('symbolSearch.keyboardClose', 'Close')}</span>
               </div>
             </div>
           )}
@@ -260,7 +264,7 @@ export function TopNav({
           {/* No results */}
           {showDropdown && searched && !isSearching && query && results.length === 0 && (
             <div className="absolute top-full right-0 mt-1 w-64 border border-(--color-term-border) bg-(--color-term-bg) shadow-xl z-[9999] px-3 py-4 text-center text-(--color-term-muted) text-[12px]">
-              {t('symbolSearch.noResults', { query, defaultValue: `找不到「${query}」相關股票` })}
+              {t('symbolSearch.noResults', { query, defaultValue: 'No matches for "{{query}}"' })}
             </div>
           )}
         </div>

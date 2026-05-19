@@ -42,7 +42,7 @@ function parsePathView(pathname: string): TerminalView {
   return 'dashboard';
 }
 
-const VIEW_DESCRIPTIONS: Record<TerminalView, string> = {
+const DEFAULT_VIEW_DESCRIPTIONS: Record<TerminalView, string> = {
   dashboard:   '即時總覽市場行情、持倉損益、AI 訊號與最新財經新聞。',
   market:      '美股、台股即時報價、K線圖與技術指標分析。',
   crypto:      '比特幣、以太坊等加密貨幣即時價格與趨勢分析。',
@@ -56,18 +56,18 @@ const VIEW_DESCRIPTIONS: Record<TerminalView, string> = {
   settings:    '帳戶設定、API 金鑰管理與通知偏好設定。',
 };
 
-const SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
-  dashboard: 'SEARCH...',
-  market: 'SEARCH MARKETS...',
-  crypto: 'SEARCH COINS...',
-  portfolio: 'SEARCH HOLDINGS...',
-  research: 'Search AAPL...',
-  backtest: 'BACKTEST...',
-  news: '搜尋 . . .',
-  alerts: 'SEARCH ALERTS...',
-  screener: 'SEARCH SCREENER...',
-  autotrading: 'SEARCH BOT LOGS...',
-  settings: 'SEARCH SETTINGS...',
+const DEFAULT_SEARCH_PLACEHOLDER: Record<TerminalView, string> = {
+  dashboard: '搜尋...',
+  market: '搜尋市場...',
+  crypto: '搜尋幣種...',
+  portfolio: '搜尋持倉...',
+  research: '搜尋 AAPL...',
+  backtest: '搜尋回測...',
+  news: '搜尋新聞...',
+  alerts: '搜尋提醒...',
+  screener: '搜尋選股結果...',
+  autotrading: '搜尋機器人日誌...',
+  settings: '搜尋設定...',
 };
 
 export default function App() {
@@ -77,6 +77,8 @@ export default function App() {
   const location = useLocation();
 
   const view = parsePathView(location.pathname);
+  const viewDescription = t(`app.viewDescription.${view}`, DEFAULT_VIEW_DESCRIPTIONS[view]);
+  const searchPlaceholder = t(`app.searchPlaceholder.${view}`, DEFAULT_SEARCH_PLACEHOLDER[view]);
 
   const handleChange = useCallback(
     (next: TerminalView) => startTransition(() => navigate(`/${next}`)),
@@ -109,10 +111,10 @@ export default function App() {
     <>
       <SEO
         title={t(`nav.${view}`, view.toUpperCase())}
-        description={VIEW_DESCRIPTIONS[view]}
+        description={viewDescription}
         path={`/${view}`}
       />
-      <Layout active={view} onChange={handleChange} searchPlaceholder={SEARCH_PLACEHOLDER[view]}>
+      <Layout active={view} onChange={handleChange} searchPlaceholder={searchPlaceholder}>
         <ViewTransition default="none" enter="fade-in" exit="fade-out">
           <div className="h-full w-full">
             {view === 'dashboard' && <DashboardPage />}

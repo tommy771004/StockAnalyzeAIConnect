@@ -7,14 +7,17 @@ import { cn } from '../../lib/utils';
 import { Loader2, Bell, Plus, Trash2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
 import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
+import { SmartMoneyAlertSettingsPanel } from '../ui/SmartMoneyAlertSettingsPanel';
+import { NotificationSettings } from '../../components/AutoTrading/NotificationSettings';
 
 export function AlertsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [newAlert, setNewAlert] = useState({ symbol: '', condition: 'above', target: '' });
   const [addError, setAddError] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState('');
+  const numberLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
 
   const { data: alerts = [], isLoading: loading } = useQuery<AlertRecord[]>({
     queryKey: ['alerts'],
@@ -158,7 +161,7 @@ export function AlertsPage() {
                 min="0"
                 value={newAlert.target}
                 onChange={e => setNewAlert({ ...newAlert, target: e.target.value })}
-                placeholder="150.00"
+                placeholder={t('alerts.targetPlaceholder', '150.00')}
                 className="w-full bg-(--color-term-panel) border border-(--color-term-border) text-sm p-2 outline-none focus:border-sky-500 rounded-sm"
               />
             </div>
@@ -173,9 +176,13 @@ export function AlertsPage() {
 
             <button
               disabled={addMutation.isPending}
+              aria-busy={addMutation.isPending}
               className="focus-ring w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-sm text-sm transition-opacity mt-2 disabled:opacity-50"
             >
-              {addMutation.isPending ? <Loader2 className="animate-spin h-4 w-4 mx-auto" /> : t('alerts.submit')}
+              <span className="inline-flex items-center justify-center gap-2">
+                {addMutation.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : null}
+                {addMutation.isPending ? t('alerts.submitting', 'Submitting...') : t('alerts.submit')}
+              </span>
             </button>
           </form>
         </Panel>
@@ -234,7 +241,10 @@ export function AlertsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right tabular-nums text-sky-400 font-medium">
-                      ${Number(a.target).toFixed(2)}
+                      {Number(a.target).toLocaleString(numberLocale, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="px-4 py-4 text-center">
                       {a.triggered ? (
@@ -301,6 +311,16 @@ export function AlertsPage() {
               ))}
             </tbody>
           </table>
+        </Panel>
+      </div>
+
+      <div className="col-span-12 lg:col-span-7 min-h-0">
+        <SmartMoneyAlertSettingsPanel />
+      </div>
+
+      <div className="col-span-12 lg:col-span-5 min-h-0">
+        <Panel title={t('smartMoney.channels', '主動通知通道')} bodyClassName="p-4 overflow-auto" className="h-full">
+          <NotificationSettings />
         </Panel>
       </div>
     </div>

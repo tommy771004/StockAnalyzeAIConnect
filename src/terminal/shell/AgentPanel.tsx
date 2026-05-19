@@ -88,7 +88,10 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
                 return { ...m, components: [...m.components, chunk.component] };
               }
               if (chunk.kind === 'error') {
-                return { ...m, content: m.content + `\n\n[SYS_ERROR]: ${chunk.message}` };
+                return {
+                  ...m,
+                  content: m.content + `\n\n${t('agent.systemErrorPrefix', '[SYS_ERROR]')}: ${chunk.message}`,
+                };
               }
               return m;
             })
@@ -98,7 +101,9 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content: m.content + '\n\n[COMM_LINK_DISCONNECTED]' } : m
+          m.id === assistantId
+            ? { ...m, content: m.content + `\n\n${t('agent.linkDisconnected', 'Connection lost. Please try again.')}` }
+            : m
         )
       );
     } finally {
@@ -113,7 +118,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
         <div key={index} className="mt-4 border border-(--color-term-accent)/30 overflow-hidden rounded bg-(--color-term-bg)/50 p-2 h-64">
            <div className="text-[10px] text-(--color-term-accent) mb-2 opacity-80 flex items-center gap-2">
              <BrainCircuit className="h-3 w-3" />
-             [GEN_UI: {comp.componentName}]
+             {t('agent.generatedComponent', 'Generated component')}: {comp.componentName}
            </div>
            {/* Fallback to non-live mode wrapper for now */}
            <ChartWidget symbol={sym} />
@@ -123,7 +128,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
     // Fallback for other components
     return (
       <div key={index} className="mt-4 p-3 border border-(--color-term-subtle) bg-(--color-term-bg) text-[11px] font-mono text-(--color-term-muted)">
-        <div className="text-(--color-term-accent) mb-1">[COMPONENT_RENDER: {comp.componentName}]</div>
+        <div className="text-(--color-term-accent) mb-1">{t('agent.componentRender', 'Component render')}: {comp.componentName}</div>
         <pre>{JSON.stringify(comp.props, null, 2)}</pre>
       </div>
     );
@@ -147,6 +152,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
             </div>
             <button
               onClick={onClose}
+              aria-label={t('common.close')}
               className="text-(--color-term-muted) hover:text-(--color-term-text) transition-colors"
             >
               <X className="h-4 w-4" />
@@ -162,7 +168,7 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
               className="flex-1 bg-transparent text-[10px] text-(--color-term-text) outline-none appearance-none cursor-pointer hover:text-(--color-term-accent) transition-colors"
             >
               {availableModels.length === 0 ? (
-                <option disabled>Loading models...</option>
+                <option disabled>{t('agent.loadingModels', 'Loading models...')}</option>
               ) : (
                 availableModels.map(m => (
                   <option key={m.id} value={m.id} className="bg-(--color-term-panel)">
@@ -171,7 +177,9 @@ export function AgentPanel({ isOpen, onClose, selectedSymbol = 'NVDA' }: AgentPa
                 ))
               )}
             </select>
-            <div className="text-[9px] text-(--color-term-muted) border border-(--color-term-border) px-1 rounded uppercase tracking-tighter">Free Tier</div>
+            <div className="text-[9px] text-(--color-term-muted) border border-(--color-term-border) px-1 rounded uppercase tracking-tighter">
+              {t('agent.freeTier', 'Free tier')}
+            </div>
           </div>
 
           {/* Chat History */}

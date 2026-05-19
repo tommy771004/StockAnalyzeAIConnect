@@ -14,6 +14,14 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const title = isRegister ? t('auth.register', 'Register') : t('auth.loginTitle', 'Sign In');
+  const submitLabel = loading
+    ? isRegister
+      ? t('auth.registering', 'Registering...')
+      : t('auth.loggingIn', 'Signing in...')
+    : isRegister
+      ? t('auth.establishUplink', 'ESTABLISH_UPLINK')
+      : t('auth.initiateHandshake', 'INITIATE_HANDSHAKE');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +62,11 @@ export function LoginPage() {
           <div className="mb-4 inline-flex items-center justify-center border border-(--color-term-accent)/30 bg-(--color-term-accent)/10 p-3 text-(--color-term-accent)">
             <Terminal className="h-6 w-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-[0.2em] text-(--color-term-text)">
+          <p className="mb-2 text-[10px] tracking-[0.24em] text-(--color-term-muted)">
             {t('auth.appTitle', 'Stock AI Connect')}
+          </p>
+          <h1 className="text-xl font-bold tracking-[0.2em] text-(--color-term-text)">
+            {title}
           </h1>
           <p className="mt-2 text-[11px] tracking-widest text-(--color-term-muted)">
             {t('auth.loginSubtitle', 'AUTONOMOUS_TRADING_SYNDICATE_v3')}
@@ -138,18 +149,17 @@ export function LoginPage() {
             type="submit"
             disabled={loading}
             className={cn(
-              'focus-ring mt-2 relative h-10 overflow-hidden border border-(--color-term-accent) bg-(--color-term-accent)/20 text-[12px] font-bold tracking-[0.2em] text-(--color-term-accent) motion-safe:transition-all hover:bg-(--color-term-accent)/30',
+              'focus-ring mt-2 flex h-10 items-center justify-center overflow-hidden border border-(--color-term-accent) bg-(--color-term-accent)/20 px-4 text-[12px] font-bold tracking-[0.2em] text-(--color-term-accent) motion-safe:transition-all hover:bg-(--color-term-accent)/30',
               loading && 'opacity-50 cursor-not-allowed',
             )}
+            aria-busy={loading}
           >
-            <span className={cn('relative z-10', loading && 'invisible')}>
-              {isRegister ? t('auth.establishUplink', 'ESTABLISH_UPLINK') : t('auth.initiateHandshake', 'INITIATE_HANDSHAKE')}
-            </span>
-            {loading && (
-              <div className="absolute inset-0 z-0 flex items-center justify-center">
+            <span className="relative z-10 flex items-center gap-2">
+              {loading ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-(--color-term-accent) border-t-transparent" />
-              </div>
-            )}
+              ) : null}
+              {submitLabel}
+            </span>
           </button>
 
           <div className="text-center">

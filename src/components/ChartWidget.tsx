@@ -24,6 +24,47 @@ interface Props {
 
 type ChartType = 'candle' | 'line' | 'area';
 
+const MARKET_TIME_ZONE = 'Asia/Taipei';
+
+function formatAxisTickLabel(timestampSeconds: number, timeframe: string, locale: string): string {
+  const date = new Date(timestampSeconds * 1000);
+  if (['1D', '5D', '1W'].includes(timeframe)) {
+    return date.toLocaleTimeString(locale, {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: MARKET_TIME_ZONE,
+    });
+  }
+
+  return date.toLocaleDateString(locale, {
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: MARKET_TIME_ZONE,
+  });
+}
+
+function formatTooltipDateTime(timestampMs: number, locale: string): string {
+  return new Date(timestampMs).toLocaleString(locale, {
+    timeZone: MARKET_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function formatBusinessDayLabel(time: { year: number; month: number; day: number }, locale: string): string {
+  return new Date(Date.UTC(time.year, time.month - 1, time.day)).toLocaleDateString(locale, {
+    timeZone: MARKET_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
 function resolveWsUrl(): string | null {
   const configuredWs = (import.meta.env.VITE_WS_URL as string | undefined)?.trim();
   if (configuredWs) return configuredWs;
@@ -71,9 +112,12 @@ function fmtVol(v: number): string {
 }
 
 const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = false, focusMode = false, timeframe: timeframeProp, onTimeframeChange }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [internalTimeframe, setInternalTimeframe] = useState("1D");
   const timeframe = timeframeProp || internalTimeframe;
+  const dateLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
+  const chartLocale = i18n.language.startsWith('zh') ? 'zh-Hant-TW' : 'en-US';
+  const chartDateFormat = i18n.language.startsWith('zh') ? 'yyyy/MM/dd' : 'MM/dd/yyyy';
   const setTimeframe = (t: string) => {
     setInternalTimeframe(t);
     if (onTimeframeChange) onTimeframeChange(t);
@@ -234,23 +278,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         rightOffset: 0,
         barSpacing: 12,
         minBarSpacing: 1,
-        tickMarkFormatter: (time: number) => {
-          const date = new Date(time * 1000);
-          if (["1D", "5D", "1W"].includes(timeframe)) {
-            return date.toLocaleTimeString("zh-TW", {
-              hour12: false,
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Taipei",
-            });
-          } else {
-            return date.toLocaleDateString("zh-TW", {
-              month: "2-digit",
-              day: "2-digit",
-              timeZone: "Asia/Taipei",
-            });
-          }
-        },
+        tickMarkFormatter: (time: number) => formatAxisTickLabel(time, timeframe, dateLocale),
       },
       rightPriceScale: {
         borderColor: gridColor,
@@ -262,22 +290,14 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         },
       },
       localization: {
-        locale: 'zh-Hant-TW',
-        dateFormat: 'yyyy/MM/dd',
+        locale: chartLocale,
+        dateFormat: chartDateFormat,
         timeFormatter: (time: any) => {
           // time is UTCTimestamp (seconds) or BusinessDay object
           if (typeof time === 'number') {
-            return new Date(time * 1000).toLocaleString('zh-TW', {
-              timeZone: 'Asia/Taipei',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-            });
+            return formatTooltipDateTime(time * 1000, dateLocale);
           }
-          return `${time.year}/${String(time.month).padStart(2, '0')}/${String(time.day).padStart(2, '0')}`;
+          return formatBusinessDayLabel(time, dateLocale);
         },
       },
       width: chartContainerRef.current.clientWidth,
@@ -376,14 +396,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
 
         const currentItem = localData[dataIndex];
         const timestamp = typeof timeVal === 'number' ? timeVal * 1000 : new Date(timeVal as string).getTime();
-        const fullDate = new Date(timestamp).toLocaleDateString('zh-TW', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Taipei',
-        });
+        const fullDate = formatTooltipDateTime(timestamp, dateLocale);
         
         setHoverData({
           time: fullDate,
@@ -422,32 +435,26 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
         chartRef.current = null;
       }
     };
-  }, [isDark, focusMode]); // Removed chartType from here to prevent full chart reset
+  }, [isDark, focusMode, dateLocale, chartLocale, chartDateFormat]); // Removed chartType from here to prevent full chart reset
 
   useEffect(() => {
     if (!chartRef.current) return;
     chartRef.current.applyOptions({
       timeScale: {
-        tickMarkFormatter: (time: number) => {
-          const date = new Date(time * 1000);
-          if (["1D", "5D", "1W"].includes(timeframe)) {
-            return date.toLocaleTimeString("zh-TW", {
-              hour12: false,
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Taipei"
-            });
-          } else {
-            return date.toLocaleDateString("zh-TW", {
-              month: "2-digit",
-              day: "2-digit",
-              timeZone: "Asia/Taipei"
-            });
+        tickMarkFormatter: (time: number) => formatAxisTickLabel(time, timeframe, dateLocale)
+      },
+      localization: {
+        locale: chartLocale,
+        dateFormat: chartDateFormat,
+        timeFormatter: (time: any) => {
+          if (typeof time === 'number') {
+            return formatTooltipDateTime(time * 1000, dateLocale);
           }
-        }
-      }
+          return formatBusinessDayLabel(time, dateLocale);
+        },
+      },
     });
-  }, [timeframe]);
+  }, [timeframe, dateLocale, chartLocale, chartDateFormat]);
 
   // Data & Series update effect - Separated from Chart creation to preserve state
   useEffect(() => {

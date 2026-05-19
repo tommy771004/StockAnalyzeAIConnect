@@ -10,15 +10,27 @@ import { useDashboardData, type ChartRange } from '../hooks/useDashboardData';
 import { executeTrade } from '../../services/api';
 import ChartWidget from '../../components/ChartWidget';
 import { DataStatusBadge } from '../ui/DataStatusBadge';
+import { SmartMoneyRecentEventsPanel } from '../ui/SmartMoneyRecentEventsPanel';
 
-const CATEGORY_STYLE: Record<NewsCategory['id'], { label: string; className: string }> = {
-  EARNINGS: { label: 'EARNINGS', className: 'text-(--color-term-accent) border-(--color-term-accent)' },
-  MACRO:    { label: 'MACRO',    className: 'text-(--color-term-positive) border-(--color-term-positive)' },
-  ALERT:    { label: 'ALERT',    className: 'text-(--color-term-negative) border-(--color-term-negative)' },
-  CRYPTO:   { label: 'CRYPTO',  className: 'text-violet-300 border-violet-400/60' },
-  TECH:     { label: 'TECH',    className: 'text-cyan-300 border-cyan-400/60' },
-  ENERGY:   { label: 'ENERGY',  className: 'text-amber-300 border-amber-400/60' },
+const CATEGORY_STYLE: Record<NewsCategory['id'], { className: string }> = {
+  EARNINGS: { className: 'text-(--color-term-accent) border-(--color-term-accent)' },
+  MACRO:    { className: 'text-(--color-term-positive) border-(--color-term-positive)' },
+  ALERT:    { className: 'text-(--color-term-negative) border-(--color-term-negative)' },
+  CRYPTO:   { className: 'text-violet-300 border-violet-400/60' },
+  TECH:     { className: 'text-cyan-300 border-cyan-400/60' },
+  ENERGY:   { className: 'text-amber-300 border-amber-400/60' },
 };
+
+function getNumberLocale(language: string): string {
+  return language.startsWith('zh') ? 'zh-TW' : 'en-US';
+}
+
+function formatFixedLocale(value: number, locale: string, digits = 2): string {
+  return value.toLocaleString(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export function DashboardPage() {
@@ -71,6 +83,7 @@ export function DashboardPage() {
       {/* Right column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <MarketNewsPanel news={news} onSelect={setSelected} />
+        <SmartMoneyRecentEventsPanel symbol={selectedRow.symbol} maxEvents={3} compact navigateOnEventClick />
         <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
       </div>
     </div>
@@ -99,9 +112,10 @@ export function WatchlistPanel({
   onAdd: (s: string) => Promise<void>;
   onDelete: (s: string) => Promise<void>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [newSymbol, setNewSymbol] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const numberLocale = getNumberLocale(i18n.language);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +142,7 @@ export function WatchlistPanel({
           {/* Manual refresh */}
           <button
             type="button"
-            title="Refresh"
+            title={t('dashboard.refresh', 'Refresh')}
             onClick={onRefresh}
             className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors"
           >
@@ -160,9 +174,9 @@ export function WatchlistPanel({
       <table className="w-full text-[12px]">
         <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
           <tr className="border-b border-(--color-term-border)">
-            <th className="px-3 py-3 text-left font-medium">SYM</th>
-            <th className="px-3 py-3 text-right font-medium">LAST</th>
-            <th className="px-3 py-3 text-right font-medium">CHG%</th>
+            <th className="px-3 py-3 text-left font-medium">{t('dashboard.symbolHeader', 'SYM')}</th>
+            <th className="px-3 py-3 text-right font-medium">{t('dashboard.lastHeader', 'LAST')}</th>
+            <th className="px-3 py-3 text-right font-medium">{t('dashboard.changeHeader', 'CHG%')}</th>
             <th className="px-3 py-3 text-right font-medium w-8"></th>
           </tr>
         </thead>
@@ -198,7 +212,7 @@ export function WatchlistPanel({
                   </span>
                 </td>
                 <td className="px-3 py-3 text-right tabular-nums">
-                  {row.last > 0 ? row.last.toFixed(2) : '—'}
+                  {row.last > 0 ? formatFixedLocale(row.last, numberLocale) : '—'}
                 </td>
                 <td className={cn('px-3 py-3 text-right tabular-nums', toneClass(row.changePct))}>
                   {formatPct(row.changePct)}
@@ -208,7 +222,7 @@ export function WatchlistPanel({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Remove ${row.symbol}?`)) onDelete(row.symbol);
+                      if (confirm(t('dashboard.removeSymbolConfirm', 'Remove {{symbol}}?', { symbol: row.symbol }))) onDelete(row.symbol);
                     }}
                     className="focus-ring opacity-0 group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
                    >
@@ -254,7 +268,7 @@ export function TopMoversPanel({
                 : 'text-(--color-term-muted) hover:text-(--color-term-text)',
             )}
           >
-            {k}
+            {k === 'gainers' ? t('dashboard.gainers', 'GAINERS') : t('dashboard.losers', 'LOSERS')}
           </button>
         ))}
       </div>
@@ -322,7 +336,7 @@ export function MarketPulsePanel({
 export function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
   const { t } = useTranslation();
   if (!watchlist || watchlist.length === 0) {
-    return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">Pulse unavailable</div>;
+    return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">{t('dashboard.pulseUnavailable', 'Pulse unavailable')}</div>;
   }
   
   // Create a grid of up to 6 core items
@@ -413,8 +427,9 @@ export function SelectedChartPanel({
   dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
   lastUpdated: string | null;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const numberLocale = getNumberLocale(i18n.language);
   const last = candles[candles.length - 1];
   const first = candles[0];
   const close   = last?.close  ?? row.last;
@@ -451,10 +466,10 @@ export function SelectedChartPanel({
             navigate('/research');
           }}
           className="focus-ring flex items-center gap-1 px-2 py-1 text-[10px] font-bold tracking-widest text-(--color-term-accent) border border-(--color-term-accent)/40 rounded-sm hover:bg-(--color-term-accent)/10 motion-safe:transition-colors"
-          title="深入研究"
+          title={t('dashboard.deepResearch', '深入研究')}
         >
           <Microscope className="h-3 w-3" />
-          深入研究
+          {t('dashboard.deepResearch', '深入研究')}
         </button>
       </header>
 
@@ -462,24 +477,24 @@ export function SelectedChartPanel({
       <div className="flex items-center justify-between px-3 py-2 text-[11px] text-(--color-term-muted)">
         <div className="flex gap-4 tabular-nums">
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">O</span>
-            <span className="text-(--color-term-text)">{open.toFixed(2)}</span>
+            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcOpen', 'O')}</span>
+            <span className="text-(--color-term-text)">{formatFixedLocale(open, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">H</span>
-            <span className="text-(--color-term-text)">{high.toFixed(2)}</span>
+            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcHigh', 'H')}</span>
+            <span className="text-(--color-term-text)">{formatFixedLocale(high, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">L</span>
-            <span className="text-(--color-term-text)">{low.toFixed(2)}</span>
+            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcLow', 'L')}</span>
+            <span className="text-(--color-term-text)">{formatFixedLocale(low, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">C</span>
-            <span className="text-(--color-term-text)">{close.toFixed(2)}</span>
+            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcClose', 'C')}</span>
+            <span className="text-(--color-term-text)">{formatFixedLocale(close, numberLocale)}</span>
           </span>
         </div>
         <span className={toneClass(changeAbs)}>
-          {`${changeAbs > 0 ? '+' : ''}${changeAbs.toFixed(2)} (${formatPct(changePct)})`}
+          {`${changeAbs > 0 ? '+' : ''}${formatFixedLocale(Math.abs(changeAbs), numberLocale)} (${formatPct(changePct)})`}
         </span>
       </div>
 
@@ -508,6 +523,15 @@ export function SelectedChartPanel({
 export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onSelect: (s: string) => void }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<NewsCategory['id'] | 'ALL'>('ALL');
+  const categoryLabels: Record<NewsCategory['id'] | 'ALL', string> = {
+    ALL: t('dashboard.newsCategory.all', 'ALL'),
+    EARNINGS: t('dashboard.newsCategory.earnings', 'EARNINGS'),
+    MACRO: t('dashboard.newsCategory.macro', 'MACRO'),
+    ALERT: t('dashboard.newsCategory.alert', 'ALERT'),
+    CRYPTO: t('dashboard.newsCategory.crypto', 'CRYPTO'),
+    TECH: t('dashboard.newsCategory.tech', 'TECH'),
+    ENERGY: t('dashboard.newsCategory.energy', 'ENERGY'),
+  };
   
   const filteredNews = useMemo(() => {
     if (filter === 'ALL') return news;
@@ -522,11 +546,11 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
 
   return (
     <Panel
-      title={`MARKET NEWS ${filter !== 'ALL' ? `(${filter})` : ''}`}
+      title={`${t('dashboard.marketNews', 'MARKET NEWS')} ${filter !== 'ALL' ? `(${categoryLabels[filter]})` : ''}`}
       actions={
         <button 
           onClick={cycleFilter}
-          title="切換新聞類別"
+          title={t('dashboard.cycleNewsCategory', '切換新聞類別')}
           className="focus-ring p-1 hover:bg-white/10 rounded-sm motion-safe:transition-colors text-(--color-term-accent)"
         >
           <Filter className="h-3.5 w-3.5" />
@@ -551,7 +575,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
               >
                 <div className="mb-1.5 flex items-center justify-between text-[10px] tracking-widest">
                   <span className={cn('border px-1.5 py-0.5 uppercase', cat.className)}>
-                    {cat.label}
+                    {categoryLabels[n.category]}
                   </span>
                   <span className="text-(--color-term-muted)">{n.time}</span>
                 </div>
@@ -559,7 +583,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
                   {n.title}
                 </p>
                 <div className="flex items-center gap-1.5 text-[10px] text-(--color-term-muted)">
-                  <span>Mentions:</span>
+                  <span>{t('dashboard.mentions', 'Mentions')}:</span>
                   {n.tickers?.map((t, i) => (
                     <span key={t}>
                       <button 
@@ -588,13 +612,14 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
 type TradeStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function QuickTradePanel({ symbol, price }: { symbol: string; price: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [qty, setQty]           = useState(100);
   const [orderPrice, setOrderPrice] = useState(price);
   const [side, setSide]         = useState<'buy' | 'sell'>('buy');
   const [status, setStatus]     = useState<TradeStatus>('idle');
   const [errMsg, setErrMsg]     = useState('');
   const total = qty * orderPrice;
+  const numberLocale = getNumberLocale(i18n.language);
 
   // Sync order price when selected symbol changes
   useEffect(() => {
@@ -620,7 +645,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
       setTimeout(() => setStatus('idle'), 2500);
     } catch (e: unknown) {
       setStatus('error');
-      setErrMsg(e instanceof Error ? e.message : 'Trade failed');
+      setErrMsg(e instanceof Error ? e.message : t('dashboard.tradeFailed', 'Trade failed'));
       setTimeout(() => setStatus('idle'), 3000);
     }
   };
@@ -661,19 +686,19 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
         <div className="flex items-center justify-between border-t border-(--color-term-border) pt-3 text-[11px]">
           <span className="tracking-widest text-(--color-term-muted)">{t('dashboard.estTotal', 'EST. TOTAL')}</span>
           <span className="font-semibold tabular-nums text-(--color-term-text)">
-            ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${total.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
 
         {/* Status feedback */}
         {status === 'success' && (
           <p className="text-center text-[11px] text-(--color-term-positive) tracking-widest">
-            ✓ Order submitted
+            ✓ {t('dashboard.orderSubmitted', 'Order submitted')}
           </p>
         )}
         {status === 'error' && (
           <p className="text-center text-[11px] text-(--color-term-negative) truncate" title={errMsg}>
-            ✗ {errMsg || 'Trade failed'}
+            ✗ {errMsg || t('dashboard.tradeFailed', 'Trade failed')}
           </p>
         )}
 
@@ -689,7 +714,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
                 : 'hover:bg-sky-300/30',
             )}
           >
-            {status === 'submitting' && side === 'buy' ? '…' : 'BUY'}
+            {status === 'submitting' && side === 'buy' ? '…' : t('dashboard.buy', 'BUY')}
           </button>
           <button
             type="button"
@@ -702,7 +727,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
                 : 'hover:bg-rose-300/30',
             )}
           >
-            {status === 'submitting' && side === 'sell' ? '…' : 'SELL'}
+            {status === 'submitting' && side === 'sell' ? '…' : t('dashboard.sell', 'SELL')}
           </button>
         </div>
       </div>

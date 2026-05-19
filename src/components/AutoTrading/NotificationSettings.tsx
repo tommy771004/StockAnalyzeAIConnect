@@ -54,6 +54,8 @@ const TRIGGERS = [
   { id: 'risk_block', labelKey: 'autotrading.notifications.trigger.riskBlock', labelFallback: '訂單被風控攔截' },
   { id: 'stop_loss_intercept', labelKey: 'autotrading.notifications.trigger.stopLossIntercept', labelFallback: '主動停損攔截' },
   { id: 'quantum_forced_liquidation', labelKey: 'autotrading.notifications.trigger.quantumForcedLiquidation', labelFallback: '量子強制平倉' },
+  { id: 'smart_money_13f_new_position', labelKey: 'autotrading.notifications.trigger.smartMoney13f', labelFallback: '13F 新建倉' },
+  { id: 'smart_money_insider_large_buy', labelKey: 'autotrading.notifications.trigger.smartMoneyInsider', labelFallback: '內部人大額買入' },
   { id: 'fill', labelKey: 'autotrading.notifications.trigger.fill', labelFallback: '訂單成交' },
   { id: 'daily_report', labelKey: 'autotrading.notifications.trigger.dailyReport', labelFallback: '每日結算' },
 ] as const;
