@@ -415,7 +415,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
                       type="text"
                       value={customSymbols}
                       onChange={e => setCustomSymbols(e.target.value)}
-                      placeholder="AAPL, NVDA, 2330.TW, BTC-USD …"
+                      placeholder={t('screener.customSymbolsInputPlaceholder', 'e.g. AAPL, NVDA, 2330.TW, BTC-USD')}
                       className="w-full h-11 px-3 bg-(--color-term-bg) border border-(--color-term-border) text-sm font-mono text-(--color-term-text) focus:outline-none focus:border-(--color-term-accent)"
                     />
                   </div>
@@ -456,7 +456,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
           <div className="flex-1 flex items-center justify-center min-h-[200px]">
             <div className="flex flex-col items-center gap-4">
               <Loader2Icon className="w-8 h-8 animate-spin text-(--color-term-accent)" />
-              <span className="text-sm font-bold tracking-widest text-(--color-term-muted)">SCANNING UNIVERSE...</span>
+              <span className="text-sm font-bold tracking-widest text-(--color-term-muted)">{t('screener.scanningUniverse', 'SCANNING UNIVERSE...')}</span>
             </div>
           </div>
         )}
