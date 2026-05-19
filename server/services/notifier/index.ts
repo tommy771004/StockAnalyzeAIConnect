@@ -23,7 +23,14 @@ import { webhookNotifier } from './WebhookNotifier.js';
 import { emailNotifier } from './EmailNotifier.js';
 
 export type NotifyEvent = 'kill_switch' | 'risk_block' | 'fill' | 'daily_report';
-export type ExtendedNotifyEvent = NotifyEvent | 'stop_loss_intercept' | 'quantum_forced_liquidation' | 'margin_call' | 'take_profit';
+export type ExtendedNotifyEvent =
+  | NotifyEvent
+  | 'stop_loss_intercept'
+  | 'quantum_forced_liquidation'
+  | 'margin_call'
+  | 'take_profit'
+  | 'smart_money_13f_new_position'
+  | 'smart_money_insider_large_buy';
 
 export interface NotifierChannel {
   channel: string;
@@ -91,6 +98,28 @@ function formatMessage(event: ExtendedNotifyEvent, payload: Record<string, unkno
       return {
         subject: `🎯 停利出場 ${payload.symbol ?? ''}`.trim(),
         body: `標的：${payload.symbol ?? 'UNKNOWN'}\n原因：${payload.reason ?? 'take profit triggered'}\n價格：${payload.price ?? '-'}`,
+      };
+    case 'smart_money_13f_new_position':
+      return {
+        subject: `🐋 13F 新建倉 ${payload.managerName ?? ''}`.trim(),
+        body: [
+          `機構：${payload.managerName ?? 'Unknown Manager'}`,
+          `標的：${payload.issuer ?? 'Unknown Issuer'}`,
+          `申報日：${payload.filingDate ?? '-'}`,
+          `持倉價值：${payload.valueUsd ? Number(payload.valueUsd).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '-'}`,
+          payload.sourceUrl ? `來源：${payload.sourceUrl}` : '',
+        ].filter(Boolean).join('\n'),
+      };
+    case 'smart_money_insider_large_buy':
+      return {
+        subject: `🧠 內部人大額買入 ${payload.symbol ?? ''}`.trim(),
+        body: [
+          `標的：${payload.symbol ?? 'UNKNOWN'}${payload.issuer ? ` (${payload.issuer})` : ''}`,
+          `內部人：${payload.insiderName ?? 'Unknown Insider'}`,
+          `交易日：${payload.tradeDate ?? '-'}`,
+          `金額：${payload.amountUsd ? Number(payload.amountUsd).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '-'}`,
+          payload.sourceUrl ? `來源：${payload.sourceUrl}` : '',
+        ].filter(Boolean).join('\n'),
       };
   }
 }
