@@ -57,6 +57,13 @@ import { getPerformance, type Period as PerformancePeriod } from './server/servi
 import { copyTradingService } from './server/services/copyTradingService.js';
 import { notifier } from './server/services/notifier/index.js';
 import {
+  getAllTrackedManagers,
+  getSmartMoneySettingsForUser,
+  getSmartMoneyStateForUser,
+  saveSmartMoneySettingsForUser,
+} from './server/services/smartMoneyConfig.js';
+import { runSmartMoneyMonitorCycle, scanSmartMoneyForUser } from './server/services/smartMoneyMonitor.js';
+import {
   isAblyEnabled,
   getAutotradingRealtimeMeta,
   createAutotradingToken,
@@ -1054,6 +1061,8 @@ app.put('/api/autotrading/notifications', authMiddleware, async (req: AuthReques
     'daily_report',
     'stop_loss_intercept',
     'quantum_forced_liquidation',
+    'smart_money_13f_new_position',
+    'smart_money_insider_large_buy',
   ]);
   const triggers = rawTriggers
     .map((x: unknown) => String(x))
@@ -1765,6 +1774,63 @@ app.put('/api/settings/:key', authMiddleware, async (req: AuthRequest, res) => {
   catch (e) { handleApiError(res, e); }
 });
 
+app.get('/api/smart-money/config', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  try {
+    const [settings, state, watchlist] = await Promise.all([
+      getSmartMoneySettingsForUser(req.userId),
+      getSmartMoneyStateForUser(req.userId),
+      watchlistRepo.getWatchlistByUser(req.userId),
+    ]);
+
+    res.json({
+      ok: true,
+      settings,
+      availableManagers: getAllTrackedManagers(settings.customManagers),
+      recentEvents: state.recentEvents,
+      lastScanAt: state.lastScanAt,
+      watchlistSymbols: watchlist.map((item) => item.symbol),
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.put('/api/smart-money/config', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  try {
+    const settings = await saveSmartMoneySettingsForUser(req.userId, req.body ?? {});
+    res.json({
+      ok: true,
+      settings,
+      availableManagers: getAllTrackedManagers(settings.customManagers),
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+app.post('/api/smart-money/scan', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  try {
+    const result = await scanSmartMoneyForUser(req.userId, { notify: false });
+    res.json({
+      ok: true,
+      newEvents: result.newEvents,
+      recentEvents: result.state.recentEvents,
+      lastScanAt: result.state.lastScanAt,
+    });
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
 app.get('/api/strategies', authMiddleware, async (req: AuthRequest, res) => {
   try { res.json(await strategiesRepo.getStrategiesByUser(req.userId!)); } catch (e) { handleApiError(res, e); }
 });
@@ -2332,6 +2398,14 @@ if (!process.env.VERCEL) {
       }
     } catch (e) { console.error('[Snapshot Task] Global error:', e); }
   }, 3600 * 1000);
+
+  if (dbAvailable) {
+    setInterval(() => {
+      runSmartMoneyMonitorCycle().catch((error: unknown) => {
+        console.error('[SmartMoneyMonitor] Global error:', error);
+      });
+    }, 30 * 60 * 1000);
+  }
 }
 
 if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
