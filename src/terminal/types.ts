@@ -4,6 +4,7 @@ export type TerminalView =
   | 'crypto'
   | 'portfolio'
   | 'research'
+  | 'smartmoney'
   | 'backtest'
   | 'news'
   | 'alerts'
