@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Edit2, Trash2, Check, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
@@ -8,7 +9,12 @@ import { usePortfolioData } from '../hooks/usePortfolioData';
 import { StockSymbolAutocomplete } from '../../components/common/StockSymbolAutocomplete';
 import { resolveSymbolWithLookup } from '../../utils/stockSymbolLookup';
 
+function getNumberLocale(language: string) {
+  return language.startsWith('zh') ? 'zh-TW' : 'en-US';
+}
+
 export function PortfolioPage() {
+  const { t, i18n } = useTranslation();
   const { 
     positions, 
     trades, 
@@ -23,6 +29,7 @@ export function PortfolioPage() {
 
   const [isAdding, setIsAdding] = useState(false);
   const [newPos, setNewPos] = useState({ symbol: '', shares: '', avgCost: '' });
+  const numberLocale = getNumberLocale(i18n.language);
 
   if (loading && positions.length === 0) {
     return (
@@ -83,16 +90,16 @@ export function PortfolioPage() {
       </div>
       <div className="col-span-12 lg:col-span-7 md:min-h-0 shrink-0 md:shrink">
         <div className="h-full flex flex-col justify-center p-6 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm">
-          <div className="text-sm text-(--color-term-muted) mb-1">總權益 (Total Equity - TWD)</div>
+          <div className="text-sm text-(--color-term-muted) mb-1">{t('portfolio.totalEquityTwd', 'Total Equity (TWD)')}</div>
           <div className="text-4xl font-bold text-(--color-term-text) tabular-nums">
-            ${totalEquityTWD.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            ${totalEquityTWD.toLocaleString(numberLocale, { maximumFractionDigits: 0 })}
           </div>
           <div className="flex items-center gap-4 mt-2">
             <div className={cn("text-sm", toneClass(totalPLTWD))}>
-              {totalPLTWD >= 0 ? '+' : ''}${totalPLTWD.toLocaleString('en-US', { maximumFractionDigits: 0 })} ({plPct.toFixed(2)}%)
+              {totalPLTWD >= 0 ? '+' : ''}${totalPLTWD.toLocaleString(numberLocale, { maximumFractionDigits: 0 })} ({plPct.toFixed(2)}%)
             </div>
             <div className="text-[10px] text-(--color-term-muted) bg-white/5 px-2 py-0.5 rounded-full">
-              參考匯率: {usdtwd.toFixed(2)} USDTWD
+              {t('portfolio.referenceRate', 'Reference rate: {{rate}} USDTWD', { rate: usdtwd.toFixed(2) })}
             </div>
           </div>
         </div>
@@ -113,38 +120,38 @@ export function PortfolioPage() {
       {isAdding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-(--color-term-panel) border border-(--color-term-border) p-6 rounded-lg shadow-2xl">
-            <h3 className="text-lg font-bold mb-4 text-(--color-term-text)">新增持倉標的</h3>
+            <h3 className="text-lg font-bold mb-4 text-(--color-term-text)">{t('portfolio.addPosition', 'Add Position')}</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-(--color-term-muted) mb-1">股票代號 (如: 2330.TW 或 AAPL)</label>
+                <label className="block text-xs text-(--color-term-muted) mb-1">{t('portfolio.symbol', 'Symbol')}</label>
                 <StockSymbolAutocomplete
                   autoFocus
                   value={newPos.symbol}
                   onValueChange={value => setNewPos(p => ({ ...p, symbol: value }))}
                   onSymbolSubmit={value => setNewPos(p => ({ ...p, symbol: value }))}
-                  placeholder="SYMBOL"
+                  placeholder={t('portfolio.symbolPlaceholder', 'e.g. 2330.TW or AAPL')}
                   inputClassName="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-(--color-term-muted) mb-1">持有股數</label>
+                  <label className="block text-xs text-(--color-term-muted) mb-1">{t('portfolio.shares', 'Shares')}</label>
                   <input 
                     type="number"
                     className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                     value={newPos.shares}
                     onChange={e => setNewPos(p => ({ ...p, shares: e.target.value }))}
-                    placeholder="QTY"
+                    placeholder={t('portfolio.sharesPlaceholder', 'QTY')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-(--color-term-muted) mb-1">平均成本</label>
+                  <label className="block text-xs text-(--color-term-muted) mb-1">{t('portfolio.cost', 'Avg Cost')}</label>
                   <input 
                     type="number"
                     className="w-full h-11 bg-(--color-term-bg) border border-(--color-term-border) px-3 text-sm text-(--color-term-text) focus:border-(--color-term-accent) outline-none"
                     value={newPos.avgCost}
                     onChange={e => setNewPos(p => ({ ...p, avgCost: e.target.value }))}
-                    placeholder="COST"
+                    placeholder={t('portfolio.costPlaceholder', 'COST')}
                   />
                 </div>
               </div>
@@ -154,13 +161,13 @@ export function PortfolioPage() {
                 onClick={() => setIsAdding(false)}
                 className="focus-ring px-4 h-11 min-w-[88px] text-sm text-(--color-term-muted) hover:text-(--color-term-text)"
               >
-                取消
+                {t('portfolio.cancel', 'Cancel')}
               </button>
               <button
                 onClick={handleAdd}
                 className="focus-ring bg-(--color-term-accent) text-black px-6 h-11 text-sm font-bold rounded-sm hover:opacity-90"
               >
-                確認新增
+                {t('portfolio.confirm', 'Confirm')}
               </button>
             </div>
           </div>
@@ -178,6 +185,7 @@ export function PortfolioPage() {
 }
 
 export function EquityPanel({ history, currentEquity }: { history: any[], currentEquity: number }) {
+  const { t } = useTranslation();
   const [range, setRange] = useState('1M');
   
   const chartPoints = useMemo(() => {
@@ -218,7 +226,7 @@ export function EquityPanel({ history, currentEquity }: { history: any[], curren
 
   return (
     <Panel
-      title="資產淨值走勢 (NAV)"
+      title={t('portfolio.navTitle', 'Net Asset Value')}
       actions={
         <div className="flex items-center gap-1">
           {['1W', '1M', '3M', 'ALL'].map((r) => (
@@ -245,9 +253,9 @@ export function EquityPanel({ history, currentEquity }: { history: any[], curren
           className="absolute inset-0"
         />
         <div className="absolute inset-y-0 right-0 flex flex-col justify-between py-2 text-[10px] text-(--color-term-muted) tabular-nums px-2">
-          <span>HIGH</span>
-          <span>AVG</span>
-          <span>LOW</span>
+          <span>{t('portfolio.navHigh', 'HIGH')}</span>
+          <span>{t('portfolio.navAverage', 'AVG')}</span>
+          <span>{t('portfolio.navLow', 'LOW')}</span>
         </div>
       </div>
     </Panel>
@@ -271,6 +279,8 @@ export function HoldingsPanel({
   loading: boolean,
   usdtwd: number
 }) {
+  const { t, i18n } = useTranslation();
+  const numberLocale = getNumberLocale(i18n.language);
   const [editingSym, setEditingSym] = useState<string | null>(null);
   const [editBuf, setEditBuf] = useState<any>(null);
 
@@ -288,25 +298,25 @@ export function HoldingsPanel({
 
   return (
     <Panel
-      title="持倉明細"
+      title={t('portfolio.holdingsTitle', 'Holdings')}
       actions={
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 mr-2">
              <button 
                 onClick={onRefresh}
                 disabled={loading}
-                title="立即刷新現價"
+                title={t('portfolio.refresh', 'Refresh Prices')}
                 className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors p-2"
              >
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
              </button>
-             <span className="text-(--color-term-muted) text-[11px]">共 {positions.length} 檔標的</span>
+             <span className="text-(--color-term-muted) text-[11px]">{t('portfolio.holdingsCount', '{{count}} holdings', { count: positions.length })}</span>
           </div>
           <button 
             onClick={onAdd}
             className="focus-ring flex items-center gap-1 bg-(--color-term-accent)/10 text-(--color-term-accent) border border-(--color-term-accent)/30 px-3 py-2 text-[11px] font-bold hover:bg-(--color-term-accent)/20 motion-safe:transition-all"
           >
-            <Plus size={14} /> 新增持倉
+            <Plus size={14} /> {t('portfolio.addPosition', 'Add Position')}
           </button>
         </div>
       }
@@ -316,20 +326,20 @@ export function HoldingsPanel({
       <table className="w-full text-[12px]">
         <thead className="sticky top-0 bg-(--color-term-panel) text-[10px] tracking-widest text-(--color-term-muted) z-10">
           <tr className="border-b border-(--color-term-border)">
-            <th className="px-4 py-3 text-left font-medium">代號 (SYMBOL)</th>
-            <th className="px-4 py-3 text-right font-medium">數量 (QTY)</th>
-            <th className="px-4 py-3 text-right font-medium">成本 (COST)</th>
-            <th className="px-4 py-3 text-right font-medium">現價 (PRICE)</th>
-            <th className="px-4 py-3 text-right font-medium">市值 (VAL)</th>
-            <th className="px-4 py-3 text-right font-medium">未實現損益 (P/L)</th>
-            <th className="px-4 py-3 text-center font-medium">操作</th>
+            <th className="px-4 py-3 text-left font-medium">{t('portfolio.symbol', 'Symbol')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.shares', 'Shares')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.cost', 'Avg Cost')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.price', 'Price')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.value', 'Value')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.pnl', 'P/L')}</th>
+            <th className="px-4 py-3 text-center font-medium">{t('portfolio.action', 'Action')}</th>
           </tr>
         </thead>
         <tbody>
           {positions.length === 0 && (
             <tr>
               <td colSpan={7} className="py-20 text-center text-(--color-term-muted)">
-                目前無持倉數據
+                {t('portfolio.noPositions', 'No positions yet')}
               </td>
             </tr>
           )}
@@ -360,7 +370,7 @@ export function HoldingsPanel({
                       value={editBuf.shares}
                       onChange={e => setEditBuf((b:any) => ({ ...b, shares: e.target.value }))}
                     />
-                  ) : h.shares.toLocaleString()}
+                  ) : h.shares.toLocaleString(numberLocale)}
                 </td>
                 <td className="px-4 py-3.5 text-right tabular-nums">
                   {isEditing ? (
@@ -373,18 +383,18 @@ export function HoldingsPanel({
                   ) : (
                     <div className="flex flex-col items-end">
                       <span>{h.currency === 'USD' ? (h.avgCost * usdtwd).toFixed(1) : h.avgCost.toFixed(1)}</span>
-                      {h.currency === 'USD' && <span className="text-[9px] text-(--color-term-muted)">${h.avgCost} USD</span>}
+                      {h.currency === 'USD' && <span className="text-[9px] text-(--color-term-muted)">${h.avgCost.toLocaleString(numberLocale, { maximumFractionDigits: 2 })} USD</span>}
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-3.5 text-right tabular-nums font-medium text-(--color-term-text)">
                   <div className="flex flex-col items-end">
                     <span>{h.currency === 'USD' ? (h.currentPrice * usdtwd).toFixed(1) : h.currentPrice.toFixed(1)}</span>
-                    {h.currency === 'USD' && <span className="text-[9px] text-(--color-term-muted)">${h.currentPrice} USD</span>}
+                    {h.currency === 'USD' && <span className="text-[9px] text-(--color-term-muted)">${h.currentPrice.toLocaleString(numberLocale, { maximumFractionDigits: 2 })} USD</span>}
                   </div>
                 </td>
                 <td className="px-4 py-3.5 text-right tabular-nums text-(--color-term-muted)">
-                  {h.marketValueTWD?.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                  {h.marketValueTWD?.toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
                   <span className="ml-1 text-[10px]">TWD</span>
                 </td>
                 <td
@@ -395,7 +405,7 @@ export function HoldingsPanel({
                 >
                   {h.pnlTWD != null ? (
                     <>
-                      {h.pnlTWD >= 0 ? '+' : ''}{h.pnlTWD?.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                      {h.pnlTWD >= 0 ? '+' : ''}{h.pnlTWD?.toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
                       <div className="text-[10px] font-normal">{formatPct(h.pnlPercent || 0, 1)}</div>
                     </>
                   ) : '---'}
@@ -420,7 +430,7 @@ export function HoldingsPanel({
                           <Edit2 size={15} />
                         </button>
                         <button
-                          onClick={() => { if(confirm(`確定刪除 ${h.symbol} 持倉？`)) onDelete(h.symbol); }}
+                          onClick={() => { if(confirm(t('portfolio.deleteConfirm', 'Delete {{symbol}} position?', { symbol: h.symbol }))) onDelete(h.symbol); }}
                           className="focus-ring text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
                           <Trash2 size={15} />
@@ -438,13 +448,14 @@ export function HoldingsPanel({
   );
 }
 export function AllocationPanel({ positions }: { positions: any[] }) {
+  const { t } = useTranslation();
   const allocation = useMemo(() => {
-    if (positions.length === 0) return [{ label: 'CASH', pct: 100, color: '#374151' }];
+    if (positions.length === 0) return [{ label: t('portfolio.cash', 'Cash'), pct: 100, color: '#374151' }];
     
     const groups: Record<string, number> = {};
     let total = 0;
     positions.forEach(p => {
-       const key = p.symbol.endsWith('.TW') ? '台股' : '美股';
+       const key = p.symbol.endsWith('.TW') ? t('portfolio.marketTaiwan', 'TW Market') : t('portfolio.marketUS', 'US Market');
        groups[key] = (groups[key] || 0) + (p.marketValueTWD || 0);
        total += (p.marketValueTWD || 0);
     });
@@ -454,10 +465,10 @@ export function AllocationPanel({ positions }: { positions: any[] }) {
       pct: (val / total) * 100,
       color: i === 0 ? '#22d3ee' : '#f59e0b'
     }));
-  }, [positions]);
+  }, [positions, t]);
 
   return (
-    <Panel title="資產分配 (市場)" collapsible className="h-full" bodyClassName="flex flex-col p-4 gap-4">
+    <Panel title={t('portfolio.allocationMarketTitle', 'Asset Allocation (Market)')} collapsible className="h-full" bodyClassName="flex flex-col p-4 gap-4">
       <div className="flex items-center justify-center">
         <Donut sectors={allocation} />
       </div>
@@ -477,6 +488,7 @@ export function AllocationPanel({ positions }: { positions: any[] }) {
 }
 
 export function Donut({ sectors }: { sectors: any[] }) {
+  const { t } = useTranslation();
   const size = 160;
   const r = 58;
   const stroke = 18;
@@ -508,55 +520,57 @@ export function Donut({ sectors }: { sectors: any[] }) {
       })}
       <g transform={`rotate(90 ${cx} ${cy})`}>
         <text
-          x={cx} y={cy - 4} textAnchor="middle" fill="#6b7280" fontSize="10" letterSpacing="0.15em">ASSET</text>
+          x={cx} y={cy - 4} textAnchor="middle" fill="#6b7280" fontSize="10" letterSpacing="0.15em">{t('portfolio.assetShort', 'ASSET')}</text>
         <text
-          x={cx} y={cy + 12} textAnchor="middle" fill="#e6e8eb" fontSize="14" fontWeight="600">DIST.</text>
+          x={cx} y={cy + 12} textAnchor="middle" fill="#e6e8eb" fontSize="14" fontWeight="600">{t('portfolio.distributionShort', 'DIST.')}</text>
       </g>
     </svg>
   );
 }
 
 export function TradeLogPanel({ trades }: { trades: any[] }) {
+  const { t, i18n } = useTranslation();
+  const numberLocale = getNumberLocale(i18n.language);
   return (
     <Panel
-      title="交易歷史紀錄"
+      title={t('portfolio.tradeLog', 'Trade History')}
     >
       <table className="w-full text-[12px]">
         <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
           <tr className="border-b border-(--color-term-border)">
-            <th className="px-4 py-3 text-left font-medium">成交時間 (EXECUTION)</th>
-            <th className="px-4 py-3 text-left font-medium">類型 (SIDE)</th>
-            <th className="px-4 py-3 text-left font-medium">標的 (SYMBOL)</th>
-            <th className="px-4 py-3 text-right font-medium">數量 (QTY)</th>
-            <th className="px-4 py-3 text-right font-medium">成交價 (PRICE)</th>
-            <th className="px-4 py-3 text-right font-medium">總額 (TOTAL)</th>
+            <th className="px-4 py-3 text-left font-medium">{t('portfolio.executionTime', 'Execution')}</th>
+            <th className="px-4 py-3 text-left font-medium">{t('portfolio.side', 'Side')}</th>
+            <th className="px-4 py-3 text-left font-medium">{t('portfolio.symbol', 'Symbol')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.shares', 'Shares')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.price', 'Price')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('portfolio.total', 'Total')}</th>
           </tr>
         </thead>
         <tbody>
           {trades.length === 0 && (
-            <tr><td colSpan={6} className="py-10 text-center text-(--color-term-muted)">尚無交易紀錄</td></tr>
+            <tr><td colSpan={6} className="py-10 text-center text-(--color-term-muted)">{t('portfolio.noTrades', 'No trade history')}</td></tr>
           )}
-          {trades.slice(0, 10).map((t) => (
+          {trades.slice(0, 10).map((trade) => (
             <tr
-              key={t.id || t.time + t.symbol}
+              key={trade.id || trade.time + trade.symbol}
               className="border-b border-(--color-term-border)/40 hover:bg-white/5 transition-colors"
             >
               <td className="px-4 py-3 text-(--color-term-muted) tabular-nums">
-                {new Date(t.time).toLocaleString('zh-TW', { hour12: false })}
+                {new Date(trade.time).toLocaleString(numberLocale, { hour12: false })}
               </td>
               <td
                 className={cn(
                   'px-4 py-3 font-bold tracking-widest text-[11px]',
-                  t.side.toUpperCase() === 'BUY' ? 'text-sky-400' : 'text-rose-400',
+                  trade.side.toUpperCase() === 'BUY' ? 'text-sky-400' : 'text-rose-400',
                 )}
               >
-                {t.side.toUpperCase()}
+                {trade.side.toUpperCase() === 'BUY' ? t('portfolio.sideBuy', 'BUY') : t('portfolio.sideSell', 'SELL')}
               </td>
-              <td className="px-4 py-3 font-semibold tracking-wider text-(--color-term-text)">{t.symbol}</td>
-              <td className="px-4 py-3 text-right tabular-nums">{t.amount.toLocaleString()}</td>
-              <td className="px-4 py-3 text-right tabular-nums">{t.price.toFixed(2)}</td>
+              <td className="px-4 py-3 font-semibold tracking-wider text-(--color-term-text)">{trade.symbol}</td>
+              <td className="px-4 py-3 text-right tabular-nums">{trade.amount.toLocaleString(numberLocale)}</td>
+              <td className="px-4 py-3 text-right tabular-nums">{trade.price.toFixed(2)}</td>
               <td className="px-4 py-3 text-right tabular-nums font-semibold text-(--color-term-text)">
-                {(t.amount * t.price).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                {(trade.amount * trade.price).toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
               </td>
             </tr>
           ))}
