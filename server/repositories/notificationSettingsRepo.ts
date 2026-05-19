@@ -12,7 +12,9 @@ export type NotifyEvent =
   | 'fill'
   | 'daily_report'
   | 'stop_loss_intercept'
-  | 'quantum_forced_liquidation';
+  | 'quantum_forced_liquidation'
+  | 'smart_money_13f_new_position'
+  | 'smart_money_insider_large_buy';
 
 export interface NotificationSettingInput {
   channel: string;
