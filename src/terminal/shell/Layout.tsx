@@ -49,10 +49,11 @@ const BOTTOM_NAV_IDS: Array<{ id: TerminalView; icon: React.ReactNode; labelKey:
 ];
 
 export function Layout({ active, onChange, searchPlaceholder, children }: LayoutProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isAgentOpen, setIsAgentOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [customSymbols, setCustomSymbols] = useState<string[]>(getInitialSymbols);
+  const numberLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
 
   const toggleAgent = () => setIsAgentOpen((prev) => !prev);
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
@@ -76,16 +77,16 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
           label: TICKER_LABEL_MAP[sym] ?? sym.replace(/[=].*$/, '').replace('-USD', ''),
           value: price != null
             ? price >= 1000
-              ? price.toLocaleString('en-US', { maximumFractionDigits: 0 })
-              : price >= 1
-              ? price.toFixed(2)
-              : price.toFixed(4)
+              ? price.toLocaleString(numberLocale, { maximumFractionDigits: 0 })
+              : price.toLocaleString(numberLocale, price >= 1
+                ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                : { minimumFractionDigits: 4, maximumFractionDigits: 4 })
             : '---',
           changePct: q?.regularMarketChangePercent ?? 0,
           change: q?.regularMarketChange ?? undefined,
         };
       }),
-    [customSymbols, quoteMap]
+    [customSymbols, numberLocale, quoteMap]
   );
 
   const handleTickerSelect = useCallback((symbol: string) => {
