@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -15,6 +16,7 @@ interface PersonaDef {
   nameZh:     string;
   emoji:      string;
   philosophy: string;
+  philosophyEn?: string;
 }
 
 interface PersonaSelectorProps {
@@ -24,9 +26,11 @@ interface PersonaSelectorProps {
 }
 
 export function PersonaSelector({ value, onChange, compact = false }: PersonaSelectorProps) {
+  const { t, i18n } = useTranslation();
   const [personas, setPersonas]   = useState<PersonaDef[]>([]);
   const [open, setOpen]           = useState(false);
   const ref                       = useRef<HTMLDivElement>(null);
+  const isZh = i18n.language.startsWith('zh');
 
   // Load personas list from backend once
   useEffect(() => {
@@ -46,6 +50,7 @@ export function PersonaSelector({ value, onChange, compact = false }: PersonaSel
   }, []);
 
   const current = personas.find(p => p.id === value);
+  const currentLabel = current ? (isZh ? current.nameZh : current.name) : t('research.persona.hermes', 'Hermes 通用');
 
   return (
     <div className="relative" ref={ref}>
@@ -58,12 +63,12 @@ export function PersonaSelector({ value, onChange, compact = false }: PersonaSel
           'text-[12px] text-(--color-term-text) hover:border-(--color-term-accent) transition-colors',
           compact ? 'px-2 py-1' : 'px-3 py-2',
         )}
-        title="選擇 AI 人格 / 投資大師視角"
+        title={t('research.personaSelectorTitle', '選擇 AI 人格 / 投資大師視角')}
       >
         <span>{current?.emoji ?? '⚡'}</span>
         {!compact && (
           <span className="hidden sm:inline max-w-[140px] truncate">
-            {current?.nameZh ?? 'Hermes 通用'}
+            {currentLabel}
           </span>
         )}
         <ChevronDown size={12} className={cn('transition-transform', open && 'rotate-180')} />
@@ -79,13 +84,13 @@ export function PersonaSelector({ value, onChange, compact = false }: PersonaSel
           style={{ maxHeight: '380px' }}
         >
           {/* Section headers */}
-          {Object.entries(PERSONA_GROUPS).map(([groupName, ids]) => {
-            const groupPersonas = personas.filter(p => ids.includes(p.id));
+          {PERSONA_GROUPS.map((group) => {
+            const groupPersonas = personas.filter(p => group.ids.includes(p.id));
             if (groupPersonas.length === 0) return null;
             return (
-              <div key={groupName}>
+              <div key={group.key}>
                 <div className="px-3 pt-3 pb-1 text-[9px] tracking-[0.15em] text-(--color-term-muted) uppercase">
-                  {groupName}
+                  {t(group.key, group.fallback)}
                 </div>
                 {groupPersonas.map(p => (
                   <button
@@ -100,11 +105,11 @@ export function PersonaSelector({ value, onChange, compact = false }: PersonaSel
                   >
                     <span className="text-[18px] leading-none mt-0.5">{p.emoji}</span>
                     <div className="min-w-0">
-                      <div className="text-[12px] font-semibold text-(--color-term-text)">{p.nameZh}</div>
-                      <div className="text-[10px] text-(--color-term-muted) leading-snug truncate">{p.philosophy}</div>
+                      <div className="text-[12px] font-semibold text-(--color-term-text)">{isZh ? p.nameZh : p.name}</div>
+                      <div className="text-[10px] text-(--color-term-muted) leading-snug truncate">{isZh ? p.philosophy : (p.philosophyEn ?? p.philosophy)}</div>
                     </div>
                     {p.id === value && (
-                      <span className="ml-auto text-[10px] text-(--color-term-accent) shrink-0 mt-0.5">✓ 使用中</span>
+                      <span className="ml-auto text-[10px] text-(--color-term-accent) shrink-0 mt-0.5">✓ {t('research.personaActive', '使用中')}</span>
                     )}
                   </button>
                 ))}
@@ -118,9 +123,9 @@ export function PersonaSelector({ value, onChange, compact = false }: PersonaSel
 }
 
 // Group definitions (ordering for display)
-const PERSONA_GROUPS: Record<string, string[]> = {
-  '通用 AI':          ['hermes'],
-  '價值投資大師':      ['buffett', 'munger', 'graham', 'lynch'],
-  '宏觀/量化大師':    ['soros', 'dalio', 'simons', 'cathie_wood'],
-  '特殊視角':          ['congress_tracker', 'geopolitics', 'risk_manager'],
-};
+const PERSONA_GROUPS: Array<{ key: string; fallback: string; ids: string[] }> = [
+  { key: 'research.personaGroupGeneral', fallback: '通用 AI', ids: ['hermes'] },
+  { key: 'research.personaGroupValue', fallback: '價值投資大師', ids: ['buffett', 'munger', 'graham', 'lynch'] },
+  { key: 'research.personaGroupMacro', fallback: '宏觀/量化大師', ids: ['soros', 'dalio', 'simons', 'cathie_wood'] },
+  { key: 'research.personaGroupSpecial', fallback: '特殊視角', ids: ['congress_tracker', 'geopolitics', 'risk_manager'] },
+];
