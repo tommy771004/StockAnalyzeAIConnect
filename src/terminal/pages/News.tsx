@@ -14,13 +14,20 @@ const TAG_STYLE: Record<string, string> = {
   sector: 'bg-zinc-700/50 text-zinc-300 border-zinc-600/50',
 };
 
-const CATEGORIES = ['焦點', '台股', '國際', '美股', '理財'];
+const NEWS_CATEGORIES = [
+  { value: '焦點', labelKey: 'news.categories.focus' },
+  { value: '台股', labelKey: 'news.categories.taiwan' },
+  { value: '國際', labelKey: 'news.categories.global' },
+  { value: '美股', labelKey: 'news.categories.us' },
+  { value: '理財', labelKey: 'news.categories.finance' },
+] as const;
 
 export function NewsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [activeCategory, setActiveCategory] = useState('焦點');
   const { news, loading } = useNewsFeed(undefined, activeCategory);
   const [activeId, setActiveId] = useState<string>('');
+  const timeLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
 
   useEffect(() => {
     if (news.length > 0) {
@@ -36,18 +43,18 @@ export function NewsPage() {
     <div className="flex flex-col h-full gap-3 pb-10">
       {/* Category Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {CATEGORIES.map(cat => (
+        {NEWS_CATEGORIES.map(({ value, labelKey }) => (
           <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+            key={value}
+            onClick={() => setActiveCategory(value)}
             className={cn(
               "focus-ring px-4 h-8 rounded-sm text-[11px] font-bold tracking-widest motion-safe:transition-all whitespace-nowrap",
-              activeCategory === cat 
+              activeCategory === value 
                 ? "bg-(--color-term-accent) text-black" 
                 : "bg-(--color-term-surface) text-(--color-term-muted) hover:text-(--color-term-text) border border-(--color-term-border)"
             )}
           >
-            {cat}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -60,11 +67,12 @@ export function NewsPage() {
             onSelect={setActiveId} 
             t={t} 
             loading={loading}
+            timeLocale={timeLocale}
           />
         </div>
         <div className="col-span-12 min-h-0 lg:col-span-7">
           {activeItem ? (
-            <ArticleReader item={activeItem} t={t} />
+            <ArticleReader item={activeItem} t={t} timeLocale={timeLocale} />
           ) : (
             <div className="flex h-full items-center justify-center text-(--color-term-muted) border border-(--color-term-border) bg-(--color-term-surface)/20 rounded-sm">
               {loading ? (
@@ -85,13 +93,15 @@ function LiveFeed({
   activeId,
   onSelect,
   t,
-  loading
+  loading,
+  timeLocale,
 }: {
   news: any[];
   activeId: string;
   onSelect: (id: string) => void;
   t: any;
   loading: boolean;
+  timeLocale: string;
 }) {
   return (
     <Panel
@@ -99,7 +109,7 @@ function LiveFeed({
       actions={
         <span className="flex items-center gap-1 text-[11px] tracking-widest text-(--color-term-positive)">
           <span className={cn("h-1.5 w-1.5 rounded-full bg-(--color-term-positive)", !loading && "animate-pulse")} />
-          {loading ? 'FETCHING...' : 'REAL-TIME'}
+          {loading ? t('news.fetching', 'FETCHING...') : t('news.realtime', 'REAL-TIME')}
         </span>
       }
       className="h-full"
@@ -133,7 +143,7 @@ function LiveFeed({
                 <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-tighter text-(--color-term-muted)">
                    <div className="flex gap-2 items-center">
                         <span className="font-bold text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-sm">{item.source || item.publisher}</span>
-                        <span>{publishTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{publishTime.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' })}</span>
                    </div>
                    {isActive ? <TrendingUp className="h-3 w-3 text-(--color-term-accent)" /> : null}
                 </div>
@@ -149,7 +159,7 @@ function LiveFeed({
   );
 }
 
-function ArticleReader({ item, t }: { item: any; t: any }) {
+function ArticleReader({ item, t, timeLocale }: { item: any; t: any; timeLocale: string }) {
   const [summary, setSummary] = useState<string>('');
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -166,14 +176,14 @@ function ArticleReader({ item, t }: { item: any; t: any }) {
         setSummary(res.text);
       } catch (err) {
         console.error('AI Analysis error:', err);
-        setSummary('AI 摘要生成暫時不可用。');
+        setSummary(t('news.summaryUnavailable', 'AI summary is temporarily unavailable.'));
       } finally {
         setAnalyzing(false);
       }
     };
 
     if (item) runAnalysis();
-  }, [item]);
+  }, [item, t]);
 
   const publishTime = item.published ? new Date(item.published * 1000) : new Date();
 
@@ -182,7 +192,7 @@ function ArticleReader({ item, t }: { item: any; t: any }) {
       <header className="flex items-center justify-between border-b border-(--color-term-border) px-4 py-2 text-[11px] text-(--color-term-muted)">
          <div className="flex items-center gap-4">
             <span className="font-bold text-(--color-term-accent)">{item.source || item.publisher}</span>
-            <span>{publishTime.toLocaleString()}</span>
+          <span>{publishTime.toLocaleString(timeLocale, { dateStyle: 'medium', timeStyle: 'short' })}</span>
          </div>
          <button 
            onClick={() => {
