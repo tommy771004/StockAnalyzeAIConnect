@@ -167,7 +167,7 @@ export function CongressTradesPanel({ symbol }: Props) {
           </div>
 
           {/* Trades list */}
-          <ul className="flex flex-col divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '360px' }}>
+          <ul className="flex flex-col divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '360px' }}>
             {data.trades.length === 0 && (
               <li className="px-4 py-8 text-center text-[12px] text-(--color-term-muted)">
                 {symbol
@@ -191,12 +191,12 @@ export function CongressTradesPanel({ symbol }: Props) {
                   {/* Politician + ticker */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-semibold text-(--color-term-text) truncate">{t.politician}</span>
+                      <span className="inline-block truncate max-w-[120px] sm:max-w-[200px] text-[12px] font-semibold text-(--color-term-text) align-bottom">{t.politician}</span>
                       {!symbol && (
                         <span className="shrink-0 text-[11px] font-bold text-(--color-term-accent)">{t.ticker}</span>
                       )}
                     </div>
-                    <div className="text-[10px] text-(--color-term-muted) mt-0.5">
+                    <div className="text-[10px] text-(--color-term-muted) mt-0.5 break-words text-pretty">
                       {chamberLabel} · {t.state} · {t('congress.tradeDate', '交易: {{date}}', { date: t.tradeDate })} · {t('congress.reportedDate', '申報: {{date}}', { date: t.reportedDate })}
                     </div>
                   </div>

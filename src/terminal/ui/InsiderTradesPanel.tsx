@@ -180,7 +180,7 @@ export function InsiderTradesPanel({ symbol }: Props) {
             {t('smartMoney.insiderHint', '只顯示 Form 4 的公開市場買賣代碼 P / S。大額買入以單筆 100,000 美元以上標示。')}
           </div>
 
-          <ul className="flex flex-col divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '360px' }}>
+          <ul className="flex flex-col divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '360px' }}>
             {data.transactions.length === 0 && (
               <li className="px-4 py-8 text-center text-[12px] text-(--color-term-muted)">
                 {t('smartMoney.insiderEmpty', '尚未辨識到近期公開市場內部人交易。')}
@@ -202,14 +202,14 @@ export function InsiderTradesPanel({ symbol }: Props) {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[12px] font-semibold text-(--color-term-text)">{transaction.insiderName}</span>
+                      <span className="inline-block truncate max-w-[120px] sm:max-w-[200px] text-[12px] font-semibold text-(--color-term-text) align-bottom">{transaction.insiderName}</span>
                       {transaction.isLargeBuy && (
                         <span className="shrink-0 rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-emerald-400">
                           {t('smartMoney.insiderLargeBuyBadge', '100K+')}
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-(--color-term-muted)">
+                    <div className="mt-0.5 text-[10px] text-(--color-term-muted) break-words text-pretty">
                       {transaction.title || t('smartMoney.insiderFallbackTitle', 'Insider')} · {transaction.securityTitle} · {t('smartMoney.insiderTradeDate', '交易 {{date}}', { date: transaction.tradeDate })} · {t('smartMoney.insiderFilingDate', '申報 {{date}}', { date: transaction.filingDate })}
                     </div>
                   </div>

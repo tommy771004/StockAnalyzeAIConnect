@@ -493,7 +493,7 @@ function RecentNewsPanel({ news }: { news: any[] }) {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language.startsWith('zh') ? 'zh-TW' : 'en-US';
   return (
-    <Panel title={t('research.newsPanelTitle', '標的相關新聞')} collapsible className="flex-1 min-h-[300px]" bodyClassName="overflow-auto">
+    <Panel title={t('research.newsPanelTitle', '標的相關新聞')} collapsible className="flex-1 min-h-[300px]" bodyClassName="overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
       {news.length === 0 ? <div className="p-10 text-center text-(--color-term-muted)">{t('research.newsEmpty', '尚無新聞資料')}</div> : null}
       <ul className="divide-y divide-(--color-term-border)/60">
         {news.slice(0, 10).map((n) => {
@@ -511,7 +511,7 @@ function RecentNewsPanel({ news }: { news: any[] }) {
                 <span className="group-hover/item:text-sky-400 transition-colors">{n.source || n.publisher || t('research.newsSourceFallback', 'MARKET')}</span>
                 <span>{n.published ? new Date(n.published * 1000).toLocaleDateString(dateLocale, { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit' }) : (n.time || '')}</span>
               </div>
-              <p className="text-[12.5px] leading-snug text-(--color-term-text) font-medium group-hover/item:text-(--color-term-accent) transition-colors">
+              <p className="text-[12.5px] leading-snug text-(--color-term-text) font-medium group-hover/item:text-(--color-term-accent) transition-colors break-words text-pretty">
                 {n.title}
               </p>
             </li>
@@ -527,7 +527,7 @@ function AISummaryPanel({ summary, loading, persona, modelName }: { summary: str
   const personaLabel = t(`research.persona.${persona}`, persona);
 
   return (
-    <Panel title={t('research.aiPanelTitle', 'AI 摘要與分析')} collapsible bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400">
+    <Panel title={t('research.aiPanelTitle', 'AI 摘要與分析')} collapsible bodyClassName="p-4 bg-sky-900/10 border-l-2 border-l-sky-400 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent max-h-[400px] lg:max-h-none">
       <div className="flex flex-col gap-3">
         {loading ? (
           <div className="flex items-center gap-3 py-4">
@@ -535,7 +535,7 @@ function AISummaryPanel({ summary, loading, persona, modelName }: { summary: str
             <span className="text-xs text-sky-400/70 tracking-widest animate-pulse">{t('research.aiAnalyzing', '正在以 {{persona}} 分析...', { persona: personaLabel })}</span>
           </div>
         ) : (
-          <p className="text-sm leading-relaxed text-zinc-100 font-sans whitespace-pre-wrap tracking-wide">
+          <p className="text-sm leading-relaxed text-zinc-100 font-sans whitespace-pre-wrap tracking-wide break-words text-pretty">
             {summary}
           </p>
         )}
@@ -564,7 +564,7 @@ function ChipAnalysisPanel({ data }: { data: any }) {
   ];
 
   return (
-    <Panel title={t('research.chipTitle', '籌碼分析 (玩股網)')} icon={<Users size={16} />} className="bg-(--color-term-panel)">
+    <Panel title={t('research.chipTitle', '籌碼分析 (玩股網)')} icon={<Users size={16} />} className="bg-(--color-term-panel)" bodyClassName="p-4 flex flex-col gap-4 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent min-h-0">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {items.map((item, idx) => (
           <div key={idx} className="flex flex-col gap-1">

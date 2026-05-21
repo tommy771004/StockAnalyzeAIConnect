@@ -125,8 +125,8 @@ function EventRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="line-clamp-2 text-[12px] font-semibold text-(--color-term-text)">{event.title}</div>
-        <div className="mt-0.5 line-clamp-2 text-[11px] text-(--color-term-muted)">{event.summary}</div>
+        <div className="line-clamp-2 text-[12px] font-semibold text-(--color-term-text) break-words text-pretty">{event.title}</div>
+        <div className="mt-0.5 line-clamp-2 text-[11px] text-(--color-term-muted) break-words text-pretty">{event.summary}</div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-(--color-term-muted)">
           <span>{new Date(event.eventDate).toLocaleDateString(locale)}</span>
           {event.amountUsd != null && (
@@ -413,7 +413,7 @@ export function SmartMoneyPage() {
           )}
 
           {data && data.settings.enabled && filteredEvents.length > 0 && (
-            <ul className="divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '420px' }}>
+            <ul className="divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '420px' }}>
               {filteredEvents.map((event) => (
                 <EventRow
                   key={event.id}

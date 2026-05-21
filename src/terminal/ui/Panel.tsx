@@ -77,7 +77,7 @@ export function Panel({
   return (
     <section
       className={cn(
-        'relative flex flex-col border border-(--color-term-border) overflow-hidden',
+        'relative flex flex-col border border-(--color-term-border) rounded-xl overflow-hidden',
         'transition-[border-color,box-shadow] duration-300',
         accent !== 'none' && `border-t-2 ${accentCfg.border}`,
         glowOnHover && 'hover:border-(--color-term-accent)/30',

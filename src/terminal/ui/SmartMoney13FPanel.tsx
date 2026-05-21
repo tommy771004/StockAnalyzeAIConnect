@@ -234,7 +234,7 @@ export function SmartMoney13FPanel() {
               <div className="border-b border-(--color-term-border) px-4 py-2 text-[10px] font-bold tracking-[0.24em] text-emerald-400 uppercase">
                 {t('smartMoney.13fNewPositions', '新建倉')}
               </div>
-              <ul className="divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '190px' }}>
+              <ul className="divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '190px' }}>
                 {data.newPositions.length === 0 && (
                   <li className="px-4 py-6 text-center text-[12px] text-(--color-term-muted)">
                     {t('smartMoney.13fNewEmpty', '這期尚未辨識到新建倉。')}
@@ -250,7 +250,7 @@ export function SmartMoney13FPanel() {
               <div className="border-b border-(--color-term-border) px-4 py-2 text-[10px] font-bold tracking-[0.24em] text-(--color-term-muted) uppercase">
                 {t('smartMoney.13fTopHoldings', '前十大持倉')}
               </div>
-              <ul className="divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '240px' }}>
+              <ul className="divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '240px' }}>
                 {data.topHoldings.map((holding) => (
                   <HoldingRow key={`${holding.cusip}-${holding.issuer}`} holding={holding} locale={numberLocale} />
                 ))}

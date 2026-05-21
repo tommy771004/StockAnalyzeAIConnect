@@ -472,6 +472,9 @@ def quantum_signal(payload: QuantumPayload):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
 
     # Make sure this runs on a port different from tradingview_service.py (8787)
-    uvicorn.run(app, host="127.0.0.1", port=8788)
+    host = os.getenv("SCIENCE_SERVICE_HOST", "127.0.0.1")
+    port = int(os.getenv("SCIENCE_SERVICE_PORT", "8788"))
+    uvicorn.run(app, host=host, port=port)

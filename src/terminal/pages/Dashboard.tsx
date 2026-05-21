@@ -151,7 +151,7 @@ export function WatchlistPanel({
         </div>
       }
       className="flex-1 min-h-[260px]"
-      bodyClassName="overflow-auto flex flex-col"
+      bodyClassName="overflow-auto flex flex-col scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
     >
       {showAdd && (
         <form onSubmit={handleAdd} className="flex border-b border-(--color-term-border) bg-black/20 p-2">
@@ -256,7 +256,7 @@ export function TopMoversPanel({
   const [tab, setTab] = useState<'gainers' | 'losers'>('gainers');
   const rows = tab === 'gainers' ? gainers : losers;
   return (
-    <Panel title={t('dashboard.topMovers', 'TOP MOVERS')} collapsible className="min-h-[220px]">
+    <Panel title={t('dashboard.topMovers', 'TOP MOVERS')} collapsible className="min-h-[220px]" bodyClassName="overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent flex flex-col min-h-0 max-h-[300px] lg:max-h-none">
       <div className="flex border-b border-(--color-term-border) text-[11px] tracking-widest">
         {(['gainers', 'losers'] as const).map((k) => (
           <button
@@ -570,7 +570,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
         </button>
       }
       className="flex-1 min-h-[300px]"
-      bodyClassName="overflow-auto"
+      bodyClassName="overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
     >
       {filteredNews.length === 0 ? (
         <div className="flex h-full items-center justify-center text-[11px] text-(--color-term-muted)">
@@ -592,7 +592,7 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
                   </span>
                   <span className="text-(--color-term-muted)">{n.time}</span>
                 </div>
-                <p className="mb-1.5 text-[12.5px] font-medium leading-snug text-(--color-term-text) group-hover/news:text-(--color-term-accent) transition-colors">
+                <p className="mb-1.5 text-[12.5px] font-medium leading-snug text-(--color-term-text) group-hover/news:text-(--color-term-accent) transition-colors break-words text-pretty">
                   {n.title}
                 </p>
                 <div className="flex items-center gap-1.5 text-[10px] text-(--color-term-muted)">
@@ -664,7 +664,7 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
   };
 
   return (
-    <Panel accent="amber" className="min-h-[260px]">
+    <Panel accent="amber" className="min-h-[260px]" bodyClassName="overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent min-h-0 max-h-[360px] lg:max-h-none">
       <header className="flex h-9 items-center justify-between border-b border-(--color-term-border) bg-(--color-term-accent)/10 px-3">
         <span className="text-[11px] font-semibold tracking-[0.22em] text-(--color-term-accent)">
           {t('dashboard.quickTrade', 'QUICK TRADE')}

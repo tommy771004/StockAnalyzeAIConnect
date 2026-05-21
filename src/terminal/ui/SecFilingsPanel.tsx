@@ -144,7 +144,7 @@ export function SecFilingsPanel({ symbol }: Props) {
           )}
 
           {/* Filings list */}
-          <ul className="divide-y divide-(--color-term-border)/60 overflow-auto" style={{ maxHeight: '280px' }}>
+          <ul className="divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent" style={{ maxHeight: '280px' }}>
             {data.filings.length === 0 && (
               <li className="px-4 py-6 text-center text-[12px] text-(--color-term-muted)">
                 {t('edgar.empty', '尚無近期申報')}
@@ -158,7 +158,7 @@ export function SecFilingsPanel({ symbol }: Props) {
                     {f.form}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] text-(--color-term-text) truncate">
+                    <div className="text-[11px] text-(--color-term-text) break-words text-pretty">
                       {f.description || f.form}
                     </div>
                     <div className="text-[10px] text-(--color-term-muted)">{f.filingDate}</div>

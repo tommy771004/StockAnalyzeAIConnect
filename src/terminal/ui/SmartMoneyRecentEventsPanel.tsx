@@ -85,19 +85,19 @@ export function SmartMoneyRecentEventsPanel({ symbol, maxEvents = 4, compact = f
       {data && (
         <>
           <div className={cn(
-            'grid grid-cols-3 gap-3 border-b border-(--color-term-border) px-4 py-3',
-            compact && 'gap-2 px-3 py-2',
+            'grid grid-cols-3 gap-1.5 sm:gap-3 border-b border-(--color-term-border) px-2 sm:px-4 py-3',
+            compact && 'gap-1 px-1.5 py-2',
           )}>
-            <div className="rounded border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-center">
-              <div className={cn('font-bold tabular-nums text-sky-300', compact ? 'text-[15px]' : 'text-[18px]')}>{stats.new13f.toLocaleString(locale)}</div>
+            <div className="rounded border border-sky-500/20 bg-sky-500/10 px-1.5 sm:px-3 py-2 text-center">
+              <div className={cn('font-bold tabular-nums text-sky-300', compact ? 'text-[13px] sm:text-[15px]' : 'text-[15px] sm:text-[18px]')}>{stats.new13f.toLocaleString(locale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.recent13fStat', '13F NEW')}</div>
             </div>
-            <div className="rounded border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center">
-              <div className={cn('font-bold tabular-nums text-emerald-300', compact ? 'text-[15px]' : 'text-[18px]')}>{stats.insiderBuys.toLocaleString(locale)}</div>
+            <div className="rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 sm:px-3 py-2 text-center">
+              <div className={cn('font-bold tabular-nums text-emerald-300', compact ? 'text-[13px] sm:text-[15px]' : 'text-[15px] sm:text-[18px]')}>{stats.insiderBuys.toLocaleString(locale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.recentInsiderStat', 'INSIDER')}</div>
             </div>
-            <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
-              <div className={cn('font-bold tabular-nums text-(--color-term-text)', compact ? 'text-[15px]' : 'text-[18px]')}>{stats.related.toLocaleString(locale)}</div>
+            <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) px-1.5 sm:px-3 py-2 text-center">
+              <div className={cn('font-bold tabular-nums text-(--color-term-text)', compact ? 'text-[13px] sm:text-[15px]' : 'text-[15px] sm:text-[18px]')}>{stats.related.toLocaleString(locale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{upperSymbol ? `${upperSymbol}` : t('smartMoney.recentRelatedStat', 'RELATED')}</div>
             </div>
           </div>
@@ -119,7 +119,7 @@ export function SmartMoneyRecentEventsPanel({ symbol, maxEvents = 4, compact = f
             )}
           </div>
 
-          <ul className="flex flex-1 flex-col divide-y divide-(--color-term-border)/60 overflow-auto">
+          <ul className="flex flex-1 flex-col divide-y divide-(--color-term-border)/60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
             {!data.settings.enabled && (
               <li className="px-4 py-8 text-center text-[12px] text-(--color-term-muted)">
                 {t('smartMoney.recentEnableHint', '啟用後會在這裡同步最近的 13F 新建倉與 insider 大額買入。')}
@@ -155,8 +155,8 @@ export function SmartMoneyRecentEventsPanel({ symbol, maxEvents = 4, compact = f
                       className="focus-ring min-w-0 flex-1 rounded-sm text-left transition-colors hover:bg-white/5 hover:text-(--color-term-accent)"
                       title={t('smartMoney.openResearch', '前往 Research：{{symbol}}', { symbol: event.symbol! })}
                     >
-                      <div className="truncate text-[12px] font-semibold text-(--color-term-text)">{event.title}</div>
-                      <div className={cn('text-(--color-term-muted)', compact ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]')}>{event.summary}</div>
+                      <div className="text-[12px] font-semibold text-(--color-term-text) break-words text-pretty">{event.title}</div>
+                      <div className={cn('text-(--color-term-muted) break-words text-pretty', compact ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]')}>{event.summary}</div>
                       <div className={cn('text-(--color-term-muted)', compact ? 'mt-0.5 text-[9px]' : 'mt-1 text-[10px]')}>
                         {new Date(event.eventDate).toLocaleDateString(locale)}
                         {event.symbol ? ` · ${event.symbol}` : ''}
@@ -165,8 +165,8 @@ export function SmartMoneyRecentEventsPanel({ symbol, maxEvents = 4, compact = f
                     </button>
                   ) : (
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-semibold text-(--color-term-text)">{event.title}</div>
-                      <div className={cn('text-(--color-term-muted)', compact ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]')}>{event.summary}</div>
+                      <div className="text-[12px] font-semibold text-(--color-term-text) break-words text-pretty">{event.title}</div>
+                      <div className={cn('text-(--color-term-muted) break-words text-pretty', compact ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]')}>{event.summary}</div>
                       <div className={cn('text-(--color-term-muted)', compact ? 'mt-0.5 text-[9px]' : 'mt-1 text-[10px]')}>
                         {new Date(event.eventDate).toLocaleDateString(locale)}
                         {event.symbol ? ` · ${event.symbol}` : ''}

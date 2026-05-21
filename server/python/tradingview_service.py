@@ -8,7 +8,16 @@ except ImportError:
     m = types.ModuleType("pkg_resources")
     sys.modules["pkg_resources"] = m
     m.get_distribution = lambda x: types.SimpleNamespace(version="0.0.0")
-    base_path = r"C:\Users\Tommy\AppData\Roaming\Python\Python312\site-packages\tradingview_scraper"
+    
+    # 動態取得 tradingview_scraper 模組的安裝路徑，排除 Tommy 的 AppData 硬編碼
+    base_path = ""
+    try:
+        import tradingview_scraper
+        base_path = os.path.dirname(tradingview_scraper.__file__)
+    except ImportError:
+        # 如果尚未安裝，回退到當前路徑
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        
     m.resource_filename = lambda p, f: os.path.join(base_path, f)
 
 from fastapi import FastAPI, Query
@@ -154,4 +163,6 @@ def get_earnings(countries: str = "america", days: int = 7):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8787)
+    host = os.getenv("TV_SERVICE_HOST", "127.0.0.1")
+    port = int(os.getenv("TV_SERVICE_PORT", "8787"))
+    uvicorn.run(app, host=host, port=port)

@@ -6,17 +6,29 @@ from typing import Any, Dict, Optional, Tuple
 # ── Compatibility shim ────────────────────────────────────────────────────────
 # tradingview-scraper relies on pkg_resources (setuptools < 82).
 # Suppress the PkgResourcesDeprecationWarning to keep Vercel logs clean.
+import os
 import warnings as _warnings
 try:
     with _warnings.catch_warnings():
         _warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
         _warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
-        import pkg_resources  # noqa: F401
-except ModuleNotFoundError:
-    # Last-ditch stub so the app starts and returns a structured error
+        import pkg_resources
+except ImportError:
+    # 針對 Python 3.12+ 或 Vercel 缺少 pkg_resources 的完整動態 Stub 補丁
     import types as _types
     pkg_resources = _types.ModuleType("pkg_resources")  # type: ignore[assignment]
     sys.modules["pkg_resources"] = pkg_resources
+    pkg_resources.get_distribution = lambda x: _types.SimpleNamespace(version="0.0.0")
+    
+    # 動態尋找 tradingview_scraper 安裝路徑以取得套件內部資源
+    base_path = ""
+    try:
+        import tradingview_scraper
+        base_path = os.path.dirname(tradingview_scraper.__file__)
+    except ImportError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        
+    pkg_resources.resource_filename = lambda p, f: os.path.join(base_path, f)
 
 from fastapi import FastAPI
 
