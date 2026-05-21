@@ -211,15 +211,15 @@ export function SmartMoney13FPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 border-b border-(--color-term-border) px-4 py-3 sm:grid-cols-3">
-            <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
+            <div className="rounded-lg border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-(--color-term-text)">{data.summary.totalHoldings.toLocaleString(numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.13fHoldingsStat', 'HOLDINGS')}</div>
             </div>
-            <div className="rounded border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-center">
+            <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-emerald-400">{data.summary.newPositions.toLocaleString(numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.13fNewStat', 'NEW')}</div>
             </div>
-            <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
+            <div className="rounded-lg border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-(--color-term-text)">{formatUsd(data.summary.totalValueUsd, numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.13fAumStat', 'AUM')}</div>
             </div>

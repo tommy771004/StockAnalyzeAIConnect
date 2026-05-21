@@ -473,7 +473,7 @@ export function SmartMoneyPage() {
                 href={source.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group rounded border border-(--color-term-border) bg-(--color-term-surface) p-3 transition-colors hover:border-(--color-term-accent)/40 hover:bg-(--color-term-accent)/5"
+                className="group rounded-xl border border-(--color-term-border) bg-(--color-term-surface) p-3 transition-colors hover:border-(--color-term-accent)/40 hover:bg-(--color-term-accent)/5"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[12px] font-semibold text-(--color-term-text)">{source.title}</span>
@@ -490,7 +490,7 @@ export function SmartMoneyPage() {
             {PLAYBOOK.map((item) => {
               const Icon = item.icon;
               return (
-                <article key={item.titleKey} className="rounded border border-(--color-term-border) bg-(--color-term-surface) p-3">
+                <article key={item.titleKey} className="rounded-xl border border-(--color-term-border) bg-(--color-term-surface) p-3">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-(--color-term-accent)" aria-hidden="true" />
                     <h2 className="text-[12px] font-semibold text-(--color-term-text)">{t(item.titleKey, item.fallbackTitle)}</h2>

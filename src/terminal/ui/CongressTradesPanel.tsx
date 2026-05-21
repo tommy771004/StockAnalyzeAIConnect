@@ -126,7 +126,7 @@ export function CongressTradesPanel({ symbol }: Props) {
         <>
           {/* Summary bar */}
           <div className="flex items-center gap-4 border-b border-(--color-term-border) px-4 py-3">
-            <div className={cn('rounded border px-3 py-1.5 text-center', biasConfig.bg)}>
+            <div className={cn('rounded-lg border px-3 py-1.5 text-center', biasConfig.bg)}>
               <div className={cn('text-[16px] font-bold', biasConfig.color)}>{biasConfig.label}</div>
               <div className="text-[9px] text-(--color-term-muted) tracking-widest">{t('congress.biasLabel', '議員倉位')}</div>
             </div>

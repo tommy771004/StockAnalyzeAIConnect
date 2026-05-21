@@ -150,20 +150,20 @@ export function InsiderTradesPanel({ symbol }: Props) {
           </div>
 
           <div className="grid grid-cols-2 gap-3 border-b border-(--color-term-border) px-4 py-3 lg:grid-cols-4">
-            <div className="rounded border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-center">
+            <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-emerald-400">{data.summary.openMarketBuys.toLocaleString(numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.insiderBuyStat', 'BUY')}</div>
             </div>
-            <div className="rounded border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-center">
+            <div className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-rose-400">{data.summary.openMarketSells.toLocaleString(numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.insiderSellStat', 'SELL')}</div>
             </div>
-            <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
+            <div className="rounded-lg border border-(--color-term-border) bg-(--color-term-surface) px-3 py-2 text-center">
               <div className="text-[18px] font-bold tabular-nums text-(--color-term-text)">{data.summary.largeBuys.toLocaleString(numberLocale)}</div>
               <div className="text-[9px] tracking-widest text-(--color-term-muted)">{t('smartMoney.insiderLargeBuyStat', '100K+ BUY')}</div>
             </div>
             <div className={cn(
-              'rounded border px-3 py-2 text-center',
+              'rounded-lg border px-3 py-2 text-center',
               data.summary.clusterBuying ? 'border-emerald-400/20 bg-emerald-400/10' : 'border-(--color-term-border) bg-(--color-term-surface)',
             )}>
               <div className={cn(
