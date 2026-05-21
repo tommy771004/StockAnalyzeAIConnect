@@ -80,25 +80,29 @@ function HoldingRow({
   const { t } = useTranslation();
 
   return (
-    <li className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
+    <li className="flex items-start gap-2 sm:gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[12px] font-semibold text-(--color-term-text)">{holding.issuer}</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="inline-block truncate max-w-[120px] sm:max-w-[220px] text-[12px] font-semibold text-(--color-term-text) align-bottom">
+            {holding.issuer}
+          </span>
           {(emphasizeNew || holding.isNewPosition) && (
             <span className="shrink-0 rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-emerald-400">
               {t('smartMoney.13fNewBadge', 'NEW')}
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-[10px] text-(--color-term-muted)">
+        <div className="mt-0.5 text-[10px] text-(--color-term-muted) truncate">
           {holding.classTitle || t('smartMoney.notAvailableShort', 'N/A')}
           {holding.cusip ? ` · CUSIP ${holding.cusip}` : ''}
           {holding.investmentDiscretion ? ` · ${holding.investmentDiscretion}` : ''}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="text-[12px] font-semibold tabular-nums text-(--color-term-text)">{formatUsd(holding.valueUsd, locale)}</div>
-        <div className="mt-0.5 text-[10px] text-(--color-term-muted)">
+        <div className="text-[12px] font-semibold tabular-nums text-(--color-term-text) whitespace-nowrap">
+          {formatUsd(holding.valueUsd, locale)}
+        </div>
+        <div className="mt-0.5 text-[10px] text-(--color-term-muted) whitespace-nowrap">
           {formatShares(holding.shares, locale)} {holding.shareType || t('smartMoney.sharesLabel', 'shares')}
         </div>
       </div>
@@ -166,12 +170,12 @@ export function SmartMoney13FPanel() {
 
       {data && (
         <>
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-(--color-term-border) px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-3 border-b border-(--color-term-border) px-4 py-3">
             <div className="min-w-0 flex-1">
               <select
                 value={managerId}
                 onChange={(event) => setManagerId(event.target.value)}
-                className="w-full max-w-[260px] rounded border border-(--color-term-border) bg-(--color-term-surface) px-2 py-1 text-[12px] font-semibold text-(--color-term-text) outline-none"
+                className="w-full max-w-[200px] sm:max-w-[260px] rounded border border-(--color-term-border) bg-(--color-term-surface) px-2 py-1 text-[12px] font-semibold text-(--color-term-text) outline-none truncate"
               >
                 {data.availableManagers.map((manager) => (
                   <option key={manager.id} value={manager.id} className="bg-(--color-term-panel)">
@@ -186,7 +190,7 @@ export function SmartMoney13FPanel() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[10px]">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px]">
               {([
                 ['SEC', data.sourceLinks.sec],
                 ['WhaleWisdom', data.sourceLinks.whaleWisdom],
@@ -197,7 +201,7 @@ export function SmartMoney13FPanel() {
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-(--color-term-border) px-2 py-1 text-(--color-term-muted) hover:text-(--color-term-accent)"
+                  className="inline-flex items-center gap-1 rounded border border-(--color-term-border) px-1.5 py-0.5 sm:px-2 sm:py-1 text-(--color-term-muted) hover:text-(--color-term-accent) whitespace-nowrap"
                 >
                   {label}
                   <ExternalLink size={10} />

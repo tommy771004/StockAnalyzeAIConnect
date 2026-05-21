@@ -125,8 +125,8 @@ function EventRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12px] font-semibold text-(--color-term-text)">{event.title}</div>
-        <div className="mt-0.5 text-[11px] text-(--color-term-muted)">{event.summary}</div>
+        <div className="line-clamp-2 text-[12px] font-semibold text-(--color-term-text)">{event.title}</div>
+        <div className="mt-0.5 line-clamp-2 text-[11px] text-(--color-term-muted)">{event.summary}</div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-(--color-term-muted)">
           <span>{new Date(event.eventDate).toLocaleDateString(locale)}</span>
           {event.amountUsd != null && (
@@ -137,13 +137,13 @@ function EventRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         {event.symbol && (
           <button
             type="button"
             onClick={() => onSelect(event)}
             className={cn(
-              'focus-ring rounded border px-2 py-1 text-[10px] font-bold tracking-wider transition-colors',
+              'focus-ring rounded border px-1.5 py-0.5 sm:px-2 sm:py-1 text-[9px] sm:text-[10px] font-bold tracking-wider transition-colors',
               isActive
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                 : 'border-(--color-term-border) text-(--color-term-muted) hover:border-(--color-term-accent)/30 hover:text-(--color-term-accent)',
@@ -259,7 +259,7 @@ export function SmartMoneyPage() {
     : t('smartMoney.recentNotScanned', '尚未掃描');
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 gap-6 overflow-auto pb-10">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 md:gap-6 overflow-auto pb-20 md:pb-10">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="col-span-12 flex flex-wrap items-end justify-between gap-3">
@@ -441,9 +441,8 @@ export function SmartMoneyPage() {
                   setActiveSymbol(sym.toUpperCase());
                   setSymbolInput('');
                 }}
-                placeholder={t('smartMoney.pageSymbolPlaceholder', '搜尋美股代號，例如 AAPL, NVDA...')}
-                inputClassName="h-6 rounded border border-(--color-term-border) bg-(--color-term-panel) px-2 text-[11px] text-(--color-term-text) outline-none focus:border-(--color-term-accent)"
-                inputStyle={{ width: '180px' }}
+                placeholder={t('smartMoney.pageSymbolPlaceholder', '搜尋美股代號...')}
+                inputClassName="h-6 rounded border border-(--color-term-border) bg-(--color-term-panel) px-2 text-[11px] text-(--color-term-text) outline-none focus:border-(--color-term-accent) w-[110px] sm:w-[180px]"
               />
             </div>
           )}

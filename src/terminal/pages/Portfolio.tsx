@@ -84,7 +84,7 @@ export function PortfolioPage() {
   const plPct = totalInvestedTWD > 0 ? (totalPLTWD / totalInvestedTWD) * 100 : 0;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto md:overflow-hidden pb-8 md:pb-0">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
       <div className="col-span-12 lg:col-span-5 md:min-h-0 shrink-0 md:shrink">
         <EquityPanel history={history} currentEquity={totalEquityTWD} />
       </div>
@@ -323,18 +323,19 @@ export function HoldingsPanel({
       className="h-full"
       bodyClassName="overflow-auto"
     >
-      <table className="w-full text-[12px]">
-        <thead className="sticky top-0 bg-(--color-term-panel) text-[10px] tracking-widest text-(--color-term-muted) z-10">
-          <tr className="border-b border-(--color-term-border)">
-            <th className="px-4 py-3 text-left font-medium">{t('portfolio.symbol', 'Symbol')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.shares', 'Shares')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.cost', 'Avg Cost')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.price', 'Price')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.value', 'Value')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.pnl', 'P/L')}</th>
-            <th className="px-4 py-3 text-center font-medium">{t('portfolio.action', 'Action')}</th>
-          </tr>
-        </thead>
+      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+        <table className="w-full text-[12px]">
+          <thead className="sticky top-0 bg-(--color-term-panel) text-[10px] tracking-widest text-(--color-term-muted) z-10">
+            <tr className="border-b border-(--color-term-border)">
+              <th className="px-4 py-3 text-left font-medium whitespace-nowrap">{t('portfolio.symbol', 'Symbol')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.shares', 'Shares')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.cost', 'Avg Cost')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.price', 'Price')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.value', 'Value')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.pnl', 'P/L')}</th>
+              <th className="px-4 py-3 text-center font-medium whitespace-nowrap">{t('portfolio.action', 'Action')}</th>
+            </tr>
+          </thead>
         <tbody>
           {positions.length === 0 && (
             <tr>
@@ -353,16 +354,16 @@ export function HoldingsPanel({
                 key={h.symbol}
                 className="border-b border-(--color-term-border)/40 hover:bg-white/5 transition-colors group"
               >
-                <td className="px-4 py-3.5 font-bold tracking-wider">
+                <td className="px-4 py-3.5 font-bold tracking-wider whitespace-nowrap">
                   <span className="flex items-center gap-2">
                     <span className={cn('h-2 w-2 rounded-full', sectorColor)} />
                     <div>
                         <div className="text-(--color-term-text)">{h.symbol}</div>
-                        <div className="text-[10px] font-normal text-(--color-term-muted) truncate max-w-[120px]">{h.name}</div>
+                        <div className="text-[10px] font-normal text-(--color-term-muted) truncate max-w-[80px] sm:max-w-[120px]">{h.name}</div>
                     </div>
                   </span>
                 </td>
-                <td className="px-4 py-3.5 text-right tabular-nums">
+                <td className="px-4 py-3.5 text-right tabular-nums whitespace-nowrap">
                   {isEditing ? (
                     <input 
                       className="w-16 h-8 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
@@ -372,7 +373,7 @@ export function HoldingsPanel({
                     />
                   ) : h.shares.toLocaleString(numberLocale)}
                 </td>
-                <td className="px-4 py-3.5 text-right tabular-nums">
+                <td className="px-4 py-3.5 text-right tabular-nums whitespace-nowrap">
                   {isEditing ? (
                     <input 
                       className="w-20 h-8 bg-(--color-term-bg) border border-(--color-term-border) px-1 text-right outline-none focus:border-(--color-term-accent)"
@@ -387,19 +388,19 @@ export function HoldingsPanel({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-right tabular-nums font-medium text-(--color-term-text)">
+                <td className="px-4 py-3.5 text-right tabular-nums font-medium text-(--color-term-text) whitespace-nowrap">
                   <div className="flex flex-col items-end">
                     <span>{h.currency === 'USD' ? (h.currentPrice * usdtwd).toFixed(1) : h.currentPrice.toFixed(1)}</span>
                     {h.currency === 'USD' && <span className="text-[9px] text-(--color-term-muted)">${h.currentPrice.toLocaleString(numberLocale, { maximumFractionDigits: 2 })} USD</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3.5 text-right tabular-nums text-(--color-term-muted)">
+                <td className="px-4 py-3.5 text-right tabular-nums text-(--color-term-muted) whitespace-nowrap">
                   {h.marketValueTWD?.toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
                   <span className="ml-1 text-[10px]">TWD</span>
                 </td>
                 <td
                   className={cn(
-                    'px-4 py-3.5 text-right tabular-nums font-bold',
+                    'px-4 py-3.5 text-right tabular-nums font-bold whitespace-nowrap',
                     toneClass(h.pnlTWD || 0),
                   )}
                 >
@@ -410,7 +411,7 @@ export function HoldingsPanel({
                     </>
                   ) : '---'}
                 </td>
-                <td className="px-4 py-3.5 text-center">
+                <td className="px-4 py-3.5 text-center whitespace-nowrap">
                   <div className="flex items-center justify-center gap-2">
                     {isEditing ? (
                       <>
@@ -444,6 +445,7 @@ export function HoldingsPanel({
           })}
         </tbody>
       </table>
+    </div>
     </Panel>
   );
 }
@@ -535,47 +537,49 @@ export function TradeLogPanel({ trades }: { trades: any[] }) {
     <Panel
       title={t('portfolio.tradeLog', 'Trade History')}
     >
-      <table className="w-full text-[12px]">
-        <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
-          <tr className="border-b border-(--color-term-border)">
-            <th className="px-4 py-3 text-left font-medium">{t('portfolio.executionTime', 'Execution')}</th>
-            <th className="px-4 py-3 text-left font-medium">{t('portfolio.side', 'Side')}</th>
-            <th className="px-4 py-3 text-left font-medium">{t('portfolio.symbol', 'Symbol')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.shares', 'Shares')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.price', 'Price')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('portfolio.total', 'Total')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.length === 0 && (
-            <tr><td colSpan={6} className="py-10 text-center text-(--color-term-muted)">{t('portfolio.noTrades', 'No trade history')}</td></tr>
-          )}
-          {trades.slice(0, 10).map((trade) => (
-            <tr
-              key={trade.id || trade.time + trade.symbol}
-              className="border-b border-(--color-term-border)/40 hover:bg-white/5 transition-colors"
-            >
-              <td className="px-4 py-3 text-(--color-term-muted) tabular-nums">
-                {new Date(trade.time).toLocaleString(numberLocale, { hour12: false })}
-              </td>
-              <td
-                className={cn(
-                  'px-4 py-3 font-bold tracking-widest text-[11px]',
-                  trade.side.toUpperCase() === 'BUY' ? 'text-sky-400' : 'text-rose-400',
-                )}
-              >
-                {trade.side.toUpperCase() === 'BUY' ? t('portfolio.sideBuy', 'BUY') : t('portfolio.sideSell', 'SELL')}
-              </td>
-              <td className="px-4 py-3 font-semibold tracking-wider text-(--color-term-text)">{trade.symbol}</td>
-              <td className="px-4 py-3 text-right tabular-nums">{trade.amount.toLocaleString(numberLocale)}</td>
-              <td className="px-4 py-3 text-right tabular-nums">{trade.price.toFixed(2)}</td>
-              <td className="px-4 py-3 text-right tabular-nums font-semibold text-(--color-term-text)">
-                {(trade.amount * trade.price).toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
-              </td>
+      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+        <table className="w-full text-[12px]">
+          <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
+            <tr className="border-b border-(--color-term-border)">
+              <th className="px-4 py-3 text-left font-medium whitespace-nowrap">{t('portfolio.executionTime', 'Execution')}</th>
+              <th className="px-4 py-3 text-left font-medium whitespace-nowrap">{t('portfolio.side', 'Side')}</th>
+              <th className="px-4 py-3 text-left font-medium whitespace-nowrap">{t('portfolio.symbol', 'Symbol')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.shares', 'Shares')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.price', 'Price')}</th>
+              <th className="px-4 py-3 text-right font-medium whitespace-nowrap">{t('portfolio.total', 'Total')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {trades.length === 0 && (
+              <tr><td colSpan={6} className="py-10 text-center text-(--color-term-muted)">{t('portfolio.noTrades', 'No trade history')}</td></tr>
+            )}
+            {trades.slice(0, 10).map((trade) => (
+              <tr
+                key={trade.id || trade.time + trade.symbol}
+                className="border-b border-(--color-term-border)/40 hover:bg-white/5 transition-colors"
+              >
+                <td className="px-4 py-3 text-(--color-term-muted) tabular-nums whitespace-nowrap">
+                  {new Date(trade.time).toLocaleString(numberLocale, { hour12: false })}
+                </td>
+                <td
+                  className={cn(
+                    'px-4 py-3 font-bold tracking-widest text-[11px] whitespace-nowrap',
+                    trade.side.toUpperCase() === 'BUY' ? 'text-sky-400' : 'text-rose-400',
+                  )}
+                >
+                  {trade.side.toUpperCase() === 'BUY' ? t('portfolio.sideBuy', 'BUY') : t('portfolio.sideSell', 'SELL')}
+                </td>
+                <td className="px-4 py-3 font-semibold tracking-wider text-(--color-term-text) whitespace-nowrap">{trade.symbol}</td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{trade.amount.toLocaleString(numberLocale)}</td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{trade.price.toFixed(2)}</td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-(--color-term-text) whitespace-nowrap">
+                  {(trade.amount * trade.price).toLocaleString(numberLocale, { minimumFractionDigits: 0 })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Panel>
   );
 }

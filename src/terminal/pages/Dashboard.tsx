@@ -43,7 +43,7 @@ export function DashboardPage() {
   } = data;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto md:overflow-hidden pb-8 md:pb-0">
+    <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
       {/* Left column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <WatchlistPanel
@@ -171,69 +171,71 @@ export function WatchlistPanel({
         </form>
       )}
 
-      <table className="w-full text-[12px]">
-        <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
-          <tr className="border-b border-(--color-term-border)">
-            <th className="px-3 py-3 text-left font-medium">{t('dashboard.symbolHeader', 'SYM')}</th>
-            <th className="px-3 py-3 text-right font-medium">{t('dashboard.lastHeader', 'LAST')}</th>
-            <th className="px-3 py-3 text-right font-medium">{t('dashboard.changeHeader', 'CHG%')}</th>
-            <th className="px-3 py-3 text-right font-medium w-8"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const isActive = row.symbol === selected;
-            return (
-              <tr
-                key={row.symbol}
-                onClick={() => onSelect(row.symbol)}
-                className={cn(
-                  'group cursor-pointer border-b border-(--color-term-border)/60 transition-colors',
-                  isActive
-                    ? 'bg-(--color-term-accent)/10 text-(--color-term-accent)'
-                    : 'hover:bg-white/5',
-                )}
-              >
-                <td className="px-3 py-3 font-semibold tracking-wider">
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-2',
-                      isActive && 'border-l-2 border-(--color-term-accent) pl-2 -ml-2',
-                    )}
-                  >
-                    <span className="flex flex-col leading-tight">
-                      <span>{row.symbol}</span>
-                      {row.name && /\.(TW|TWO)$/i.test(row.symbol) && (
-                        <span className="text-[10px] font-normal text-(--color-term-muted) tracking-normal">
-                          {row.name}
-                        </span>
+      <div className="overflow-x-auto w-full scrollbar-thin">
+        <table className="w-full text-[12px]">
+          <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
+            <tr className="border-b border-(--color-term-border)">
+              <th className="px-3 py-3 text-left font-medium whitespace-nowrap">{t('dashboard.symbolHeader', 'SYM')}</th>
+              <th className="px-3 py-3 text-right font-medium whitespace-nowrap">{t('dashboard.lastHeader', 'LAST')}</th>
+              <th className="px-3 py-3 text-right font-medium whitespace-nowrap">{t('dashboard.changeHeader', 'CHG%')}</th>
+              <th className="px-3 py-3 text-right font-medium w-8 whitespace-nowrap"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const isActive = row.symbol === selected;
+              return (
+                <tr
+                  key={row.symbol}
+                  onClick={() => onSelect(row.symbol)}
+                  className={cn(
+                    'group cursor-pointer border-b border-(--color-term-border)/60 transition-colors',
+                    isActive
+                      ? 'bg-(--color-term-accent)/10 text-(--color-term-accent)'
+                      : 'hover:bg-white/5',
+                  )}
+                >
+                  <td className="px-3 py-3 font-semibold tracking-wider whitespace-nowrap">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-2',
+                        isActive && 'border-l-2 border-(--color-term-accent) pl-2 -ml-2',
                       )}
+                    >
+                      <span className="flex flex-col leading-tight">
+                        <span>{row.symbol}</span>
+                        {row.name && /\.(TW|TWO)$/i.test(row.symbol) && (
+                          <span className="text-[10px] font-normal text-(--color-term-muted) tracking-normal truncate max-w-[80px] sm:max-w-[120px] block">
+                            {row.name}
+                          </span>
+                        )}
+                      </span>
                     </span>
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-right tabular-nums">
-                  {row.last > 0 ? formatFixedLocale(row.last, numberLocale) : '—'}
-                </td>
-                <td className={cn('px-3 py-3 text-right tabular-nums', toneClass(row.changePct))}>
-                  {formatPct(row.changePct)}
-                </td>
-                <td className="px-3 py-3 text-right">
-                   <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(t('dashboard.removeSymbolConfirm', 'Remove {{symbol}}?', { symbol: row.symbol }))) onDelete(row.symbol);
-                    }}
-                    className="focus-ring opacity-0 group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
-                   >
-                     <Trash2 className="h-3.5 w-3.5" />
-                   </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">
+                    {row.last > 0 ? formatFixedLocale(row.last, numberLocale) : '—'}
+                  </td>
+                  <td className={cn('px-3 py-3 text-right tabular-nums whitespace-nowrap', toneClass(row.changePct))}>
+                    {formatPct(row.changePct)}
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                     <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(t('dashboard.removeSymbolConfirm', 'Remove {{symbol}}?', { symbol: row.symbol }))) onDelete(row.symbol);
+                      }}
+                      className="focus-ring opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
+                     >
+                       <Trash2 className="h-3.5 w-3.5" />
+                     </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Panel>
   );
 }
@@ -485,26 +487,26 @@ export function SelectedChartPanel({
       </header>
 
       {/* OHLC summary bar */}
-      <div className="flex items-center justify-between px-3 py-2 text-[11px] text-(--color-term-muted)">
-        <div className="flex gap-4 tabular-nums">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2 text-[10px] sm:text-[11px] text-(--color-term-muted)">
+        <div className="flex flex-wrap gap-2.5 sm:gap-4 tabular-nums">
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcOpen', 'O')}</span>
+            <span className="text-(--color-term-muted)/70 mr-0.5">{t('dashboard.ohlcOpen', 'O')}</span>
             <span className="text-(--color-term-text)">{formatFixedLocale(open, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcHigh', 'H')}</span>
+            <span className="text-(--color-term-muted)/70 mr-0.5">{t('dashboard.ohlcHigh', 'H')}</span>
             <span className="text-(--color-term-text)">{formatFixedLocale(high, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcLow', 'L')}</span>
+            <span className="text-(--color-term-muted)/70 mr-0.5">{t('dashboard.ohlcLow', 'L')}</span>
             <span className="text-(--color-term-text)">{formatFixedLocale(low, numberLocale)}</span>
           </span>
           <span>
-            <span className="text-(--color-term-muted)/70 mr-1">{t('dashboard.ohlcClose', 'C')}</span>
+            <span className="text-(--color-term-muted)/70 mr-0.5">{t('dashboard.ohlcClose', 'C')}</span>
             <span className="text-(--color-term-text)">{formatFixedLocale(close, numberLocale)}</span>
           </span>
         </div>
-        <span className={toneClass(changeAbs)}>
+        <span className={cn(toneClass(changeAbs), "whitespace-nowrap font-mono")}>
           {`${changeAbs > 0 ? '+' : ''}${formatFixedLocale(Math.abs(changeAbs), numberLocale)} (${formatPct(changePct)})`}
         </span>
       </div>
