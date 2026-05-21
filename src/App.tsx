@@ -91,8 +91,13 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-(--color-term-bg)">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-(--color-term-accent) border-t-transparent" />
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-(--color-term-bg)">
+        <div className="relative h-10 w-10">
+          <span className="absolute inset-0 rounded-full border-2 border-(--color-term-accent)/15" />
+          <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-(--color-term-accent) animate-spin" />
+          <span className="absolute inset-2 rounded-full border border-(--color-term-accent)/10 animate-pulse" />
+        </div>
+        <span className="text-[10px] tracking-[0.3em] text-(--color-term-muted)/50 font-mono animate-pulse">INITIALIZING</span>
       </div>
     );
   }

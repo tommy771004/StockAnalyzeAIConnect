@@ -20,7 +20,7 @@
 
   /* ── Typography ──────────────────────────────────────────────────── */
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
@@ -46,10 +46,6 @@ body {
 }
 
 /* ── CRT Scan-line Texture ─────────────────────────────────────────── */
-/*
- * Subtle horizontal scan-line overlay applied to the app root.
- * Uses a pseudo-element so it doesn't interfere with z-index of content.
- */
 #root::before {
   content: '';
   position: fixed;
@@ -59,9 +55,9 @@ body {
   background: repeating-linear-gradient(
     0deg,
     transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.08) 2px,
-    rgba(0, 0, 0, 0.08) 4px
+    transparent 3px,
+    rgba(0, 0, 0, 0.04) 3px,
+    rgba(0, 0, 0, 0.04) 4px
   );
   mix-blend-mode: multiply;
 }
@@ -71,30 +67,70 @@ body {
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
   background: var(--color-term-border-strong);
-  border-radius: 2px;
+  border-radius: 4px;
 }
 *::-webkit-scrollbar-thumb:hover { background: var(--color-term-subtle); }
 
 /* ── Grid Lines Helper ─────────────────────────────────────────────── */
 .term-grid-lines {
   background-image:
-    linear-gradient(to right,  rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(to right,  rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
   background-size: 40px 40px;
+}
+
+/* ── Glass Panel ───────────────────────────────────────────────────── */
+/*
+ * Glassmorphism panel with top-edge highlight to simulate glass refraction.
+ * Apply to panel containers that need depth.
+ */
+.glass-panel {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 40%
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* ── Terminal Glow Text ────────────────────────────────────────────── */
 .term-glow {
-  text-shadow: 0 0 8px var(--color-term-accent);
+  text-shadow: 0 0 10px var(--color-term-accent), 0 0 20px var(--color-term-accent)/40;
 }
 .term-glow-cyan {
-  text-shadow: 0 0 8px var(--color-term-positive);
+  text-shadow: 0 0 10px var(--color-term-positive), 0 0 20px var(--color-term-positive)/40;
 }
 
 /* ── Accent Border Glow ────────────────────────────────────────────── */
 .panel-glow-accent {
-  box-shadow: 0 0 0 1px var(--color-term-accent)/20,
-              0 0 12px -2px var(--color-term-accent)/15;
+  box-shadow:
+    0 0 0 1px var(--color-term-accent)/20,
+    0 0 16px -4px var(--color-term-accent)/20,
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.panel-glow-cyan {
+  box-shadow:
+    0 0 0 1px var(--color-term-positive)/20,
+    0 0 16px -4px var(--color-term-positive)/15,
+    inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 /* ── Mobile safe-area bottom padding utility ───────────────────────── */
@@ -108,13 +144,7 @@ body {
   color: var(--color-term-bg);
 }
 
-/* ── View Transitions ────────────────────────────────────────────── */
-:root {
-  --duration-exit: 150ms;
-  --duration-enter: 210ms;
-  --duration-move: 400ms;
-}
-
+/* ── Animations ────────────────────────────────────────────────────── */
 @keyframes fade {
   from { filter: blur(3px); opacity: 0; }
   to { filter: blur(0); opacity: 1; }
@@ -128,6 +158,47 @@ body {
 @keyframes slide-y {
   from { transform: translateY(var(--slide-y-offset, 10px)); }
   to { transform: translateY(0); }
+}
+
+/* Shimmer sweep — apply to buttons/badges for premium feel */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.shimmer-btn {
+  background-image: linear-gradient(
+    90deg,
+    transparent 25%,
+    rgba(255,255,255,0.15) 50%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+/* Pulse glow — for active status indicators */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px var(--glow-color, theme(colors.emerald.500)); }
+  50%       { box-shadow: 0 0 8px 3px var(--glow-color, theme(colors.emerald.500)); }
+}
+
+.pulse-glow-green {
+  --glow-color: #10b981;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Slide indicator — the bottom-bar on active tabs */
+@keyframes slide-indicator {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ── View Transitions ────────────────────────────────────────────── */
+:root {
+  --duration-exit: 150ms;
+  --duration-enter: 210ms;
+  --duration-move: 400ms;
 }
 
 ::view-transition-old(.fade-out) {
@@ -199,6 +270,9 @@ body {
   ::view-transition-group(*) {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
+  }
+  .shimmer-btn {
+    animation: none;
   }
 }
 

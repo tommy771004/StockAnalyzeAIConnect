@@ -66,7 +66,9 @@ export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }:
 
   if (items.length === 0) {
     return (
-      <div className="flex h-9 items-center border-b border-(--color-term-border) bg-(--color-term-bg) px-5">
+      <div className="flex h-10 items-center border-b border-(--color-term-border) px-5"
+        style={{ background: 'linear-gradient(180deg, rgba(8,11,16,0.98) 0%, rgba(10,14,22,1) 100%)' }}
+      >
         <span className="text-[11px] text-(--color-term-muted) animate-pulse tracking-widest">
           {t('market.loading', 'LOADING...')}
         </span>
@@ -77,7 +79,10 @@ export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }:
   const displayed = [...items, ...items];
 
   return (
-    <div className="relative flex h-9 items-center border-b border-(--color-term-border) bg-(--color-term-bg)">
+    <div
+      className="relative flex h-10 items-center border-b border-(--color-term-border)"
+      style={{ background: 'linear-gradient(180deg, rgba(8,11,16,0.98) 0%, rgba(10,14,22,1) 100%)', boxShadow: 'inset 0 -1px 0 rgba(245,158,11,0.04)' }}
+    >
       {/* Manage button — icon-only, requires aria-label */}
       <button
         type="button"
@@ -85,10 +90,10 @@ export function TickerTape({ items, onSelect, onSymbolsChange, changedSymbols }:
         aria-label={t('ticker.manage')}
         aria-expanded={showManager}
         className={cn(
-          'shrink-0 flex items-center justify-center h-full px-2.5 border-r border-(--color-term-border) transition-opacity z-20',
+          'shrink-0 flex items-center justify-center h-full px-3 border-r border-(--color-term-border)/70 transition-all z-20',
           showManager
-            ? 'text-(--color-term-accent) bg-(--color-term-accent)/5'
-            : 'text-(--color-term-muted) hover:text-(--color-term-accent)'
+            ? 'text-(--color-term-accent) bg-(--color-term-accent)/8'
+            : 'text-(--color-term-muted) hover:text-(--color-term-accent) hover:bg-(--color-term-accent)/5'
         )}
       >
         <Settings2 size={13} aria-hidden="true" />
@@ -221,19 +226,19 @@ function TickerChip({
       type="button"
       onClick={() => isClickable && onSelect?.(item.symbol)}
       className={cn(
-        'flex items-center gap-1 px-3 h-full text-[11px] border-r border-(--color-term-border)/20 transition-colors shrink-0',
-        isClickable ? 'cursor-pointer hover:bg-white/5' : 'cursor-default',
+        'flex items-center gap-1.5 px-3.5 h-full text-[12px] border-r border-(--color-term-border)/15 transition-colors shrink-0',
+        isClickable ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default',
         flashClass,
       )}
     >
-      <span className={cn('text-[8px] leading-none', dotColor)}>{dot}</span>
-      <span className="font-bold tracking-wide text-(--color-term-text) mr-0.5">{item.label}</span>
-      <span className="font-mono text-(--color-term-muted) tabular-nums">{item.value}</span>
-      <span className={cn('font-mono font-bold tabular-nums', toneClass(item.changePct))}>
+      <span className={cn('text-[9px] leading-none shrink-0', dotColor)}>{dot}</span>
+      <span className="font-bold tracking-wide text-(--color-term-text)/90 mr-0.5">{item.label}</span>
+      <span className="font-mono text-(--color-term-text)/60 tabular-nums">{item.value}</span>
+      <span className={cn('font-mono font-bold tabular-nums text-[11.5px]', toneClass(item.changePct))}>
         {formatPct(item.changePct)}
       </span>
       {absDisplay ? (
-        <span className={cn('font-mono tabular-nums text-[10px] opacity-65', toneClass(item.changePct))}>
+        <span className={cn('font-mono tabular-nums text-[10px] opacity-60', toneClass(item.changePct))}>
           {absDisplay}
         </span>
       ) : null}
@@ -287,7 +292,14 @@ function TickerManager({
   };
 
   return (
-    <div className="absolute left-0 top-full z-[80] mt-px w-[340px] max-w-[calc(100vw-8px)] bg-(--color-term-panel) border border-(--color-term-border) shadow-2xl shadow-black/40">
+    <div
+      className="absolute left-0 top-full z-[80] mt-1 w-[340px] max-w-[calc(100vw-8px)] border border-(--color-term-border-strong) shadow-2xl rounded-sm overflow-hidden"
+      style={{
+        background: 'linear-gradient(180deg, rgba(14,20,32,0.99) 0%, rgba(10,14,22,1) 100%)',
+        backdropFilter: 'blur(20px)',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(245,158,11,0.1)',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border)">
         <span className="text-[11px] font-bold tracking-widest text-(--color-term-accent) uppercase">

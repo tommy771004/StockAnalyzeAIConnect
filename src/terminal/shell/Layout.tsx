@@ -98,6 +98,8 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
     setCustomSymbols(symbols);
   }, []);
 
+
+
   return (
     <div className="flex h-dvh w-screen flex-col bg-(--color-term-bg) text-(--color-term-text) overflow-hidden">
       {/* Top navigation */}
@@ -147,8 +149,13 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
 
       {/* Mobile Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-(--color-term-border) bg-(--color-term-bg)"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-(--color-term-border)/70"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          background: 'linear-gradient(0deg, rgba(8,11,16,0.99) 0%, rgba(10,14,22,0.98) 100%)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 -4px 24px rgba(0,0,0,0.4)',
+        }}
       >
         {BOTTOM_NAV_IDS.map((item) => {
           const isActive = active === item.id;
@@ -159,17 +166,27 @@ export function Layout({ active, onChange, searchPlaceholder, children }: Layout
               aria-label={t(item.labelKey)}
               onClick={() => onChange(item.id)}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors relative',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] transition-all relative',
                 isActive
                   ? 'text-(--color-term-accent)'
                   : 'text-(--color-term-muted)',
               )}
             >
-              {item.icon}
-              <span>{t(item.labelKey)}</span>
+              {/* Active top indicator */}
               {isActive && (
-                <span className="absolute top-0 left-0 right-0 h-[2px] bg-(--color-term-accent)" aria-hidden="true" />
+                <span
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-b-full"
+                  style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.6), #f59e0b, rgba(245,158,11,0.6))' }}
+                  aria-hidden="true"
+                />
               )}
+              {/* Icon with optional glow */}
+              <span
+                className={cn('transition-all', isActive && 'drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]')}
+              >
+                {item.icon}
+              </span>
+              <span className={cn('tracking-wide', isActive && 'font-semibold')}>{t(item.labelKey)}</span>
             </button>
           );
         })}

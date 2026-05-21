@@ -276,18 +276,21 @@ export function TopMoversPanel({
         {loading && rows.length === 0 ? (
           <li className="px-3 py-4 text-center text-[11px] text-(--color-term-muted)">{t('common.loading')}</li>
         ) : (
-          rows.map((m) => (
+        rows.map((m) => (
             <li 
               key={m.symbol} 
               onClick={() => onSelect(m.symbol)}
-              className="flex items-center justify-between px-3 py-3 text-[12px] hover:bg-white/5 cursor-pointer transition-colors group/mover"
+              className="flex items-center justify-between px-3 py-3 text-[12px] cursor-pointer transition-all group/mover hover:bg-white/[0.04]"
             >
               <span className="flex items-center gap-2">
                 <span
                   className={cn(
-                    'h-1.5 w-1.5 shrink-0 rounded-full',
-                    m.changePct >= 0 ? 'bg-(--color-term-positive)' : 'bg-(--color-term-negative)',
+                    'h-2 w-2 shrink-0 rounded-full transition-all',
+                    m.changePct >= 0 ? 'bg-emerald-400' : 'bg-rose-400',
                   )}
+                  style={{
+                    boxShadow: m.changePct >= 0 ? '0 0 6px rgba(52,211,153,0.6)' : '0 0 6px rgba(248,113,113,0.6)',
+                  }}
                 />
                 <span className="flex flex-col leading-tight">
                   <span className="font-semibold tracking-wider group-hover/mover:text-(--color-term-accent) transition-colors">{m.symbol}</span>
@@ -296,7 +299,7 @@ export function TopMoversPanel({
                   )}
                 </span>
               </span>
-              <span className={`${toneClass(m.changePct)} tabular-nums`}>
+              <span className={`${toneClass(m.changePct)} tabular-nums font-bold`}>
                 {formatPct(m.changePct, 1)}
               </span>
             </li>
@@ -376,30 +379,38 @@ export function HeatCell({
 }) {
   const { t } = useTranslation();
   const isDummy = cell.symbol === '--';
-  const shade = isDummy 
-    ? 'bg-zinc-800/20' 
+  const shade = isDummy
+    ? 'bg-white/[0.02]'
     : cell.changePct > 0.8
-      ? 'bg-emerald-700/80 hover:bg-emerald-700 active:scale-[0.98]'
+      ? 'bg-emerald-700/70 hover:bg-emerald-600/80 active:scale-[0.97]'
       : cell.changePct > 0
-        ? 'bg-emerald-800/70 hover:bg-emerald-800 active:scale-[0.98]'
+        ? 'bg-emerald-800/60 hover:bg-emerald-700/70 active:scale-[0.97]'
         : cell.changePct < -0.8
-          ? 'bg-rose-700/80 hover:bg-rose-700 active:scale-[0.98]'
+          ? 'bg-rose-700/70 hover:bg-rose-600/80 active:scale-[0.97]'
           : cell.changePct < 0
-            ? 'bg-rose-800/70 hover:bg-rose-800 active:scale-[0.98]'
-            : 'bg-zinc-700/70 hover:bg-zinc-700 active:scale-[0.98]';
+            ? 'bg-rose-800/60 hover:bg-rose-700/70 active:scale-[0.97]'
+            : 'bg-zinc-700/40 hover:bg-zinc-600/50 active:scale-[0.97]';
+  const glowColor = isDummy ? '' :
+    cell.changePct > 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
+
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-between p-2 text-white/90',
+        'flex flex-col items-center justify-between p-2 text-white/90 rounded-md transition-all duration-200 relative overflow-hidden',
+        !isDummy && 'cursor-pointer',
         shade,
         className,
       )}
+      onClick={() => !isDummy && onSelect(cell.symbol)}
+      style={glowColor ? { boxShadow: `inset 0 0 20px ${glowColor}, 0 0 0 1px rgba(255,255,255,0.06)` } : undefined}
     >
-      <span className={cn('font-bold tracking-widest text-[#e2e8f0]', size === 'lg' ? 'text-[14px]' : 'text-[11px]')}>
+      {/* Top highlight line */}
+      <span className="absolute inset-x-0 top-0 h-px bg-white/10 pointer-events-none" />
+      <span className={cn('font-bold tracking-widest relative z-10', size === 'lg' ? 'text-[14px]' : 'text-[11.5px]')}>
         {cell.symbol}
       </span>
       {!isDummy && (
-        <span className={cn('font-medium', size === 'lg' ? 'text-[13px]' : 'text-[10px]')}>
+        <span className={cn('font-medium relative z-10', size === 'lg' ? 'text-[13px]' : 'text-[10.5px]')}>
           {formatPct(cell.changePct)}
         </span>
       )}
@@ -708,26 +719,38 @@ export function QuickTradePanel({ symbol, price }: { symbol: string; price: numb
             onClick={() => { setSide('buy'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'focus-ring border border-sky-300/50 bg-sky-300/20 py-3 text-[12px] font-semibold tracking-widest text-sky-200 motion-safe:transition-colors',
+              'focus-ring relative overflow-hidden py-3 text-[12px] font-bold tracking-widest transition-all rounded-sm',
+              'border border-sky-400/50 bg-sky-400/15 text-sky-200',
               status === 'submitting' && side === 'buy'
                 ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-sky-300/30',
+                : 'hover:bg-sky-400/25 hover:border-sky-400/70 hover:shadow-[0_0_12px_rgba(56,189,248,0.25)]',
             )}
           >
-            {status === 'submitting' && side === 'buy' ? '…' : t('dashboard.buy', 'BUY')}
+            {status !== 'submitting' && (
+              <span className="absolute inset-0 shimmer-btn opacity-50 pointer-events-none" />
+            )}
+            <span className="relative z-10">
+              {status === 'submitting' && side === 'buy' ? '…' : t('dashboard.buy', 'BUY')}
+            </span>
           </button>
           <button
             type="button"
             onClick={() => { setSide('sell'); handleTrade(); }}
             disabled={status === 'submitting'}
             className={cn(
-              'focus-ring border border-rose-300/50 bg-rose-300/20 py-3 text-[12px] font-semibold tracking-widest text-rose-200 motion-safe:transition-colors',
+              'focus-ring relative overflow-hidden py-3 text-[12px] font-bold tracking-widest transition-all rounded-sm',
+              'border border-rose-400/50 bg-rose-400/15 text-rose-200',
               status === 'submitting' && side === 'sell'
                 ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-rose-300/30',
+                : 'hover:bg-rose-400/25 hover:border-rose-400/70 hover:shadow-[0_0_12px_rgba(251,113,133,0.25)]',
             )}
           >
-            {status === 'submitting' && side === 'sell' ? '…' : t('dashboard.sell', 'SELL')}
+            {status !== 'submitting' && (
+              <span className="absolute inset-0 shimmer-btn opacity-50 pointer-events-none" />
+            )}
+            <span className="relative z-10">
+              {status === 'submitting' && side === 'sell' ? '…' : t('dashboard.sell', 'SELL')}
+            </span>
           </button>
         </div>
       </div>
