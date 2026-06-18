@@ -162,13 +162,15 @@ export function LoginPage() {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden flex flex-col gap-1.5"
               >
-                <label className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
+                <label htmlFor="login-name" className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
                   {t('auth.operatorId', 'OPERATOR_ID')}
                 </label>
                 <div className="relative">
-                  <Cpu className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-subtle)" />
+                  <Cpu className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-term-subtle)" aria-hidden="true" />
                   <input
+                    id="login-name"
                     type="text"
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={t('auth.namePlaceholder', 'Enter handle...')}
@@ -188,18 +190,21 @@ export function LoginPage() {
 
           {/* Email */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
+            <label htmlFor="login-email" className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
               {t('auth.accessCoord', 'ACCESS_COORD (EMAIL)')}
             </label>
             <div className="relative">
               <Network
+                aria-hidden="true"
                 className={cn(
                   'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors duration-200',
                   emailFocused ? 'text-(--color-term-accent)' : 'text-(--color-term-subtle)',
                 )}
               />
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t('auth.emailPlaceholder', 'sys.operator@fin.local')}
@@ -217,18 +222,21 @@ export function LoginPage() {
 
           {/* Password */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
+            <label htmlFor="login-password" className="text-[10px] tracking-widest text-(--color-term-muted) font-sans font-semibold">
               {t('auth.securityKey', 'SECURITY_KEY')}
             </label>
             <div className="relative">
               <Database
+                aria-hidden="true"
                 className={cn(
                   'absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors duration-200',
                   passFocused ? 'text-(--color-term-accent)' : 'text-(--color-term-subtle)',
                 )}
               />
               <input
+                id="login-password"
                 type="password"
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -293,10 +301,10 @@ export function LoginPage() {
         </form>
 
         {/* Bottom corner decorators */}
-        <span className="absolute bottom-3 left-3 text-[8px] tracking-widest text-(--color-term-accent)/20 font-mono select-none">
+        <span aria-hidden="true" className="absolute bottom-3 left-3 text-[8px] tracking-widest text-(--color-term-accent)/20 font-mono select-none">
           SYS:READY
         </span>
-        <span className="absolute bottom-3 right-3 text-[8px] tracking-widest text-(--color-term-muted)/20 font-mono select-none">
+        <span aria-hidden="true" className="absolute bottom-3 right-3 text-[8px] tracking-widest text-(--color-term-muted)/20 font-mono select-none">
           v3.0.0
         </span>
       </motion.div>

@@ -152,10 +152,11 @@ export function SettingsPage() {
         <Panel title={t('settings.aiIntegration')} icon={<Key className="h-4 w-4" />} collapsible className="md:col-span-2">
           <div className="p-4 space-y-6">
             <div>
-              <label className="text-[11px] text-(--color-term-muted) uppercase tracking-widest block mb-2">
+              <label htmlFor="openrouter-api-key" className="text-[11px] text-(--color-term-muted) uppercase tracking-widest block mb-2">
                 {t('settings.apiKey')}
               </label>
               <input
+                id="openrouter-api-key"
                 type="password"
                 value={settings.OPENROUTER_API_KEY}
                 onChange={e => setSettings({ ...settings, OPENROUTER_API_KEY: e.target.value })}
@@ -172,18 +173,22 @@ export function SettingsPage() {
                 <div className="text-sm font-medium">{t('settings.notifications')}</div>
                 <div className="text-xs text-(--color-term-muted)">{t('settings.notificationsDesc')}</div>
               </div>
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.NOTIFICATION_ENABLED}
+                aria-label={t('settings.notifications')}
+                onClick={() => setSettings({ ...settings, NOTIFICATION_ENABLED: !settings.NOTIFICATION_ENABLED })}
                 className={cn(
-                  'w-10 h-5 rounded-full relative cursor-pointer transition-colors',
+                  'focus-ring w-10 h-5 rounded-full relative cursor-pointer transition-colors shrink-0',
                   settings.NOTIFICATION_ENABLED ? 'bg-sky-500' : 'bg-zinc-700',
                 )}
-                onClick={() => setSettings({ ...settings, NOTIFICATION_ENABLED: !settings.NOTIFICATION_ENABLED })}
               >
-                <div className={cn(
+                <span className={cn(
                   'absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform',
                   settings.NOTIFICATION_ENABLED ? 'translate-x-5' : 'translate-x-0',
                 )} />
-              </div>
+              </button>
             </div>
           </div>
         </Panel>

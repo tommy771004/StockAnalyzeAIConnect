@@ -320,7 +320,7 @@ export function AutoTradingPage() {
           ariaLabel={t('autotrading.layout.resizeSidebar', '調整側欄寬度')}
         />
 
-        {isMobileDrawerOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsMobileDrawerOpen(false)} />}
+        {isMobileDrawerOpen && <div aria-hidden="true" className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsMobileDrawerOpen(false)} />}
         {/* Right sidebar */}
         <div
           className={`autotrading-sidebar flex flex-col gap-2 overflow-y-auto shrink-0 bg-(--color-term-surface) p-4 lg:p-0 lg:bg-transparent fixed lg:relative inset-y-0 right-0 z-50 transition-transform ${isMobileDrawerOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}
