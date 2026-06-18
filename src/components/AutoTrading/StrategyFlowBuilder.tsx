@@ -125,7 +125,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
               <div className="text-[10px] font-mono text-violet-400">{intensity}% {t('autotrading.strategyFlow.match', 'Match')}</div>
             </div>
             
-            {/* AI Threshold Slider Slider */}
+            {/* AI Threshold Slider */}
             <div className="space-y-3">
               <div className="flex justify-between text-[9px] text-white/40 uppercase">
                  <span>{t('autotrading.strategyFlow.confidenceThreshold', 'Confidence Threshold')}</span>
