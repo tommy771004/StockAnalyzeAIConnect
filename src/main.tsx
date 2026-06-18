@@ -6,8 +6,10 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import './i18n';
 import './styles.css';
 
 // Electron production loads via file:// — BrowserRouter's history API doesn't work there.
@@ -34,7 +36,9 @@ ReactDOM.createRoot(rootEl).render(
             <SettingsProvider>
               <SubscriptionProvider>
                 <ToastProvider>
-                  <App />
+                  <ConfirmProvider>
+                    <App />
+                  </ConfirmProvider>
                 </ToastProvider>
               </SubscriptionProvider>
             </SettingsProvider>

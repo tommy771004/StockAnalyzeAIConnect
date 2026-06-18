@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Plus, Edit2, Trash2, Check, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
@@ -280,6 +281,7 @@ export function HoldingsPanel({
   usdtwd: number
 }) {
   const { t, i18n } = useTranslation();
+  const confirm = useConfirm();
   const numberLocale = getNumberLocale(i18n.language);
   const [editingSym, setEditingSym] = useState<string | null>(null);
   const [editBuf, setEditBuf] = useState<any>(null);
@@ -431,7 +433,7 @@ export function HoldingsPanel({
                           <Edit2 size={15} />
                         </button>
                         <button
-                          onClick={() => { if(confirm(t('portfolio.deleteConfirm', 'Delete {{symbol}} position?', { symbol: h.symbol }))) onDelete(h.symbol); }}
+                          onClick={async () => { if (await confirm({ message: t('portfolio.deleteConfirm', 'Delete {{symbol}} position?', { symbol: h.symbol }), confirmLabel: t('common.delete', 'Delete'), destructive: true })) onDelete(h.symbol); }}
                           className="focus-ring text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
                           <Trash2 size={15} />

@@ -16,7 +16,24 @@
 | P1-2 | 統一主色為琥珀 | Settings 全數 `sky-*` → `--color-term-accent`（Save／Contact／Edit／PRO 徽章／通知開關／輸入框 focus）；Backtest「開始回測 RUN」`indigo-500` → `--color-term-accent`。見 `screenshots/after-settings-amber.png`、`after-backtest-amber.png`。 |
 | P2-1 | 對齊側欄圖示 | `Sidebar` dashboard `Star`→`LayoutDashboard`、market `CalendarDays`→`Globe`，與底部導覽一致且語意正確。 |
 
-> 驗證：`VERCEL=1 npm run build` ✅；4 項皆以 Playwright 重新截圖確認。其餘 P2/P3 建議（alert→toast、補 `<h1>`、Backtest i18n、ARIA combobox、`<html lang>` 同步等）維持為建議。
+> 驗證：`VERCEL=1 npm run build` ✅；4 項皆以 Playwright 重新截圖確認。
+
+### 第三階段（後續實作，依序）
+
+經使用者「繼續依序執行」指示，再完成下列剩餘建議：
+
+| 原編號 | 項目 | 實作 |
+|---|---|---|
+| P2-3 | alert/prompt/confirm → toast / 自訂對話框 | Settings 存檔/更新改用 `toast()`；改名改成**行內編輯**（取代 `prompt()`，見 `screenshots/after-settings-inline-edit.png`）。新增 promise 版 `useConfirm()`（`src/contexts/ConfirmContext.tsx`，`role="alertdialog"`、Esc/背景關閉、focus 管理），Dashboard 移除自選股、Portfolio 刪除持倉改用它取代原生 `confirm()`。 |
+| P2-4 | 多頁補 `<h1>` | Dashboard / Market / Crypto / Research / AutoTrading 補上 `<h1 class="sr-only">`（視覺隱藏、不改版面），修正標題大綱「從 h2 起跳」。 |
+| P2-5 | Backtest `--md-*` 變數 | 在 `styles.css` 定義 `--md-*`（11 個）、`--color-up/down`、`--font-data`，對映到終端機調色盤，修掉回測結果視圖的未定義變數色彩 bug。**註**：該頁大量寫死繁中字串的完整 i18n 化屬大型重構，風險高，**留待獨立處理**。 |
+| P2-6 | 搜尋 ARIA combobox | TopNav 搜尋框補 `role="combobox"` + `aria-expanded`/`aria-controls`/`aria-activedescendant`；下拉 `role="listbox"`、每筆 `role="option"` + `aria-selected`。 |
+| P3-1 | 未選取分頁對比 | `text-(--color-term-text)/50` → `/70`（hover `/80`→`/90`）。 |
+| P3-6 | 清除 dead code | 移除未被引用的 `components/SentimentPage.tsx`、`Simulator.tsx`、`Alerts.tsx`（皆使用未定義 `--card-bg`/`--border-color`）。 |
+
+> **更正**：P3-3（`<html lang>` 隨語言更新）原報告誤判——`src/i18n.ts` 早已在 `languageChanged` 事件同步 `document.documentElement` 的 `lang`，**無需修改**（先前 grep 用詞不精確造成的假陰性）。順帶在 `main.tsx` 明確 `import './i18n'` 以保證啟動即初始化。
+
+> 驗證：`VERCEL=1 npm run build` ✅（無新增錯誤）；h1/行內編輯/combobox 以 Playwright DOM 斷言確認，掛載零 runtime error。仍為建議：Backtest 字串 i18n、Settings 桌機右欄留白（P3-4）、行動寬表格捲動提示（P3-5）。
 
 ---
 

@@ -26,6 +26,29 @@
 /* ── Base ──────────────────────────────────────────────────────────── */
 :root {
   color-scheme: dark;
+
+  /* ── Legacy compatibility tokens ─────────────────────────────────────
+   * The backtest module (components/backtest/*) was built against an older
+   * Material-style palette and a data font that the current terminal theme
+   * never defined, so those var() lookups resolved to nothing. Map them onto
+   * the terminal palette so the backtest results view renders correctly.
+   * --color-up/down follow the Asian convention (up = red, down = green),
+   * matching the inline rgba hints in PriceForecastPanel. */
+  --font-data:                  var(--font-mono);
+  --color-up:                   #ff4d4f;  /* red — bullish (Asian convention) */
+  --color-down:                 #52c41a;  /* green — bearish (Asian convention) */
+
+  --md-primary:                 #f59e0b;  /* amber — unified primary */
+  --md-on-primary:              #080b10;
+  --md-primary-container:       #1d2738;
+  --md-tertiary:                #22d3ee;
+  --md-error:                   #f87171;
+  --md-surface-container:       #0c1018;
+  --md-surface-container-high:  #0e1420;
+  --md-outline:                 #253040;
+  --md-outline-variant:         #192030;
+  --md-on-surface:              #dde2e8;
+  --md-on-surface-variant:      #7e8a9c;
 }
 
 html,
