@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, FileText, Info, TrendingDown, TrendingUp } from 'lucide-react';
 import type { BacktestTrade } from '../../types';
 import type { BacktestStrategyMeta } from '../../utils/backtest';
@@ -20,6 +21,7 @@ export function BacktestTradesSection({
   onTradeSortChange,
   onExportCSV,
 }: BacktestTradesSectionProps) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <div className="lg:col-span-1 glass-card rounded-[2rem] p-8 space-y-8 relative overflow-hidden">
@@ -28,30 +30,30 @@ export function BacktestTradesSection({
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(128,131,255,0.1)', border: '1px solid rgba(128,131,255,0.25)', color: 'var(--md-primary)' }}>
             <Info size={16} />
           </div>
-          策略邏輯回顧
+          {t('backtestEngine.trade.logicReview', '策略邏輯回顧')}
         </h3>
         <div className="space-y-6">
           <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(82,196,26,0.04)', border: '1px solid rgba(82,196,26,0.12)' }}>
             <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-down)' }}>
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-down)' }} />
-              買進觸發
+              {t('backtestEngine.trade.buyTrigger', '買進觸發')}
             </div>
-            <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{resultStrat.buyDesc}</div>
+            <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{t(`backtestEngine.strategy.${resultStrat.id}.buyDesc`, resultStrat.buyDesc)}</div>
           </div>
           <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(255,77,79,0.04)', border: '1px solid rgba(255,77,79,0.12)' }}>
             <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-up)' }}>
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-up)' }} />
-              賣出觸發
+              {t('backtestEngine.trade.sellTrigger', '賣出觸發')}
             </div>
-            <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{resultStrat.sellDesc}</div>
+            <div className="text-xs leading-relaxed font-medium" style={{ color: 'var(--md-on-surface-variant)' }}>{t(`backtestEngine.strategy.${resultStrat.id}.sellDesc`, resultStrat.sellDesc)}</div>
           </div>
           <div className="p-5 rounded-2xl transition-colors" style={{ background: 'rgba(255,183,131,0.05)', border: '1px solid rgba(255,183,131,0.12)' }}>
             <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--md-tertiary)' }}>
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--md-tertiary)' }} />
-              專家筆記
+              {t('backtestEngine.trade.expertNotes', '專家筆記')}
             </div>
             <div className="text-xs leading-relaxed font-medium italic opacity-80" style={{ color: 'var(--md-on-surface-variant)' }}>
-              {resultStrat.beginner.replace('新手說明：', '')}
+              {t(`backtestEngine.strategy.${resultStrat.id}.beginner`, resultStrat.beginner).replace('新手說明：', '')}
             </div>
           </div>
         </div>
@@ -66,7 +68,7 @@ export function BacktestTradesSection({
             </div>
             <div>
               <h3 className="text-xl font-black tracking-tight flex items-center gap-3" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>
-                成交明細
+                {t('backtestEngine.trade.details', '成交明細')}
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>Total {tradesRaw.length} Trades</span>
               </h3>
               <div className="flex items-center gap-3 mt-2">
@@ -97,22 +99,22 @@ export function BacktestTradesSection({
 
         <div className="flex-1">
           <div className="flex md:hidden gap-3 pb-4 overflow-x-auto">
-            {trades.map((t, i) => (
-              <div key={`mobile-trade-${t.entryTime}-${i}`} className="min-w-[200px] glass-card rounded-xl p-4 space-y-2">
+            {trades.map((tr, i) => (
+              <div key={`mobile-trade-${tr.entryTime}-${i}`} className="min-w-[200px] glass-card rounded-xl p-4 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold" style={{ color: 'var(--md-on-surface)' }}>{t.entryTime}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={(t.pnlPct ?? 0) >= 0 ? { background: 'rgba(82,196,26,0.15)', color: 'var(--color-down)' } : { background: 'rgba(255,77,79,0.15)', color: 'var(--color-up)' }}>
-                    {(t.pnlPct ?? 0) >= 0 ? '+' : ''}{Number(t.pnlPct ?? 0).toFixed(2)}%
+                  <span className="text-xs font-bold" style={{ color: 'var(--md-on-surface)' }}>{tr.entryTime}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={(tr.pnlPct ?? 0) >= 0 ? { background: 'rgba(82,196,26,0.15)', color: 'var(--color-down)' } : { background: 'rgba(255,77,79,0.15)', color: 'var(--color-up)' }}>
+                    {(tr.pnlPct ?? 0) >= 0 ? '+' : ''}{Number(tr.pnlPct ?? 0).toFixed(2)}%
                   </span>
                 </div>
-                <div className="text-[10px]" style={{ color: 'var(--md-outline)' }}>PnL: {Number(t.pnl).toLocaleString()}</div>
+                <div className="text-[10px]" style={{ color: 'var(--md-outline)' }}>PnL: {Number(tr.pnl).toLocaleString()}</div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: 'var(--md-outline)' }}>進場</span>
-                  <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.entryPrice).toFixed(2)}</span>
+                  <span style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.trade.entry', '進場')}</span>
+                  <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(tr.entryPrice).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: 'var(--md-outline)' }}>出場</span>
-                  <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(t.exitPrice).toFixed(2)}</span>
+                  <span style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.trade.exit', '出場')}</span>
+                  <span className="font-mono font-bold" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-data)' }}>{Number(tr.exitPrice).toFixed(2)}</span>
                 </div>
               </div>
             ))}

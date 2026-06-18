@@ -316,4 +316,23 @@ body {
     outline: none;
     box-shadow: 0 0 0 2px var(--color-term-action), 0 0 0 3px var(--color-term-bg);
   }
+
+  /*
+   * Horizontal scroll affordance — shows a soft shadow on whichever edge has
+   * more content to scroll toward, and hides it once that edge is reached.
+   * Cover gradients (attachment: local) move with the content; shadow
+   * gradients (attachment: scroll) stay pinned to the container edges.
+   * Apply to a horizontally-scrolling container (overflow-x-auto).
+   */
+  .scroll-shadow-x {
+    background:
+      linear-gradient(to right, var(--color-term-panel) 30%, transparent) 0 0,
+      linear-gradient(to left, var(--color-term-panel) 30%, transparent) 100% 0,
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.45), transparent) 0 0,
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.45), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
 }
+

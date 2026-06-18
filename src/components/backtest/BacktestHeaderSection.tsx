@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Play, Download, Loader2, TrendingUp, ChevronDown, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { BacktestStrategyId, BacktestStrategyMeta } from '../../utils/backtest';
@@ -60,8 +61,10 @@ export function BacktestHeaderSection({
   strategyParams,
   onStrategyParamChange,
 }: BacktestHeaderSectionProps) {
+  const { t } = useTranslation();
   const strategyType = mapBacktestStrategyToStrategyType(strategy);
   const strategyParamSchema = STRATEGY_PARAM_SCHEMA[strategyType] ?? [];
+  const sk = (id: string, field: string, fallback: string) => t(`backtestEngine.strategy.${id}.${field}`, fallback);
 
   return (
     <>
@@ -74,7 +77,7 @@ export function BacktestHeaderSection({
             <Play size={28} className="fill-current hidden md:block" style={{ color: 'var(--md-on-primary)' }} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl md:text-3xl font-black tracking-tighter" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>回測引擎 <span className="text-[10px] md:text-sm font-bold ml-1 px-1.5 md:px-2 py-0.5 rounded-lg" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.2)' }}>V4.2</span></h1>
+            <h1 className="text-xl md:text-3xl font-black tracking-tighter" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t('backtestEngine.title', '回測引擎')} <span className="text-[10px] md:text-sm font-bold ml-1 px-1.5 md:px-2 py-0.5 rounded-lg" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.2)' }}>V4.2</span></h1>
             <p className="label-meta font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-0.5 md:mt-1 truncate" style={{ color: 'var(--md-outline)' }}>Quantum Backtesting Lab</p>
           </div>
         </div>
@@ -85,7 +88,7 @@ export function BacktestHeaderSection({
               value={symbol}
               onValueChange={onSymbolChange}
               onSymbolSubmit={onSymbolChange}
-              placeholder="代碼 (AAPL, 2330.TW)"
+              placeholder={t('backtestEngine.symbolPlaceholder', '代碼 (AAPL, 2330.TW)')}
               className="relative w-full"
               inputClassName="w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 transition"
               inputStyle={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
@@ -100,7 +103,7 @@ export function BacktestHeaderSection({
               className="relative w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 transition appearance-none cursor-pointer"
               style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
             >
-              {strategies.map(s => <option key={`opt-${s.id}`} value={s.id} style={{ background: 'var(--md-surface-container)' }}>{s.label}</option>)}
+              {strategies.map(s => <option key={`opt-${s.id}`} value={s.id} style={{ background: 'var(--md-surface-container)' }}>{sk(s.id, 'label', s.label)}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--md-outline)' }} />
           </div>
@@ -111,19 +114,19 @@ export function BacktestHeaderSection({
               onClick={onToggleCompare}
               className={cn("flex-1 lg:flex-none px-4 py-3 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 active:scale-95", compareMode ? "bg-indigo-500 text-black shadow-lg shadow-indigo-500/20" : "bg-white/5 text-zinc-400 border border-white/10")}>
               {comparing ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
-              比較績效 COMPARE
+              {t('backtestEngine.compare', '比較績效 COMPARE')}
             </button>
             {resultExists && (
               <button type="button" onClick={onExportPDF}
                 className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition flex items-center justify-center gap-2" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-on-surface-variant)' }}
               >
-                <Download size={16} /> 匯出 PDF
+                <Download size={16} /> {t('backtestEngine.exportPdf', '匯出 PDF')}
               </button>
             )}
             <button type="button" onClick={onRun} disabled={running}
               className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-(--color-term-accent) text-(--color-term-bg) shadow-lg shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-50">
               {running ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} className="fill-current" />}
-              {running ? '執行中 COMPUTING...' : '開始回測 RUN'}
+              {running ? t('backtestEngine.computing', '執行中 COMPUTING...') : t('backtestEngine.run', '開始回測 RUN')}
             </button>
           </div>
         </div>
@@ -135,12 +138,12 @@ export function BacktestHeaderSection({
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
               <Settings size={18} />
             </div>
-            <h3 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.2em]" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>回測設定</h3>
+            <h3 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.2em]" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t('backtestEngine.settings', '回測設定')}</h3>
           </div>
 
           <div className="space-y-4 md:space-y-6">
             <div className="space-y-2 md:space-y-3">
-              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>初始資金 (USD)</label>
+              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.initialCapital', '初始資金 (USD)')}</label>
               <div className="relative group">
                 <input
                   type="text"
@@ -155,7 +158,7 @@ export function BacktestHeaderSection({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
               <div className="space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>開始日期</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.startDate', '開始日期')}</label>
                 <input
                   type="date"
                   value={period1}
@@ -165,7 +168,7 @@ export function BacktestHeaderSection({
                 />
               </div>
               <div className="space-y-2 md:space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>結束日期</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.endDate', '結束日期')}</label>
                 <input
                   type="date"
                   value={period2}
@@ -178,7 +181,7 @@ export function BacktestHeaderSection({
           </div>
 
           <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
-            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>策略參數</label>
+            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.strategyParams', '策略參數')}</label>
             <div className="grid grid-cols-1 gap-3">
               {strategyParamSchema.map((field) => {
                 const value = getStrategyParamValue(strategyParams, field.path, field.defaultValue);
@@ -245,20 +248,20 @@ export function BacktestHeaderSection({
                   <div className="w-8 h-8 rounded-full" style={{ backgroundColor: currentStrategy.color }} />
                 </div>
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2" style={{ color: currentStrategy.color, fontFamily: 'var(--font-heading)' }}>{currentStrategy.label}</h2>
-                  <div className="text-xs font-black uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--md-outline)' }}>{currentStrategy.type}</div>
+                  <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2" style={{ color: currentStrategy.color, fontFamily: 'var(--font-heading)' }}>{sk(strategy, 'label', currentStrategy.label)}</h2>
+                  <div className="text-xs font-black uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--md-outline)' }}>{sk(strategy, 'type', currentStrategy.type)}</div>
                 </div>
               </div>
             </div>
 
-            <p className="text-sm leading-relaxed font-medium mt-6 mb-6" style={{ color: 'var(--md-on-surface-variant)' }}>{currentStrategy.desc}</p>
+            <p className="text-sm leading-relaxed font-medium mt-6 mb-6" style={{ color: 'var(--md-on-surface-variant)' }}>{sk(strategy, 'desc', currentStrategy.desc)}</p>
 
             <div className="mt-6 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
-                <span>📈</span> {currentStrategy.suitable}
+                <span>📈</span> {sk(strategy, 'suitable', currentStrategy.suitable)}
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
-                <span>⚠️</span> {currentStrategy.avoid}
+                <span>⚠️</span> {sk(strategy, 'avoid', currentStrategy.avoid)}
               </div>
             </div>
           </div>

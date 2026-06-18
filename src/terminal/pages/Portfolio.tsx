@@ -325,7 +325,7 @@ export function HoldingsPanel({
       className="h-full"
       bodyClassName="overflow-auto"
     >
-      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scroll-shadow-x">
         <table className="w-full text-[12px]">
           <thead className="sticky top-0 bg-(--color-term-panel) text-[10px] tracking-widest text-(--color-term-muted) z-10">
             <tr className="border-b border-(--color-term-border)">
@@ -539,7 +539,7 @@ export function TradeLogPanel({ trades }: { trades: any[] }) {
     <Panel
       title={t('portfolio.tradeLog', 'Trade History')}
     >
-      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scroll-shadow-x">
         <table className="w-full text-[12px]">
           <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
             <tr className="border-b border-(--color-term-border)">

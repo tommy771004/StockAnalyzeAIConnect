@@ -70,7 +70,7 @@ export function MarketPage() {
           collapsible
           actions={<DataStatusBadge mode={marketDataMode} lastUpdated={lastUpdated || null} />}
         >
-          <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin">
+          <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scroll-shadow-x">
             <table className="w-full text-[12px]">
               <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) z-10 sticky top-0">
                 <tr className="border-b border-(--color-term-border)">

@@ -1093,6 +1093,135 @@
       }
     }
   },
+  "backtestEngine": {
+    "title": "Backtest Engine",
+    "symbolPlaceholder": "Symbol (AAPL, 2330.TW)",
+    "compare": "COMPARE",
+    "exportPdf": "Export PDF",
+    "computing": "COMPUTING...",
+    "run": "RUN BACKTEST",
+    "settings": "Backtest Settings",
+    "initialCapital": "Initial Capital (USD)",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "strategyParams": "Strategy Parameters",
+    "failedTitle": "Backtest Failed",
+    "compareTitle": "Multi-Strategy Performance Matrix",
+    "closeCompare": "Close Comparison",
+    "marketState": "Market State",
+    "optimizing": "Optimizing…",
+    "optimize": "Auto-Optimize Parameters",
+    "betterParams": "Better Parameters Found",
+    "improvement": "Est. ROI improvement +{{pct}}%, risk score {{score}}",
+    "applyParams": "Apply Parameters",
+    "noImprovement": "Scanned 5 parameter variants; the current configuration is already optimal with no significant room for improvement.",
+    "emptyTitle": "Ready to validate your trading strategy?",
+    "emptyDesc": "The backtest engine lets you simulate trading performance using historical market data. Past performance doesn't guarantee future results, but it's a key step to refining strategies and building confidence.",
+    "disclaimerTitle": "Investment Risk Disclaimer",
+    "disclaimerBody": "Backtest results from this tool are for academic research and strategy development reference only. Markets change constantly and historical data cannot fully predict future movements. All trading decisions should be evaluated by the investor; this platform assumes no liability for any investment losses arising from use of this tool.",
+    "tradesUnit": " trades",
+    "err": {
+      "enterSymbol": "Please enter a stock symbol",
+      "enterSymbolCrypto": "Please enter a stock/crypto symbol",
+      "dateOrder": "Start date must be earlier than end date",
+      "badFormat": "Server returned an invalid format",
+      "noData": "Not enough historical data in this date range; please widen it (at least 6 months recommended)",
+      "runFailed": "Backtest failed, please try again later"
+    },
+    "regime": {
+      "bull": "Bull Market",
+      "bear": "Bear Market",
+      "sideways": "Range-Bound"
+    },
+    "col": {
+      "strategy": "Strategy",
+      "roi": "Total Return (ROI)",
+      "sharpe": "Sharpe Ratio",
+      "mdd": "Max Drawdown (MDD)",
+      "winRate": "Win Rate",
+      "avgWin": "Avg Win %",
+      "avgLoss": "Avg Loss %",
+      "pf": "Profit Factor (PF)",
+      "trades": "Trades"
+    },
+    "chart": {
+      "strategy": "Strategy",
+      "buyHold": "Buy & Hold",
+      "maxDrawdown": "Max Drawdown",
+      "totalReturn": "Total Return",
+      "benchmark": "Benchmark",
+      "winRate": "Win Rate",
+      "advancedMatrix": "Advanced Performance Matrix"
+    },
+    "metric": {
+      "profitFactor": "Profit Factor",
+      "avgWin": "Avg Win",
+      "avgLoss": "Avg Loss",
+      "maxWinStreak": "Max Win Streak",
+      "maxLossStreak": "Max Loss Streak",
+      "rating": "Strategy Rating"
+    },
+    "rating": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "normal": "Average"
+    },
+    "trade": {
+      "entry": "Entry",
+      "exit": "Exit",
+      "logicReview": "Strategy Logic Review",
+      "buyTrigger": "Buy Trigger",
+      "sellTrigger": "Sell Trigger",
+      "expertNotes": "Expert Notes",
+      "details": "Trade Details"
+    },
+    "forecast": {
+      "title": "30-Day Price Forecast",
+      "disclaimer": "Forecast uses a linear-trend fallback model (TimesFM service not running). Start the Python scientific service for more accurate AI predictions."
+    },
+    "strategy": {
+      "ma_crossover": {
+        "label": "MA Crossover Strategy",
+        "type": "Trend Following",
+        "desc": "Buy when the short-term MA (10-day) crosses above the long-term MA (30-day); sell on the reverse. Best for markets with clear trends.",
+        "suitable": "Best for: one-directional trends (bull or bear markets)",
+        "avoid": "Avoid: choppy, range-bound markets — prone to false signals",
+        "buyDesc": "SMA10 crosses above SMA30 (golden cross) → uptrend confirmed, buy",
+        "sellDesc": "SMA10 crosses below SMA30 (death cross) → bearish signal, sell",
+        "beginner": "Beginner note: A moving average is the average price over a period. A short MA crossing above a long MA signals strengthening recent buying — a turn toward an uptrend."
+      },
+      "neural": {
+        "label": "Multi-Factor AI Strategy",
+        "type": "AI Model",
+        "desc": "Simulates a machine-learning model analyzing momentum, volume and volatility together, deciding after a combined score.",
+        "suitable": "Best for: markets where trend and volume align",
+        "avoid": "Avoid: low-volatility, trendless markets",
+        "buyDesc": "Buy only when all three hold: EMA8/EMA21 momentum score > 0.3, volume expanding, and ATR volatility > 0.8%",
+        "sellDesc": "Sell when the EMA8/EMA21 momentum score turns negative (below -0.2); upward momentum has faded",
+        "beginner": "Beginner note: The AI strategy watches several indicators at once (momentum + volume + volatility) and only trades when multiple conditions hold — fewer signals but higher precision."
+      },
+      "rsi": {
+        "label": "RSI Overbought/Oversold",
+        "type": "Mean Reversion",
+        "desc": "RSI below 35 is considered oversold — wait for a rebound to buy; above 65 is overbought — wait for a pullback to sell.",
+        "suitable": "Best for: range-bound, oscillating markets",
+        "avoid": "Avoid: one-directional trends (risk of catching a falling knife)",
+        "buyDesc": "RSI(14) recovers from below 35 back up to 35 → oversold ends, rebound begins, buy",
+        "sellDesc": "RSI(14) falls from above 65 back down to 65 → overbought ends, pullback begins, sell",
+        "beginner": "Beginner note: RSI measures the strength of recent gains and losses. 0-30 is oversold (possible rebound), 70-100 overbought (possible drop). This strategy waits for reversal confirmation before entering."
+      },
+      "macd": {
+        "label": "MACD Momentum Strategy",
+        "type": "Momentum",
+        "desc": "When the MACD histogram turns from negative to positive and the signal line is above zero, bullish momentum is confirmed; sell when the histogram turns negative.",
+        "suitable": "Best for: trend turning points and medium-term trends",
+        "avoid": "Avoid: fast choppy markets (MACD reacts slowly)",
+        "buyDesc": "MACD histogram turns from negative to positive (momentum flips bullish) and the MACD line > 0 (above zero), buy",
+        "sellDesc": "MACD histogram turns from positive to negative (momentum flips bearish), sell and exit",
+        "beginner": "Beginner note: MACD subtracts two MAs of different speeds to gauge momentum. A histogram turning from negative to positive means bullish force is starting to overcome bearish force."
+      }
+    }
+  },
   "symbolSearch": {
     "searching": "Searching...",
     "noResults": "No matches for \"{{query}}\"",

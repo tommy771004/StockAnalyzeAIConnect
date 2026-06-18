@@ -26,14 +26,23 @@
 |---|---|---|
 | P2-3 | alert/prompt/confirm → toast / 自訂對話框 | Settings 存檔/更新改用 `toast()`；改名改成**行內編輯**（取代 `prompt()`，見 `screenshots/after-settings-inline-edit.png`）。新增 promise 版 `useConfirm()`（`src/contexts/ConfirmContext.tsx`，`role="alertdialog"`、Esc/背景關閉、focus 管理），Dashboard 移除自選股、Portfolio 刪除持倉改用它取代原生 `confirm()`。 |
 | P2-4 | 多頁補 `<h1>` | Dashboard / Market / Crypto / Research / AutoTrading 補上 `<h1 class="sr-only">`（視覺隱藏、不改版面），修正標題大綱「從 h2 起跳」。 |
-| P2-5 | Backtest `--md-*` 變數 | 在 `styles.css` 定義 `--md-*`（11 個）、`--color-up/down`、`--font-data`，對映到終端機調色盤，修掉回測結果視圖的未定義變數色彩 bug。**註**：該頁大量寫死繁中字串的完整 i18n 化屬大型重構，風險高，**留待獨立處理**。 |
+| P2-5 | Backtest `--md-*` 變數 | 在 `styles.css` 定義 `--md-*`（11 個）、`--color-up/down`、`--font-data`，對映到終端機調色盤，修掉回測結果視圖的未定義變數色彩 bug。（該頁完整字串 i18n 已於第四階段完成，見上方更新。） |
 | P2-6 | 搜尋 ARIA combobox | TopNav 搜尋框補 `role="combobox"` + `aria-expanded`/`aria-controls`/`aria-activedescendant`；下拉 `role="listbox"`、每筆 `role="option"` + `aria-selected`。 |
 | P3-1 | 未選取分頁對比 | `text-(--color-term-text)/50` → `/70`（hover `/80`→`/90`）。 |
 | P3-6 | 清除 dead code | 移除未被引用的 `components/SentimentPage.tsx`、`Simulator.tsx`、`Alerts.tsx`（皆使用未定義 `--card-bg`/`--border-color`）。 |
 
 > **更正**：P3-3（`<html lang>` 隨語言更新）原報告誤判——`src/i18n.ts` 早已在 `languageChanged` 事件同步 `document.documentElement` 的 `lang`，**無需修改**（先前 grep 用詞不精確造成的假陰性）。順帶在 `main.tsx` 明確 `import './i18n'` 以保證啟動即初始化。
 
-> 驗證：`VERCEL=1 npm run build` ✅（無新增錯誤）；h1/行內編輯/combobox 以 Playwright DOM 斷言確認，掛載零 runtime error。仍為建議：Backtest 字串 i18n、行動寬表格捲動提示（P3-5）。（P3-4 已於後續完成。）
+> 驗證：`VERCEL=1 npm run build` ✅（無新增錯誤）；h1/行內編輯/combobox 以 Playwright DOM 斷言確認，掛載零 runtime error。
+
+### 第四階段（後續實作）
+| 原編號 | 項目 | 實作 |
+|---|---|---|
+| P3-4 | Settings 桌機版面平衡 | AI & Integration 改為兩欄佈局（左 Profile+Subscription、右 AI），`md:items-start`。 |
+| P3-5 | 行動寬表格捲動提示 | 新增 `.scroll-shadow-x` 純 CSS 工具，套用於 5 個表格容器。 |
+| P2-5 | Backtest 字串 i18n | 完整 i18n 化 Backtest 五個元件（chrome + 策略 metadata + 錯誤/空狀態/圖表/明細/預測），採 `t('backtestEngine.X', '中文')` 模式（zh 用內嵌中文 fallback、新增 en 鍵）。已用 Playwright 在 en/zh 雙語截圖確認（en 顯示「Backtest Engine」、zh 顯示「回測引擎」）。CSV 匯出內容與檔名維持原樣（格式敏感、低價值）。 |
+
+> 至此審計報告中的所有建議項目皆已實作完成。`VERCEL=1 npm run build` ✅。
 
 ---
 
@@ -175,8 +184,8 @@
 ### 🟢 P3-4 ✅　Settings 桌機右欄留白、版面略失衡（已修）
 - 原本 `md:grid-cols-2` 下 AI & Integration 為 `md:col-span-2` 整列，造成右側留白。已改為平衡的兩欄佈局：**左欄堆疊 Profile + Subscription、右欄放 AI & Integration**，並加 `md:items-start` 讓面板維持自然高度。桌機/平板（≥768px）兩欄、手機單欄。見 `screenshots/after-settings-balanced.png`。
 
-### 🟢 P3-5　行動裝置寬表格僅靠水平捲動、缺提示
-- `Portfolio.tsx:326,540`、`Dashboard.tsx:174`、`Screener.tsx:479` 採 `overflow-x-auto`（含 `-mx-3 px-3 sm:mx-0` 邊到邊捲動，做得不錯）。但手機上使用者不一定知道可橫向捲（見 `screenshots/04-portfolio-mobile.png` 右緣裁切）。可加捲動陰影提示或在窄螢幕改卡片式。**只建議**。
+### 🟢 P3-5 ✅　行動裝置寬表格僅靠水平捲動、缺提示（已修）
+- 新增純 CSS 工具 `.scroll-shadow-x`（`styles.css`）：以 `background-attachment: local/scroll` 在「還能往哪邊捲」的那一側顯示柔和陰影、捲到邊即隱藏。套用於 Market / Dashboard / Screener / Portfolio（×2）的 `overflow-x-auto` 表格容器。無 JS、低風險。
 
 ### 🟢 P3-6　ErrorBoundary 與多個 legacy 元件使用未定義 CSS 變數（dead code）
 - `ErrorBoundary.tsx:24` 用 `bg-[var(--card-bg)]`（主題未定義 → 透明卡片）；`components/SentimentPage.tsx`、`components/Simulator.tsx`、`components/Alerts.tsx` 亦同，且**未被任何地方 import**（dead code）。建議清除或修正；若採用 P0-1 的建議啟用 ErrorBoundary，務必先把背景改為 `--color-term-panel`。**只建議**。

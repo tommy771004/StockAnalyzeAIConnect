@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LineChart,
   Line,
@@ -49,6 +50,7 @@ const ForecastTip = ({
 };
 
 export function PriceForecastPanel({ symbol, forecast, loading }: Props) {
+  const { t } = useTranslation();
   if (loading || !forecast) {
     return (
       <div className="glass-card rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
@@ -105,7 +107,7 @@ export function PriceForecastPanel({ symbol, forecast, loading }: Props) {
               className="text-xl font-black tracking-tight"
               style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}
             >
-              未來 30 天價格預測
+              {t('backtestEngine.forecast.title', '未來 30 天價格預測')}
             </h3>
             <div className="flex items-center gap-2 mt-1">
               <span
@@ -245,7 +247,7 @@ export function PriceForecastPanel({ symbol, forecast, loading }: Props) {
           className="mt-4 text-[10px] font-medium leading-relaxed"
           style={{ color: 'var(--md-outline)' }}
         >
-          * 預測使用線性趨勢回退模型（TimesFM 服務未啟動）。啟動 Python 科學服務可獲得更精確的 AI 預測。
+          * {t('backtestEngine.forecast.disclaimer', '預測使用線性趨勢回退模型（TimesFM 服務未啟動）。啟動 Python 科學服務可獲得更精確的 AI 預測。')}
         </p>
       )}
     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AreaChart,
   Area,
@@ -14,13 +15,14 @@ import type { BacktestMetrics, BacktestTrade } from '../../types';
 import type { BacktestStrategyMeta } from '../../utils/backtest';
 
 const EquityTip = ({ active, payload, label, color }: { active?: boolean; payload?: { dataKey: string; value: number }[]; label?: string; color?: string }) => {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl p-3 text-sm shadow-xl min-w-[160px]" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', fontFamily: 'var(--font-data)' }}>
       <div className="mb-2 text-xs" style={{ color: 'var(--md-outline)' }}>{label}</div>
       {payload.map((p, idx) => (
         <div key={`${p.dataKey}-${idx}`} className="flex justify-between gap-4" style={{ color: p.dataKey === 'portfolio' ? color : '#94a3b8' }}>
-          <span>{p.dataKey === 'portfolio' ? '策略' : '買進持有'}</span>
+          <span>{p.dataKey === 'portfolio' ? t('backtestEngine.chart.strategy', '策略') : t('backtestEngine.chart.buyHold', '買進持有')}</span>
           <span className="font-bold">{(p.value >= 0 ? '+' : '') + Number(p.value).toFixed(2)}%</span>
         </div>
       ))}
@@ -29,11 +31,12 @@ const EquityTip = ({ active, payload, label, color }: { active?: boolean; payloa
 };
 
 const DdTip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl p-2.5 text-xs shadow-xl" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', fontFamily: 'var(--font-data)' }}>
       <div className="mb-1" style={{ color: 'var(--md-outline)' }}>{label}</div>
-      <div style={{ color: 'var(--color-up)' }}>最大回撤: -{Number(payload[0]?.value || 0).toFixed(2)}%</div>
+      <div style={{ color: 'var(--color-up)' }}>{t('backtestEngine.chart.maxDrawdown', '最大回撤')}: -{Number(payload[0]?.value || 0).toFixed(2)}%</div>
     </div>
   );
 };
@@ -73,6 +76,7 @@ export function BacktestChartSection({
   maxWinStreak,
   maxLossStreak,
 }: BacktestChartSectionProps) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <div className="lg:col-span-3 glass-card rounded-[2.5rem] p-8 shadow-2xl flex flex-col min-h-[500px] relative overflow-hidden">
@@ -150,12 +154,12 @@ export function BacktestChartSection({
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(82,196,26,0.1)', border: '1px solid rgba(82,196,26,0.25)', color: 'var(--color-down)' }}>
               <TrendingUp size={20} />
             </div>
-            總報酬率
+            {t('backtestEngine.chart.totalReturn', '總報酬率')}
           </div>
           <div className="text-3xl font-black mb-1 tracking-tight tabular-nums" style={{ color: metrics.roi >= 0 ? 'var(--color-down)' : 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
             {metrics.roi >= 0 ? '+' : ''}{metrics.roi}%
           </div>
-          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>基準：{benchEnd >= 0 ? '+' : ''}{benchEnd.toFixed(1)}%</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.chart.benchmark', '基準')}：{benchEnd >= 0 ? '+' : ''}{benchEnd.toFixed(1)}%</div>
         </div>
 
         <div className="glass-card rounded-[2rem] p-6 relative overflow-hidden transition duration-300 hover:-translate-y-1">
@@ -163,7 +167,7 @@ export function BacktestChartSection({
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(255,77,79,0.1)', border: '1px solid rgba(255,77,79,0.25)', color: 'var(--color-up)' }}>
               <ArrowDownRight size={20} />
             </div>
-            最大回撤
+            {t('backtestEngine.chart.maxDrawdown', '最大回撤')}
           </div>
           <div className="text-3xl font-black mb-1 tracking-tight tabular-nums" style={{ color: 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
             -{metrics.maxDrawdown}%
@@ -176,7 +180,7 @@ export function BacktestChartSection({
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(255,183,131,0.1)', border: '1px solid rgba(255,183,131,0.25)', color: 'var(--md-tertiary)' }}>
               <Target size={20} />
             </div>
-            勝率
+            {t('backtestEngine.chart.winRate', '勝率')}
           </div>
           <div className="text-3xl font-black mb-1 tracking-tight tabular-nums" style={{ color: metrics.winRate >= 50 ? 'var(--color-down)' : 'var(--color-up)', fontFamily: 'var(--font-data)' }}>
             {metrics.winRate}%
@@ -189,16 +193,16 @@ export function BacktestChartSection({
         <div className="liquid-glass rounded-[2rem] p-8 border border-white/10 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-slate-500/20 to-transparent" />
           <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-            <Settings size={14} className="text-slate-400" /> 進階績效矩陣
+            <Settings size={14} className="text-slate-400" /> {t('backtestEngine.chart.advancedMatrix', '進階績效矩陣')}
           </div>
           <div className="grid grid-cols-2 gap-y-6 gap-x-4">
             {[
-              ['獲利因子', `${metrics.profitFactor?.toFixed(2) ?? '—'}`],
-              ['平均獲利', metrics.avgWin != null ? `+${metrics.avgWin}%` : '—'],
-              ['平均虧損', metrics.avgLoss != null ? `${metrics.avgLoss}%` : '—'],
-              ['最長連勝', `${maxWinStreak}筆`],
-              ['最長連敗', `${maxLossStreak}筆`],
-              ['策略評級', metrics.roi > 50 ? '卓越' : metrics.roi > 20 ? '良好' : '普通'],
+              [t('backtestEngine.metric.profitFactor', '獲利因子'), `${metrics.profitFactor?.toFixed(2) ?? '—'}`],
+              [t('backtestEngine.metric.avgWin', '平均獲利'), metrics.avgWin != null ? `+${metrics.avgWin}%` : '—'],
+              [t('backtestEngine.metric.avgLoss', '平均虧損'), metrics.avgLoss != null ? `${metrics.avgLoss}%` : '—'],
+              [t('backtestEngine.metric.maxWinStreak', '最長連勝'), `${maxWinStreak}${t('backtestEngine.tradesUnit', '筆')}`],
+              [t('backtestEngine.metric.maxLossStreak', '最長連敗'), `${maxLossStreak}${t('backtestEngine.tradesUnit', '筆')}`],
+              [t('backtestEngine.metric.rating', '策略評級'), metrics.roi > 50 ? t('backtestEngine.rating.excellent', '卓越') : metrics.roi > 20 ? t('backtestEngine.rating.good', '良好') : t('backtestEngine.rating.normal', '普通')],
             ].map(([k, v], idx) => (
               <div key={`metric-${idx}`} className="space-y-1.5 group">
                 <div className="text-[9px] font-black text-slate-600 uppercase tracking-[0.15em] group-hover:text-slate-400 transition-colors">{k}</div>
@@ -216,7 +220,7 @@ export function BacktestChartSection({
           </div>
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-2xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{resultStrat.label}</h3>
+              <h3 className="text-2xl font-black tracking-tight" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t(`backtestEngine.strategy.${resultStrat.id}.label`, resultStrat.label)}</h3>
               <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>Strategy Report</span>
             </div>
             <p className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--md-outline)' }}>
