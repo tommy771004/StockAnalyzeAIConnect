@@ -106,7 +106,9 @@ export function SettingsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:items-start">
+        {/* Left column — account */}
+        <div className="flex flex-col gap-6">
         {/* Profile */}
         <Panel title={t('settings.profile')} icon={<User className="h-4 w-4" />} collapsible>
           <div className="p-4 space-y-4">
@@ -178,9 +180,10 @@ export function SettingsPage() {
             </button>
           </div>
         </Panel>
+        </div>
 
         {/* AI & Integration */}
-        <Panel title={t('settings.aiIntegration')} icon={<Key className="h-4 w-4" />} collapsible className="md:col-span-2">
+        <Panel title={t('settings.aiIntegration')} icon={<Key className="h-4 w-4" />} collapsible>
           <div className="p-4 space-y-6">
             <div>
               <label htmlFor="openrouter-api-key" className="text-[11px] text-(--color-term-muted) uppercase tracking-widest block mb-2">

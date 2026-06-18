@@ -33,7 +33,7 @@
 
 > **更正**：P3-3（`<html lang>` 隨語言更新）原報告誤判——`src/i18n.ts` 早已在 `languageChanged` 事件同步 `document.documentElement` 的 `lang`，**無需修改**（先前 grep 用詞不精確造成的假陰性）。順帶在 `main.tsx` 明確 `import './i18n'` 以保證啟動即初始化。
 
-> 驗證：`VERCEL=1 npm run build` ✅（無新增錯誤）；h1/行內編輯/combobox 以 Playwright DOM 斷言確認，掛載零 runtime error。仍為建議：Backtest 字串 i18n、Settings 桌機右欄留白（P3-4）、行動寬表格捲動提示（P3-5）。
+> 驗證：`VERCEL=1 npm run build` ✅（無新增錯誤）；h1/行內編輯/combobox 以 Playwright DOM 斷言確認，掛載零 runtime error。仍為建議：Backtest 字串 i18n、行動寬表格捲動提示（P3-5）。（P3-4 已於後續完成。）
 
 ---
 
@@ -172,8 +172,8 @@
 ### 🟢 P3-3　`<html lang>` 寫死且不隨語言切換更新
 - `index.html:2`（`lang="zh-TW"`）；找不到任何 `documentElement.lang` 同步邏輯。切到 English 時語言標記仍是中文。建議在 i18n `languageChanged` 時更新 `document.documentElement.lang`。**只建議**。
 
-### 🟢 P3-4　Settings 桌機右欄留白、版面略失衡
-- `Settings.tsx:84`（`md:grid-cols-2`）：見 `screenshots/12-settings-desktop.png`，SUBSCRIPTION 下方右欄整片空白。可考慮把「AI & Integration」改為右欄延伸或調整佈局。**只建議**。
+### 🟢 P3-4 ✅　Settings 桌機右欄留白、版面略失衡（已修）
+- 原本 `md:grid-cols-2` 下 AI & Integration 為 `md:col-span-2` 整列，造成右側留白。已改為平衡的兩欄佈局：**左欄堆疊 Profile + Subscription、右欄放 AI & Integration**，並加 `md:items-start` 讓面板維持自然高度。桌機/平板（≥768px）兩欄、手機單欄。見 `screenshots/after-settings-balanced.png`。
 
 ### 🟢 P3-5　行動裝置寬表格僅靠水平捲動、缺提示
 - `Portfolio.tsx:326,540`、`Dashboard.tsx:174`、`Screener.tsx:479` 採 `overflow-x-auto`（含 `-mx-3 px-3 sm:mx-0` 邊到邊捲動，做得不錯）。但手機上使用者不一定知道可橫向捲（見 `screenshots/04-portfolio-mobile.png` 右緣裁切）。可加捲動陰影提示或在窄螢幕改卡片式。**只建議**。
