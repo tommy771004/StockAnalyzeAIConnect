@@ -26,6 +26,7 @@ export function MarketPage() {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-auto pb-20 md:pb-10">
+      <h1 className="sr-only">{t('nav.market', 'Market')}</h1>
       <div className="col-span-12">
         <Panel
           title={t('market.sectorTitle')}

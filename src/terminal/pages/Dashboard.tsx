@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Filter, RefreshCw, Plus, Trash2, X, Microscope } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
@@ -34,16 +35,18 @@ function formatFixedLocale(value: number, locale: string, digits = 2): string {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export function DashboardPage() {
+  const { t } = useTranslation();
   const [range, setRange] = useState<ChartRange>('1W');
   const data = useDashboardData(range);
-  const { 
+  const {
     loading, isLive, dataMode, watchlist, gainers, losers, candles, news, lastUpdated,
     selected, setSelected, selectedRow, refresh,
-    addToWatchlist, removeFromWatchlist 
+    addToWatchlist, removeFromWatchlist
   } = data;
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
+      <h1 className="sr-only">{t('nav.dashboard', 'Dashboard')}</h1>
       {/* Left column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <WatchlistPanel
@@ -113,6 +116,7 @@ export function WatchlistPanel({
   onDelete: (s: string) => Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
+  const confirm = useConfirm();
   const [newSymbol, setNewSymbol] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const numberLocale = getNumberLocale(i18n.language);
@@ -221,9 +225,13 @@ export function WatchlistPanel({
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                      <button
                       type="button"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        if (confirm(t('dashboard.removeSymbolConfirm', 'Remove {{symbol}}?', { symbol: row.symbol }))) onDelete(row.symbol);
+                        if (await confirm({
+                          message: t('dashboard.removeSymbolConfirm', 'Remove {{symbol}}?', { symbol: row.symbol }),
+                          confirmLabel: t('common.remove', 'Remove'),
+                          destructive: true,
+                        })) onDelete(row.symbol);
                       }}
                       className="focus-ring opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
                      >

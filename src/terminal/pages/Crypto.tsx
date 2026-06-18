@@ -46,6 +46,7 @@ export function CryptoPage() {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3">
+      <h1 className="sr-only">{t('nav.crypto', 'Crypto')}</h1>
       <div className="col-span-12 min-h-[300px]">
         <Panel title={t('crypto.title', 'REAL-TIME CRYPTO MARKETS (USD)')} collapsible>
           <table className="w-full text-[12px]">

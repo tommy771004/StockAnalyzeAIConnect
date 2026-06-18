@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
-import { Loader2, Save, User, Shield, CreditCard, Key, Edit2 } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
+import { Loader2, Save, User, Shield, CreditCard, Key, Edit2, Check, X } from 'lucide-react';
 
 // Fix #6: typed user/settings state — no more useState<any>
 interface UserProfile {
@@ -19,9 +20,12 @@ interface AppSettings {
 
 export function SettingsPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const [settings, setSettings] = useState<AppSettings>({
     OPENROUTER_API_KEY: '',
     NOTIFICATION_ENABLED: true,
@@ -53,9 +57,30 @@ export function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: settings.OPENROUTER_API_KEY }),
       });
-      alert(t('settings.saved'));
+      toast(t('settings.saved'), 'success');
     } catch {
-      alert(t('settings.saveFailed'));
+      toast(t('settings.saveFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveName = async () => {
+    const newName = nameDraft.trim();
+    if (!newName || newName === user?.name) { setEditingName(false); return; }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/auth/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      });
+      const updated = await res.json();
+      setUser(prev => (prev ? { ...prev, name: updated.name } : prev));
+      toast(t('settings.profileUpdated'), 'success');
+      setEditingName(false);
+    } catch {
+      toast(t('settings.updateFailed'), 'error');
     } finally {
       setSaving(false);
     }
@@ -86,10 +111,32 @@ export function SettingsPage() {
         <Panel title={t('settings.profile')} icon={<User className="h-4 w-4" />} collapsible>
           <div className="p-4 space-y-4">
             <div>
-              <label className="text-[10px] text-(--color-term-muted) uppercase tracking-widest block mb-1">
+              <label htmlFor="profile-name" className="text-[10px] text-(--color-term-muted) uppercase tracking-widest block mb-1">
                 {t('settings.name')}
               </label>
-              <div className="text-sm font-medium">{user?.name || t('settings.notSet')}</div>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    id="profile-name"
+                    autoFocus
+                    value={nameDraft}
+                    onChange={e => setNameDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                    placeholder={t('settings.enterName')}
+                    className="flex-1 bg-(--color-term-panel) border border-(--color-term-border) text-sm px-2 py-1 outline-none focus:border-(--color-term-accent) transition-colors rounded-sm"
+                  />
+                  <button type="button" onClick={handleSaveName} disabled={saving} aria-label={t('common.save', 'Save')}
+                    className="focus-ring p-1.5 rounded-sm text-(--color-term-accent) hover:bg-(--color-term-accent)/10 disabled:opacity-50">
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  </button>
+                  <button type="button" onClick={() => setEditingName(false)} aria-label={t('common.cancel', 'Cancel')}
+                    className="focus-ring p-1.5 rounded-sm text-(--color-term-muted) hover:bg-white/5">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm font-medium">{user?.name || t('settings.notSet')}</div>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-(--color-term-muted) uppercase tracking-widest block mb-1">
@@ -97,33 +144,17 @@ export function SettingsPage() {
               </label>
               <div className="text-sm font-medium">{user?.email}</div>
             </div>
-            <div className="pt-2">
-              <button
-                onClick={async () => {
-                  const newName = prompt(t('settings.enterName'), user?.name || '');
-                  if (newName && newName !== user?.name) {
-                    setSaving(true);
-                    try {
-                      const res = await fetch('/api/auth/update', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: newName }),
-                      });
-                      const updated = await res.json();
-                      setUser((prev: any) => ({ ...prev, name: updated.name }));
-                      alert(t('settings.profileUpdated'));
-                    } catch {
-                      alert(t('settings.updateFailed'));
-                    } finally {
-                      setSaving(false);
-                    }
-                  }
-                }}
-                className="focus-ring text-xs text-(--color-term-accent) hover:underline flex items-center gap-1"
-              >
-                <Edit2 className="h-3 w-3" /> {t('settings.editProfile')}
-              </button>
-            </div>
+            {!editingName && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setNameDraft(user?.name || ''); setEditingName(true); }}
+                  className="focus-ring text-xs text-(--color-term-accent) hover:underline flex items-center gap-1"
+                >
+                  <Edit2 className="h-3 w-3" /> {t('settings.editProfile')}
+                </button>
+              </div>
+            )}
           </div>
         </Panel>
 

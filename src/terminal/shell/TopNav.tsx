@@ -177,7 +177,7 @@ export function TopNav({
                 'focus-ring relative h-full px-3 pt-4 pb-2.5 text-[11.5px] tracking-wider motion-safe:transition-all whitespace-nowrap font-medium',
                 isActive
                   ? 'text-(--color-term-accent)'
-                  : 'text-(--color-term-text)/50 hover:text-(--color-term-text)/80',
+                  : 'text-(--color-term-text)/70 hover:text-(--color-term-text)/90',
               )}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
@@ -225,7 +225,12 @@ export function TopNav({
             id="topnav-search-input"
             ref={inputRef}
             type="search"
+            role="combobox"
             aria-label={searchPlaceholder ?? t('topnav.search', 'SEARCH...')}
+            aria-expanded={showDropdown && results.length > 0}
+            aria-controls="topnav-search-listbox"
+            aria-autocomplete="list"
+            aria-activedescendant={activeIdx >= 0 ? `search-result-${activeIdx}` : undefined}
             value={query}
             onChange={e => { setQuery(e.target.value); if (e.target.value.trim()) setShowDropdown(true); }}
             onKeyDown={handleKeyDown}
@@ -258,6 +263,9 @@ export function TopNav({
           {/* Autocomplete dropdown */}
           {showDropdown && results.length > 0 && (
             <div
+              id="topnav-search-listbox"
+              role="listbox"
+              aria-label={t('topnav.searchResults', 'Search results')}
               className="absolute top-full right-0 mt-1.5 w-72 border border-(--color-term-border-strong) shadow-2xl z-[9999] overflow-hidden rounded-sm"
               style={{
                 background: 'linear-gradient(180deg, rgba(14,20,32,0.98) 0%, rgba(12,16,24,0.99) 100%)',
@@ -270,6 +278,8 @@ export function TopNav({
                   key={r.symbol}
                   type="button"
                   id={`search-result-${idx}`}
+                  role="option"
+                  aria-selected={idx === activeIdx}
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
                     idx === activeIdx

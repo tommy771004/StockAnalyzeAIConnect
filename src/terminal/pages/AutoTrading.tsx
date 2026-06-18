@@ -145,6 +145,7 @@ export function AutoTradingPage() {
 
   return (
     <div className="autotrading-pane h-full flex flex-col gap-2 overflow-hidden">
+      <h1 className="sr-only">{t('nav.autotrading', 'Auto Trading')}</h1>
       <TradeToast events={ws.orderEvents} />
       {/* Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border border-(--color-term-border) rounded-sm shrink-0">
