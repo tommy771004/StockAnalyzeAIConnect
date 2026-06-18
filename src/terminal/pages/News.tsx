@@ -133,7 +133,15 @@ function LiveFeed({
             return (
               <li
                 key={itemId}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(itemId)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelect(itemId);
+                  }
+                }}
                 className={cn(
                   'cursor-pointer px-4 py-4 transition-colors',
                   isActive

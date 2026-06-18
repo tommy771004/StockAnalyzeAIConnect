@@ -49,7 +49,8 @@ export function CryptoPage() {
       <h1 className="sr-only">{t('nav.crypto', 'Crypto')}</h1>
       <div className="col-span-12 min-h-[300px]">
         <Panel title={t('crypto.title', 'REAL-TIME CRYPTO MARKETS (USD)')} collapsible>
-          <table className="w-full text-[12px]">
+          <div className="w-full overflow-x-auto scrollbar-thin scroll-shadow-x">
+          <table className="w-full min-w-[720px] text-[12px]">
             <thead className="text-[10px] tracking-widest text-(--color-term-muted) bg-(--color-term-bg) sticky top-0 z-10">
               <tr className="border-b border-(--color-term-border)">
                 <th className="px-4 py-3 text-left">{t('crypto.pair', 'PAIR')}</th>
@@ -61,15 +62,28 @@ export function CryptoPage() {
             </thead>
             <tbody>
               {data.map((c, i) => (
-                <tr 
-                  key={c.symbol} 
+                <tr
+                  key={c.symbol}
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('symbol-search', { detail: c.symbol }));
                     navigate('/dashboard');
                   }}
                   className="border-b border-(--color-term-border)/60 hover:bg-white/5 transition-colors cursor-pointer group"
                 >
-                  <td className="px-4 py-3 font-bold tracking-wider group-hover:text-(--color-term-accent) transition-colors">{c.symbol}</td>
+                  <td className="px-4 py-3 font-bold tracking-wider group-hover:text-(--color-term-accent) transition-colors">
+                    <button
+                      type="button"
+                      aria-label={t('crypto.openAsset', 'Open {{symbol}}', { symbol: c.symbol })}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.dispatchEvent(new CustomEvent('symbol-search', { detail: c.symbol }));
+                        navigate('/dashboard');
+                      }}
+                      className="focus-ring"
+                    >
+                      {c.symbol}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-(--color-term-muted)">{c.shortName || 'Crypto Asset'}</td>
                   <td className="px-4 py-3 text-right tabular-nums font-semibold">
                     {Number(c.regularMarketPrice || 0).toLocaleString('en-US', {
@@ -92,6 +106,7 @@ export function CryptoPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </Panel>
       </div>
     </div>

@@ -4,7 +4,12 @@ import portfolio from '../Portfolio.tsx?raw';
 import dashboard from '../Dashboard.tsx?raw';
 import news from '../News.tsx?raw';
 import strategyTab from '../../../components/AutoTrading/StrategyTab.tsx?raw';
+import strategyFlow from '../../../components/AutoTrading/StrategyFlowBuilder.tsx?raw';
 import backtestHeader from '../../../components/backtest/BacktestHeaderSection.tsx?raw';
+import riskControl from '../../../components/AutoTrading/RiskControlPanel.tsx?raw';
+import smartMoneySettings from '../../ui/SmartMoneyAlertSettingsPanel.tsx?raw';
+import research from '../Research.tsx?raw';
+import crypto from '../Crypto.tsx?raw';
 import englishRaw from '../../../../public/locales/en/translation.json?raw';
 import chineseRaw from '../../../../public/locales/zh/translation.json?raw';
 
@@ -50,5 +55,51 @@ describe('UX accessibility contracts', () => {
 
     expect(english.smartMoney.pageSubtitle).not.toContain('Follow.md');
     expect(chinese.smartMoney.pageSubtitle).not.toContain('Follow.md');
+  });
+
+  it('programmatically associates configuration labels with their inputs', () => {
+    expect(backtestHeader).toContain('htmlFor="backtest-capital"');
+    expect(backtestHeader).toContain('id="backtest-capital"');
+    expect(backtestHeader).toContain('htmlFor="backtest-start-date"');
+    expect(backtestHeader).toContain('id="backtest-start-date"');
+    expect(riskControl).toContain('htmlFor={inputId}');
+    expect(riskControl).toContain('id={inputId}');
+    expect(smartMoneySettings).toContain('htmlFor="smart-money-min-buy"');
+    expect(research).toContain("aria-label={t('research.modelLabel'");
+  });
+
+  it('makes data rows keyboard operable', () => {
+    expect(dashboard).toContain("aria-label={t('dashboard.openSymbol'");
+    expect(market).toContain("aria-label={t('market.openIndex'");
+    expect(news).toContain("event.key === 'Enter' || event.key === ' '");
+    expect(crypto).toContain("aria-label={t('crypto.openAsset'");
+  });
+
+  it('contains the crypto table on narrow screens and preserves heading order', () => {
+    expect(crypto).toContain('overflow-x-auto');
+    expect(crypto).toContain('min-w-[720px]');
+    expect(backtestHeader).toContain('<h2 className="text-xs md:text-sm');
+    expect(backtestHeader).not.toContain('<h3 className="text-xs md:text-sm');
+  });
+
+  it('uses readable functional labels in compact trading controls', () => {
+    expect(strategyTab).toContain('text-[11px] font-bold');
+    expect(strategyTab).not.toContain('text-[9px] font-bold');
+    expect(riskControl).toContain('text-[11px] text-(--color-term-muted) uppercase');
+    expect(riskControl).not.toContain('text-[9px] text-(--color-term-muted) uppercase');
+  });
+
+  it('gives frequent icon-only actions a 44px touch target', () => {
+    expect(strategyTab).toContain('min-h-11 min-w-11');
+    expect(smartMoneySettings).toContain('min-h-11 min-w-11');
+    expect(dashboard).toContain('min-h-11 min-w-11');
+  });
+
+  it('removes sub-11px functional text from strategy and risk panels', () => {
+    expect(strategyFlow).not.toContain('text-[8px]');
+    expect(strategyFlow).not.toContain('text-[9px]');
+    expect(strategyFlow).not.toContain('text-[10px]');
+    expect(riskControl).not.toContain('text-[9px]');
+    expect(riskControl).not.toContain('text-[10px]');
   });
 });

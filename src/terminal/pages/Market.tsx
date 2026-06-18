@@ -93,7 +93,18 @@ export function MarketPage() {
                     }}
                   >
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-bold tracking-wider text-(--color-term-text) group-hover:text-(--color-term-accent) transition-colors">{r.symbol}</div>
+                      <button
+                        type="button"
+                        aria-label={t('market.openIndex', 'Open {{symbol}}', { symbol: r.symbol })}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          window.dispatchEvent(new CustomEvent('symbol-search', { detail: r.symbol }));
+                          navigate('/dashboard');
+                        }}
+                        className="focus-ring font-bold tracking-wider text-(--color-term-text) group-hover:text-(--color-term-accent) transition-colors"
+                      >
+                        {r.symbol}
+                      </button>
                       <div className="text-[10px] text-(--color-term-muted)">{r.shortName}</div>
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap">

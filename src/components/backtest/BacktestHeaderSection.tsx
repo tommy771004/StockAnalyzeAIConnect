@@ -99,6 +99,7 @@ export function BacktestHeaderSection({
 
           <div className="flex-1 min-w-[140px] lg:flex-none lg:min-w-[180px] relative">
             <select
+              aria-label={t('backtestEngine.strategyLabel', 'Trading strategy')}
               value={strategy}
               onChange={e => onStrategyChange(e.target.value as BacktestStrategyId)}
               className="relative w-full rounded-xl md:rounded-2xl px-3 md:px-5 py-2.5 md:py-3 text-base md:text-sm font-bold focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20 transition appearance-none cursor-pointer"
@@ -139,14 +140,15 @@ export function BacktestHeaderSection({
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center" style={{ background: 'var(--md-surface-container-high)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
               <Settings size={18} />
             </div>
-            <h3 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.2em]" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t('backtestEngine.settings', '回測設定')}</h3>
+            <h2 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] md:tracking-[0.2em]" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t('backtestEngine.settings', '回測設定')}</h2>
           </div>
 
           <div className="space-y-4 md:space-y-6">
             <div className="space-y-2 md:space-y-3">
-              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.initialCapital', '初始資金 (USD)')}</label>
+              <label htmlFor="backtest-capital" className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.initialCapital', '初始資金 (USD)')}</label>
               <div className="relative group">
                 <input
+                  id="backtest-capital"
                   type="text"
                   value={capital}
                   onChange={e => onCapitalChange(e.target.value)}
@@ -159,8 +161,9 @@ export function BacktestHeaderSection({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
               <div className="space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.startDate', '開始日期')}</label>
+                <label htmlFor="backtest-start-date" className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.startDate', '開始日期')}</label>
                 <input
+                  id="backtest-start-date"
                   type="date"
                   value={period1}
                   onChange={e => onPeriod1Change(e.target.value)}
@@ -169,8 +172,9 @@ export function BacktestHeaderSection({
                 />
               </div>
               <div className="space-y-2 md:space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.endDate', '結束日期')}</label>
+                <label htmlFor="backtest-end-date" className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.endDate', '結束日期')}</label>
                 <input
+                  id="backtest-end-date"
                   type="date"
                   value={period2}
                   onChange={e => onPeriod2Change(e.target.value)}
@@ -182,15 +186,17 @@ export function BacktestHeaderSection({
           </div>
 
           <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
-            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.strategyParams', '策略參數')}</label>
+            <h3 className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.strategyParams', '策略參數')}</h3>
             <div className="grid grid-cols-1 gap-3">
               {strategyParamSchema.map((field) => {
                 const value = getStrategyParamValue(strategyParams, field.path, field.defaultValue);
+                const fieldId = `backtest-param-${field.path.replace(/[^a-z0-9]+/gi, '-')}`;
                 if (field.type === 'range') {
                   return (
                     <div key={field.path} className="space-y-2">
-                      <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
+                      <label htmlFor={fieldId} className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                       <input
+                        id={fieldId}
                         type="range"
                         min={field.min}
                         max={field.max}
@@ -205,8 +211,9 @@ export function BacktestHeaderSection({
                 }
                 return (
                   <div key={field.path} className="space-y-2">
-                    <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
+                    <label htmlFor={fieldId} className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                     <input
+                      id={fieldId}
                       type="number"
                       min={field.min}
                       max={field.max}
@@ -221,10 +228,12 @@ export function BacktestHeaderSection({
               })}
               {RISK_EXIT_PARAM_SCHEMA.map((field) => {
                 const value = getStrategyParamValue(strategyParams, field.path, field.defaultValue);
+                const fieldId = `backtest-risk-${field.path.replace(/[^a-z0-9]+/gi, '-')}`;
                 return (
                   <div key={field.path} className="space-y-2">
-                    <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
+                    <label htmlFor={fieldId} className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                     <input
+                      id={fieldId}
                       type="number"
                       min={field.min}
                       max={field.max}

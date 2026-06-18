@@ -27,3 +27,5 @@ graphify-out/*
 知識庫資料夾/*
 graphify_vendor/*
 docs/*
+!docs/ux-audit/
+!docs/ux-audit/**

@@ -33,9 +33,9 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
         <div className={cn("p-1 rounded-sm", `bg-${color}-500/20`)}>
           <Icon className={cn("h-3.5 w-3.5", `text-${color}-400`)} />
         </div>
-        <div className="text-[8px] font-mono text-white/40 uppercase">{t('autotrading.strategyFlow.weight', 'Weight')}: {(weight * 100).toFixed(0)}%</div>
+        <div className="text-[11px] font-mono text-white/40 uppercase">{t('autotrading.strategyFlow.weight', 'Weight')}: {(weight * 100).toFixed(0)}%</div>
       </div>
-      <div className="text-[10px] font-bold text-white mb-2 uppercase tracking-tighter">{title}</div>
+      <div className="text-[11px] font-bold text-white mb-2 uppercase tracking-tighter">{title}</div>
       <div className="h-1 bg-white/5 rounded-full overflow-hidden">
          <div 
            className={cn("h-full transition-all duration-1000", `bg-${color}-500`)} 
@@ -69,7 +69,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
                 {params.enableMTF && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Layers className="h-2.5 w-2.5 text-blue-300" />
-                    <span className="text-[8px] text-blue-300 font-mono uppercase">{t('autotrading.strategyFlow.mtfFilter', 'MTF Filter')}: {params.mtfTimeframe} / {params.mtfTrendIndicator}</span>
+                    <span className="text-[11px] text-blue-300 font-mono uppercase">{t('autotrading.strategyFlow.mtfFilter', 'MTF Filter')}: {params.mtfTimeframe} / {params.mtfTrendIndicator}</span>
                   </div>
                 )}
               </div>
@@ -122,12 +122,12 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
                 <Cpu className={cn("h-5 w-5", isFiring ? "text-violet-400 animate-spin" : "text-white/20")} />
                 <span className="text-[11px] font-bold text-white uppercase tracking-widest">{t('autotrading.strategyFlow.neuralConsensusEngine', 'Neural Consensus Engine')}</span>
               </div>
-              <div className="text-[10px] font-mono text-violet-400">{intensity}% {t('autotrading.strategyFlow.match', 'Match')}</div>
+              <div className="text-[11px] font-mono text-violet-400">{intensity}% {t('autotrading.strategyFlow.match', 'Match')}</div>
             </div>
             
             {/* AI Threshold Slider */}
             <div className="space-y-3">
-              <div className="flex justify-between text-[9px] text-white/40 uppercase">
+              <div className="flex justify-between text-[11px] text-white/40 uppercase">
                  <span>{t('autotrading.strategyFlow.confidenceThreshold', 'Confidence Threshold')}</span>
                  <span>{params.AI_LLM?.confidenceThreshold}%</span>
               </div>
@@ -153,7 +153,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
           )}>
              <BarChart3 className={cn("h-3 w-3", params.sizingMethod === 'risk_base' ? "text-violet-400" : "text-white/20")} />
              <span className={cn(
-               "text-[9px] font-bold uppercase tracking-widest",
+                "text-[11px] font-bold uppercase tracking-widest",
                params.sizingMethod === 'risk_base' ? "text-violet-300" : "text-white/40"
              )}>
                {t('autotrading.strategyFlow.positionSizing', 'Position Sizing')}: {params.sizingMethod === 'risk_base' ? `${t('autotrading.strategyFlow.risk', 'Risk')} ${params.riskPerTradePct || 1}%` : t('autotrading.strategyFlow.fixedMode', 'Fixed Mode')}
@@ -180,7 +180,7 @@ export function StrategyFlowBuilder({ params, onChange, activeHeat = 0 }: Props)
 
       {/* 底部裝飾與說明 */}
       <div className="mt-8 pt-8 border-t border-white/5 flex justify-center">
-        <div className="flex gap-8 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+        <div className="flex flex-wrap justify-center gap-4 text-[11px] font-bold text-white/20 uppercase tracking-widest md:gap-8">
            <span>{t('autotrading.strategyFlow.alphaVersion', 'Alpha v3.0')}</span>
            <span>{t('autotrading.strategyFlow.parallelLogicExecution', 'Parallel Logic Execution')}</span>
            <span>{t('autotrading.strategyFlow.endToEndVisualized', 'End-to-End Visualized')}</span>

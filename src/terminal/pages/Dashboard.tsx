@@ -139,7 +139,7 @@ export function WatchlistPanel({
              type="button"
              onClick={() => setShowAdd(!showAdd)}
              aria-label={t('dashboard.addSymbol', 'Add symbol')}
-             className={cn("focus-ring", "motion-safe:transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
+             className={cn("focus-ring inline-flex min-h-11 min-w-11 items-center justify-center", "motion-safe:transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
            >
              <Plus className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -150,7 +150,7 @@ export function WatchlistPanel({
              title={t('dashboard.refresh', 'Refresh')}
              aria-label={t('dashboard.refresh', 'Refresh')}
             onClick={onRefresh}
-            className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors"
+            className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors"
           >
              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden="true" />
           </button>
@@ -172,10 +172,10 @@ export function WatchlistPanel({
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
           />
-           <button type="submit" aria-label={t('dashboard.addSymbol', 'Add symbol')} className="focus-ring text-(--color-term-accent) px-2">
+           <button type="submit" aria-label={t('dashboard.addSymbol', 'Add symbol')} className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center text-(--color-term-accent)">
              <Plus className="h-4 w-4" aria-hidden="true" />
            </button>
-           <button type="button" onClick={() => setShowAdd(false)} aria-label={t('common.close', 'Close')} className="focus-ring text-(--color-term-muted) px-2">
+           <button type="button" onClick={() => setShowAdd(false)} aria-label={t('common.close', 'Close')} className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center text-(--color-term-muted)">
              <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </form>
@@ -206,9 +206,15 @@ export function WatchlistPanel({
                   )}
                 >
                   <td className="px-3 py-3 font-semibold tracking-wider whitespace-nowrap">
-                    <span
+                    <button
+                      type="button"
+                      aria-label={t('dashboard.openSymbol', 'Open {{symbol}}', { symbol: row.symbol })}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(row.symbol);
+                      }}
                       className={cn(
-                        'inline-flex items-center gap-2',
+                        'focus-ring inline-flex items-center gap-2 text-left',
                         isActive && 'border-l-2 border-(--color-term-accent) pl-2 -ml-2',
                       )}
                     >
@@ -220,7 +226,7 @@ export function WatchlistPanel({
                           </span>
                         )}
                       </span>
-                    </span>
+                    </button>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">
                     {row.last > 0 ? formatFixedLocale(row.last, numberLocale) : '—'}

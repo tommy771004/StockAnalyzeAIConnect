@@ -204,6 +204,7 @@ export function ResearchPage() {
           <div className="flex items-center gap-2 bg-(--color-term-surface) px-3 py-1 rounded border border-(--color-term-border) h-8">
             <Cpu className="h-3.5 w-3.5 text-(--color-term-muted)" />
             <select
+              aria-label={t('research.modelLabel', 'AI model')}
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="bg-transparent text-[11px] font-bold text-(--color-term-text) outline-none appearance-none cursor-pointer uppercase tracking-wider"

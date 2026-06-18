@@ -275,7 +275,7 @@ export function SmartMoneyAlertSettingsPanel() {
             disabled={scanMutation.isPending || isLoading}
             aria-label={t('smartMoney.scanNow', 'Scan Smart Money now')}
             title={t('smartMoney.scanNow', 'Scan Smart Money now')}
-            className="focus-ring rounded border border-(--color-term-border) px-2 py-1 text-[10px] text-(--color-term-muted) hover:text-(--color-term-text) disabled:opacity-40"
+            className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-(--color-term-border) text-(--color-term-muted) hover:text-(--color-term-text) disabled:opacity-40"
           >
             {scanMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3 w-3" aria-hidden="true" />}
           </button>
@@ -285,7 +285,7 @@ export function SmartMoneyAlertSettingsPanel() {
             disabled={saveMutation.isPending || isLoading}
             aria-label={t('smartMoney.saveSettings', 'Save Smart Money settings')}
             title={t('smartMoney.saveSettings', 'Save Smart Money settings')}
-            className="focus-ring rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
+            className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
           >
             {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Save className="h-3 w-3" aria-hidden="true" />}
           </button>
@@ -350,8 +350,9 @@ export function SmartMoneyAlertSettingsPanel() {
             </label>
 
             <div className="rounded border border-(--color-term-border) bg-(--color-term-surface) p-3">
-              <label className="block text-[10px] uppercase text-(--color-term-muted)">{t('smartMoney.minBuy', '大額 insider buy 門檻')}</label>
+              <label htmlFor="smart-money-min-buy" className="block text-[10px] uppercase text-(--color-term-muted)">{t('smartMoney.minBuy', '大額 insider buy 門檻')}</label>
               <input
+                id="smart-money-min-buy"
                 type="number"
                 min="1000"
                 step="1000"
@@ -375,6 +376,7 @@ export function SmartMoneyAlertSettingsPanel() {
               <div className="text-[10px] font-bold tracking-widest text-(--color-term-muted) uppercase">{t('smartMoney.lookup', 'SEC 基金搜尋 / CIK 查找')}</div>
               <div className="mt-1 text-[11px] text-(--color-term-muted)">{t('smartMoney.lookupHelp', '輸入基金名稱，直接用 SEC 搜尋結果帶回 CIK，再一鍵加入追蹤')}</div>
               <input
+                aria-label={t('smartMoney.lookup', 'SEC 基金搜尋 / CIK 查找')}
                 type="text"
                 value={managerSearchQuery}
                 onChange={(event) => setManagerSearchQuery(event.target.value)}
@@ -497,6 +499,7 @@ export function SmartMoneyAlertSettingsPanel() {
 
             <div className="grid gap-2 border-t border-(--color-term-border) px-4 py-3 sm:grid-cols-[1fr_160px_auto]">
               <input
+                aria-label={t('smartMoney.managerName', '自訂基金名稱')}
                 type="text"
                 value={managerDraft.name}
                 onChange={(event) => setManagerDraft((current) => ({ ...current, name: event.target.value }))}
@@ -505,6 +508,7 @@ export function SmartMoneyAlertSettingsPanel() {
                 className="rounded border border-(--color-term-border) bg-(--color-term-panel) px-3 py-2 text-sm text-(--color-term-text) outline-none"
               />
               <input
+                aria-label={t('smartMoney.managerCik', 'CIK')}
                 type="text"
                 value={managerDraft.cik}
                 onChange={(event) => setManagerDraft((current) => ({ ...current, cik: event.target.value }))}
@@ -547,6 +551,7 @@ export function SmartMoneyAlertSettingsPanel() {
 
             <div className="grid gap-2 border-t border-(--color-term-border) px-4 py-3 sm:grid-cols-[1fr_auto]">
               <input
+                aria-label={t('smartMoney.symbolInput', '額外 Insider 監控代號')}
                 type="text"
                 value={symbolDraft}
                 onChange={(event) => setSymbolDraft(event.target.value)}

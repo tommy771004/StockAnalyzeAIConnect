@@ -111,11 +111,11 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       'border rounded-sm p-3 space-y-3',
       isKillActive ? 'border-rose-500/50 bg-rose-950/20' : 'border-(--color-term-border)'
     )}>
-      <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase flex items-center gap-2 text-rose-400">
+      <h3 className="text-[11px] font-bold tracking-[0.2em] uppercase flex items-center gap-2 text-rose-400">
         <AlertTriangle className="h-3 w-3" />
         {t('autotrading.risk.title')}
         {isKillActive && (
-          <span className="ml-auto text-[9px] bg-rose-500/20 border border-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded animate-pulse">
+          <span className="ml-auto text-[11px] bg-rose-500/20 border border-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded animate-pulse">
             {t('autotrading.risk.killActive')}
           </span>
         )}
@@ -162,7 +162,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       <button
         type="button"
         onClick={handleSave}
-        className="focus-ring w-full py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 motion-safe:transition-colors"
+        className="focus-ring w-full py-1.5 rounded text-[11px] font-bold uppercase tracking-widest border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 motion-safe:transition-colors"
       >
         {t('autotrading.risk.saveParams')}
       </button>
@@ -170,7 +170,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       {/* Daily loss progress */}
       {riskStats && riskStats.dailyLoss > 0 && (
         <div>
-          <div className="flex justify-between text-[9px] text-(--color-term-muted) mb-1">
+          <div className="flex justify-between text-[11px] text-(--color-term-muted) mb-1">
             <span>{t('autotrading.risk.todayLoss')}</span>
             <span>{((riskStats.dailyLoss / riskStats.config.maxDailyLossTWD) * 100).toFixed(1)}%</span>
           </div>
@@ -186,7 +186,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       {/* Loss Streak Badge */}
       {riskStats && (
         <div className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded">
-           <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.risk.lossStreak')}</span>
+           <span className="text-[11px] text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.risk.lossStreak')}</span>
            <span className={cn(
              "text-[12px] font-bold font-mono",
              riskStats.lossStreakCount > 0 ? "text-amber-400" : "text-emerald-400"
@@ -199,9 +199,9 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
       {riskStats?.monteCarlo && (
         <div className="p-2 bg-white/5 border border-white/5 rounded space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-(--color-term-muted) uppercase tracking-widest">Monte Carlo</span>
+            <span className="text-[11px] text-(--color-term-muted) uppercase tracking-widest">Monte Carlo</span>
             <span className={cn(
-              'text-[10px] font-mono font-bold',
+              'text-[11px] font-mono font-bold',
               riskStats.monteCarlo.ruinProbability >= 0.1
                 ? 'text-rose-400'
                 : riskStats.monteCarlo.ruinProbability >= 0.03
@@ -211,15 +211,15 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
               Ruin {(riskStats.monteCarlo.ruinProbability * 100).toFixed(2)}%
             </span>
           </div>
-          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+          <div className="text-[11px] text-(--color-term-muted) flex items-center justify-between">
             <span>Paths / Horizon</span>
             <span className="font-mono">{riskStats.monteCarlo.paths} / {riskStats.monteCarlo.horizonSteps}</span>
           </div>
-          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+          <div className="text-[11px] text-(--color-term-muted) flex items-center justify-between">
             <span>VaR 95%</span>
             <span className="font-mono">{riskStats.monteCarlo.valueAtRisk95Pct.toFixed(2)}%</span>
           </div>
-          <div className="text-[9px] text-(--color-term-muted) flex items-center justify-between">
+          <div className="text-[11px] text-(--color-term-muted) flex items-center justify-between">
             <span>Expected Max DD</span>
             <span className="font-mono">{riskStats.monteCarlo.expectedMaxDrawdownPct.toFixed(2)}%</span>
           </div>
@@ -243,7 +243,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
         </button>
       ) : (
         <div className="space-y-2">
-          <p className="text-[10px] text-rose-300 text-center">{t('autotrading.risk.killConfirmDesc')}</p>
+          <p className="text-[11px] text-rose-300 text-center">{t('autotrading.risk.killConfirmDesc')}</p>
           <div className="flex gap-2">
             <button
               type="button"
@@ -265,7 +265,7 @@ export function RiskControlPanel({ riskStats, onKillSwitch, onUpdateConfig }: Pr
 
       {toast && (
         <div className={cn(
-          'p-2 border rounded flex items-center gap-2 text-[10px]',
+          'p-2 border rounded flex items-center gap-2 text-[11px]',
           toast.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
         )}>
           {toast.type === 'success' ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
@@ -285,13 +285,19 @@ interface NumberFieldProps {
   step?: number;
 }
 function NumberField({ label, unit, value, onChange, error, step }: NumberFieldProps) {
+  const inputId = React.useId();
+  const errorId = error ? `${inputId}-error` : undefined;
+
   return (
     <div>
-      <label className="text-[9px] text-(--color-term-muted) uppercase tracking-widest block mb-1">{label}</label>
+      <label htmlFor={inputId} className="text-[11px] text-(--color-term-muted) uppercase tracking-widest block mb-1">{label}</label>
       <div className="flex items-center gap-1">
-        <span className="text-[10px] text-(--color-term-muted) shrink-0 w-7">{unit}</span>
+        <span className="text-[11px] text-(--color-term-muted) shrink-0 w-7">{unit}</span>
         <input
+          id={inputId}
           type="number"
+          aria-describedby={errorId}
+          aria-invalid={Boolean(error)}
           value={Number.isFinite(value) ? value : 0}
           step={step}
           onChange={e => onChange(Number(e.target.value))}
@@ -301,7 +307,7 @@ function NumberField({ label, unit, value, onChange, error, step }: NumberFieldP
           )}
         />
       </div>
-      {error && <div className="text-[9px] text-rose-300 mt-1">{error}</div>}
+      {error && <div id={errorId} className="text-[11px] text-rose-300 mt-1">{error}</div>}
     </div>
   );
 }
