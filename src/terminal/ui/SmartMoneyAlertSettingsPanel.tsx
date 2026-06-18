@@ -273,17 +273,21 @@ export function SmartMoneyAlertSettingsPanel() {
             type="button"
             onClick={() => scanMutation.mutate()}
             disabled={scanMutation.isPending || isLoading}
+            aria-label={t('smartMoney.scanNow', 'Scan Smart Money now')}
+            title={t('smartMoney.scanNow', 'Scan Smart Money now')}
             className="focus-ring rounded border border-(--color-term-border) px-2 py-1 text-[10px] text-(--color-term-muted) hover:text-(--color-term-text) disabled:opacity-40"
           >
-            {scanMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {scanMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3 w-3" aria-hidden="true" />}
           </button>
           <button
             type="button"
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending || isLoading}
+            aria-label={t('smartMoney.saveSettings', 'Save Smart Money settings')}
+            title={t('smartMoney.saveSettings', 'Save Smart Money settings')}
             className="focus-ring rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
           >
-            {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Save className="h-3 w-3" aria-hidden="true" />}
           </button>
         </div>
       }

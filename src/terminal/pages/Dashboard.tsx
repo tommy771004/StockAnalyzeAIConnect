@@ -135,22 +135,24 @@ export function WatchlistPanel({
       actions={
         <div className="flex items-center gap-2">
           {/* Add button */}
-          <button
-            type="button"
-            onClick={() => setShowAdd(!showAdd)}
-            className={cn("focus-ring", "motion-safe:transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
-          >
-            <Plus className="h-4 w-4" />
+           <button
+             type="button"
+             onClick={() => setShowAdd(!showAdd)}
+             aria-label={t('dashboard.addSymbol', 'Add symbol')}
+             className={cn("focus-ring", "motion-safe:transition-colors", showAdd ? "text-(--color-term-accent)" : "text-(--color-term-muted) hover:text-(--color-term-accent)")}
+           >
+             <Plus className="h-4 w-4" aria-hidden="true" />
           </button>
           <DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />
           {/* Manual refresh */}
           <button
-            type="button"
-            title={t('dashboard.refresh', 'Refresh')}
+             type="button"
+             title={t('dashboard.refresh', 'Refresh')}
+             aria-label={t('dashboard.refresh', 'Refresh')}
             onClick={onRefresh}
             className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors"
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden="true" />
           </button>
         </div>
       }
@@ -162,15 +164,19 @@ export function WatchlistPanel({
           <input
             autoFocus
             className="flex-1 bg-transparent px-2 text-[12px] font-bold tracking-widest text-(--color-term-text) focus:outline-none placeholder:text-(--color-term-muted)/50"
-            placeholder={t('dashboard.enterTicker', 'ENTER TICKER...')}
+             placeholder={t('dashboard.enterTicker', 'ENTER TICKER...')}
+             aria-label={t('dashboard.enterTicker', 'Enter ticker')}
+             name="watchlist-symbol"
+             autoComplete="off"
+             spellCheck={false}
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
           />
-          <button type="submit" className="focus-ring text-(--color-term-accent) px-2">
-            <Plus className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => setShowAdd(false)} className="focus-ring text-(--color-term-muted) px-2">
-            <X className="h-4 w-4" />
+           <button type="submit" aria-label={t('dashboard.addSymbol', 'Add symbol')} className="focus-ring text-(--color-term-accent) px-2">
+             <Plus className="h-4 w-4" aria-hidden="true" />
+           </button>
+           <button type="button" onClick={() => setShowAdd(false)} aria-label={t('common.close', 'Close')} className="focus-ring text-(--color-term-muted) px-2">
+             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </form>
       )}
@@ -224,7 +230,8 @@ export function WatchlistPanel({
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                      <button
-                      type="button"
+                       type="button"
+                       aria-label={t('dashboard.removeSymbol', 'Remove {{symbol}}', { symbol: row.symbol })}
                       onClick={async (e) => {
                         e.stopPropagation();
                         if (await confirm({
@@ -235,7 +242,7 @@ export function WatchlistPanel({
                       }}
                       className="focus-ring opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-rose-500/60 hover:text-rose-500 motion-safe:transition-all p-1"
                      >
-                       <Trash2 className="h-3.5 w-3.5" />
+                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                      </button>
                   </td>
                 </tr>

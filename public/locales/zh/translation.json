@@ -314,7 +314,7 @@
   },
   "smartMoney": {
     "pageTitle": "聰明錢追蹤",
-    "pageSubtitle": "把 Follow.md 的 13F、內部人交易與基金追蹤流程集中成單一工作台。",
+    "pageSubtitle": "在單一工作台集中追蹤 13F、內部人交易與基金經理動向。",
     "pageFocusTitle": "追蹤焦點",
     "pageSymbolLabel": "內部人觀察標的",
     "pageSymbolPlaceholder": "搜尋美股代號，例如 AAPL, NVDA...",
@@ -750,7 +750,9 @@
       "sellTag": "(賣出)"
     },
     "strategy": {
-      "tacticalConfig": "戰術配置 (Tactical Configuration)",
+      "tacticalConfig": "股票交易策略",
+      "showMap": "顯示策略地圖",
+      "showList": "顯示策略清單",
       "names": {
         "rsiReversion": "RSI 均值回歸",
         "bollingerBreakout": "布林突破",

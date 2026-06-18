@@ -31,21 +31,27 @@ export function StrategyTab({ strategies, params, onStrategiesChange, onParamsCh
       {/* View Toggle */}
       <div className="flex justify-between items-center bg-black/40 p-1.5 rounded border border-white/5">
         <div className="flex items-center gap-2 px-2">
-           <Settings2 className="h-3 w-3 text-white/20" />
-           <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{t('autotrading.strategy.tacticalConfig')}</span>
+           <Settings2 className="h-3 w-3 text-white/20" aria-hidden="true" />
+           <span className="text-[9px] font-bold text-(--color-term-muted) uppercase tracking-widest">{t('autotrading.strategy.tacticalConfig')}</span>
         </div>
         <div className="flex gap-1">
-          <button 
-            onClick={() => setViewMode('map')} 
-            className={cn("focus-ring p-1.5 rounded motion-safe:transition-all", viewMode === 'map' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
+          <button
+            type="button"
+            onClick={() => setViewMode('map')}
+            aria-label={t('autotrading.strategy.showMap', 'Show strategy map')}
+            aria-pressed={viewMode === 'map'}
+            className={cn("focus-ring p-1.5 rounded motion-safe:transition-colors", viewMode === 'map' ? "bg-violet-500 text-white shadow-lg" : "text-white/50 hover:text-white")}
           >
-            <MapIcon className="h-3.5 w-3.5" />
+            <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <button 
-            onClick={() => setViewMode('list')} 
-            className={cn("focus-ring p-1.5 rounded motion-safe:transition-all", viewMode === 'list' ? "bg-violet-500 text-white shadow-lg" : "text-white/30 hover:text-white")}
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            aria-label={t('autotrading.strategy.showList', 'Show strategy list')}
+            aria-pressed={viewMode === 'list'}
+            className={cn("focus-ring p-1.5 rounded motion-safe:transition-colors", viewMode === 'list' ? "bg-violet-500 text-white shadow-lg" : "text-white/50 hover:text-white")}
           >
-            <List className="h-3.5 w-3.5" />
+            <List className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>

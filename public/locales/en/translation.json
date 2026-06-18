@@ -313,7 +313,7 @@
   },
   "smartMoney": {
     "pageTitle": "Smart Money Tracker",
-    "pageSubtitle": "Bring the Follow.md 13F, insider-trading, and manager-tracking workflow into one dedicated workspace.",
+    "pageSubtitle": "Track 13F filings, insider trades, and fund managers in one dedicated workspace.",
     "pageFocusTitle": "Focus",
     "pageSymbolLabel": "Insider symbol",
     "pageSymbolPlaceholder": "Search a US symbol, e.g. AAPL, NVDA...",
@@ -749,7 +749,9 @@
       "sellTag": "(Sell)"
     },
     "strategy": {
-      "tacticalConfig": "Tactical Configuration",
+      "tacticalConfig": "Stock Trading Strategies",
+      "showMap": "Show strategy map",
+      "showList": "Show strategy list",
       "names": {
         "rsiReversion": "RSI Reversion",
         "bollingerBreakout": "Bollinger Breakout",

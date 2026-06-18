@@ -65,6 +65,7 @@ export function BacktestHeaderSection({
   const strategyType = mapBacktestStrategyToStrategyType(strategy);
   const strategyParamSchema = STRATEGY_PARAM_SCHEMA[strategyType] ?? [];
   const sk = (id: string, field: string, fallback: string) => t(`backtestEngine.strategy.${id}.${field}`, fallback);
+  const labelColor = 'var(--md-on-surface-variant)';
 
   return (
     <>
@@ -78,7 +79,7 @@ export function BacktestHeaderSection({
           </div>
           <div className="min-w-0">
             <h1 className="text-xl md:text-3xl font-black tracking-tighter" style={{ color: 'var(--md-on-surface)', fontFamily: 'var(--font-heading)' }}>{t('backtestEngine.title', '回測引擎')} <span className="text-[10px] md:text-sm font-bold ml-1 px-1.5 md:px-2 py-0.5 rounded-lg" style={{ color: 'var(--md-primary)', background: 'rgba(192,193,255,0.1)', border: '1px solid rgba(192,193,255,0.2)' }}>V4.2</span></h1>
-            <p className="label-meta font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-0.5 md:mt-1 truncate" style={{ color: 'var(--md-outline)' }}>Quantum Backtesting Lab</p>
+            <p className="label-meta font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-0.5 md:mt-1 truncate" style={{ color: labelColor }}>Quantum Backtesting Lab</p>
           </div>
         </div>
 
@@ -143,7 +144,7 @@ export function BacktestHeaderSection({
 
           <div className="space-y-4 md:space-y-6">
             <div className="space-y-2 md:space-y-3">
-              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.initialCapital', '初始資金 (USD)')}</label>
+              <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.initialCapital', '初始資金 (USD)')}</label>
               <div className="relative group">
                 <input
                   type="text"
@@ -158,7 +159,7 @@ export function BacktestHeaderSection({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
               <div className="space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.startDate', '開始日期')}</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.startDate', '開始日期')}</label>
                 <input
                   type="date"
                   value={period1}
@@ -168,7 +169,7 @@ export function BacktestHeaderSection({
                 />
               </div>
               <div className="space-y-2 md:space-y-3">
-                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.endDate', '結束日期')}</label>
+                <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.endDate', '結束日期')}</label>
                 <input
                   type="date"
                   value={period2}
@@ -181,14 +182,14 @@ export function BacktestHeaderSection({
           </div>
 
           <div className="pt-6 space-y-4" style={{ borderTop: '1px solid var(--md-outline-variant)' }}>
-            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: 'var(--md-outline)' }}>{t('backtestEngine.strategyParams', '策略參數')}</label>
+            <label className="label-meta font-black uppercase tracking-widest ml-1" style={{ color: labelColor }}>{t('backtestEngine.strategyParams', '策略參數')}</label>
             <div className="grid grid-cols-1 gap-3">
               {strategyParamSchema.map((field) => {
                 const value = getStrategyParamValue(strategyParams, field.path, field.defaultValue);
                 if (field.type === 'range') {
                   return (
                     <div key={field.path} className="space-y-2">
-                      <label className="label-meta" style={{ color: 'var(--md-outline)' }}>{field.label}</label>
+                      <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                       <input
                         type="range"
                         min={field.min}
@@ -198,13 +199,13 @@ export function BacktestHeaderSection({
                         onChange={e => onStrategyParamChange(field.path, Number(e.target.value))}
                         className="w-full h-1 rounded-lg appearance-none cursor-pointer accent-violet-400"
                       />
-                      <div className="text-[10px] font-bold" style={{ color: 'var(--md-outline)' }}>{value}{field.unit ?? ''}</div>
+                      <div className="text-[10px] font-bold" style={{ color: labelColor }}>{value}{field.unit ?? ''}</div>
                     </div>
                   );
                 }
                 return (
                   <div key={field.path} className="space-y-2">
-                    <label className="label-meta" style={{ color: 'var(--md-outline)' }}>{field.label}</label>
+                    <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                     <input
                       type="number"
                       min={field.min}
@@ -222,7 +223,7 @@ export function BacktestHeaderSection({
                 const value = getStrategyParamValue(strategyParams, field.path, field.defaultValue);
                 return (
                   <div key={field.path} className="space-y-2">
-                    <label className="label-meta" style={{ color: 'var(--md-outline)' }}>{field.label}</label>
+                    <label className="label-meta" style={{ color: labelColor }}>{field.label}</label>
                     <input
                       type="number"
                       min={field.min}
@@ -249,7 +250,7 @@ export function BacktestHeaderSection({
                 </div>
                 <div>
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2" style={{ color: currentStrategy.color, fontFamily: 'var(--font-heading)' }}>{sk(strategy, 'label', currentStrategy.label)}</h2>
-                  <div className="text-xs font-black uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--md-outline)' }}>{sk(strategy, 'type', currentStrategy.type)}</div>
+                  <div className="text-xs font-black uppercase tracking-[0.2em] mb-3" style={{ color: labelColor }}>{sk(strategy, 'type', currentStrategy.type)}</div>
                 </div>
               </div>
             </div>
@@ -257,10 +258,10 @@ export function BacktestHeaderSection({
             <p className="text-sm leading-relaxed font-medium mt-6 mb-6" style={{ color: 'var(--md-on-surface-variant)' }}>{sk(strategy, 'desc', currentStrategy.desc)}</p>
 
             <div className="mt-6 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: labelColor }}>
                 <span>📈</span> {sk(strategy, 'suitable', currentStrategy.suitable)}
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: 'var(--md-outline)' }}>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold" style={{ background: 'var(--md-surface-container)', border: '1px solid var(--md-outline-variant)', color: labelColor }}>
                 <span>⚠️</span> {sk(strategy, 'avoid', currentStrategy.avoid)}
               </div>
             </div>

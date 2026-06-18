@@ -35,20 +35,21 @@ export function MarketPage() {
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1">
             {sectors.map((s) => (
-              <div
+              <button
+                type="button"
                 key={s.symbol}
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('symbol-search', { detail: s.symbol }));
                   navigate('/dashboard');
                 }}
                 className={cn(
-                  'flex flex-col items-start justify-between p-3 text-[12px] h-24 cursor-pointer hover:brightness-125 hover:scale-[1.01] active:scale-[0.98] transition-all',
+                  'min-w-0 flex flex-col items-start justify-between p-3 text-left text-[12px] h-24 cursor-pointer hover:brightness-125 hover:scale-[1.01] active:scale-[0.98] motion-safe:transition-[filter,transform]',
                   s.regularMarketChangePercent >= 0 ? 'bg-emerald-900/60 text-emerald-100' : 'bg-rose-900/60 text-rose-100',
                 )}
               >
-                <div className="flex flex-col">
+                <div className="flex w-full min-w-0 flex-col">
                   <span className="font-bold tracking-widest text-[13px]">{s.symbol}</span>
-                  <span className="text-[10px] opacity-70 truncate">
+                  <span className="block w-full truncate text-[10px] opacity-70">
                     {s.shortName?.replace('Select Sector SPDR Fund', '').trim() || t('market.sectorFallback', 'Sector')}
                   </span>
                 </div>
@@ -58,7 +59,7 @@ export function MarketPage() {
                   </span>
                   <span className="font-mono">{formatPct(s.regularMarketChangePercent || 0, 1)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Panel>

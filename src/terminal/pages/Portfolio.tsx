@@ -86,6 +86,7 @@ export function PortfolioPage() {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
+      <h1 className="sr-only">{t('nav.portfolio', 'Portfolio')}</h1>
       <div className="col-span-12 lg:col-span-5 md:min-h-0 shrink-0 md:shrink">
         <EquityPanel history={history} currentEquity={totalEquityTWD} />
       </div>
@@ -304,13 +305,15 @@ export function HoldingsPanel({
       actions={
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 mr-2">
-             <button 
+              <button
+                type="button"
                 onClick={onRefresh}
                 disabled={loading}
                 title={t('portfolio.refresh', 'Refresh Prices')}
+                aria-label={t('portfolio.refresh', 'Refresh Prices')}
                 className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) motion-safe:transition-colors p-2"
              >
-                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
              </button>
              <span className="text-(--color-term-muted) text-[11px]">{t('portfolio.holdingsCount', '{{count}} holdings', { count: positions.length })}</span>
           </div>
@@ -417,26 +420,30 @@ export function HoldingsPanel({
                   <div className="flex items-center justify-center gap-2">
                     {isEditing ? (
                       <>
-                        <button onClick={saveEdit} className="focus-ring text-emerald-400 hover:text-emerald-300 p-2">
-                          <Check size={16} />
+                        <button type="button" onClick={saveEdit} aria-label={t('portfolio.savePosition', 'Save {{symbol}}', { symbol: h.symbol })} className="focus-ring text-emerald-400 hover:text-emerald-300 p-2">
+                          <Check size={16} aria-hidden="true" />
                         </button>
-                        <button onClick={() => setEditingSym(null)} className="focus-ring text-(--color-term-muted) hover:text-(--color-term-text) p-2">
-                          <X size={16} />
+                        <button type="button" onClick={() => setEditingSym(null)} aria-label={t('portfolio.cancelEditing', 'Cancel editing {{symbol}}', { symbol: h.symbol })} className="focus-ring text-(--color-term-muted) hover:text-(--color-term-text) p-2">
+                          <X size={16} aria-hidden="true" />
                         </button>
                       </>
                     ) : (
                       <>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => startEdit(h)}
+                          aria-label={t('portfolio.editPosition', 'Edit {{symbol}} position', { symbol: h.symbol })}
                           className="focus-ring text-(--color-term-muted) hover:text-(--color-term-accent) opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
-                          <Edit2 size={15} />
+                          <Edit2 size={15} aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
                           onClick={async () => { if (await confirm({ message: t('portfolio.deleteConfirm', 'Delete {{symbol}} position?', { symbol: h.symbol }), confirmLabel: t('common.delete', 'Delete'), destructive: true })) onDelete(h.symbol); }}
+                          aria-label={t('portfolio.deletePosition', 'Delete {{symbol}} position', { symbol: h.symbol })}
                           className="focus-ring text-(--color-term-muted) hover:text-rose-400 opacity-100 lg:opacity-0 group-hover:opacity-100 motion-safe:transition-all p-2"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={15} aria-hidden="true" />
                         </button>
                       </>
                     )}

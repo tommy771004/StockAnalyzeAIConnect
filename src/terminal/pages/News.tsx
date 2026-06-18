@@ -41,6 +41,7 @@ export function NewsPage() {
 
   return (
     <div className="flex flex-col h-full gap-3 pb-10">
+      <h1 className="sr-only">{t('nav.news', 'News')}</h1>
       {/* Category Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {NEWS_CATEGORIES.map(({ value, labelKey }) => (
@@ -205,9 +206,9 @@ function ArticleReader({ item, t, timeLocale }: { item: any; t: any; timeLocale:
          </button>
       </header>
       <div className="flex-1 overflow-auto p-6 pb-20 scrollbar-thin">
-        <h1 className="mb-6 text-[24px] leading-[1.3] font-bold text-(--color-term-text) tracking-tight">
+        <h2 className="mb-6 text-[24px] leading-[1.3] font-bold text-(--color-term-text) tracking-tight">
           {item.title}
-        </h1>
+        </h2>
         
         <div className="mb-8 rounded-sm border border-(--color-term-accent)/20 p-5 bg-(--color-term-accent)/5 relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-1 h-full bg-(--color-term-accent)/40" />
