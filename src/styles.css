@@ -8,7 +8,7 @@
   --color-term-border:         #192030;
   --color-term-border-strong:  #253040;
   --color-term-text:           #dde2e8;
-  --color-term-muted:          #5c6678;
+  --color-term-muted:          #7e8a9c;       /* raised from #5c6678 to meet WCAG AA (≈5.3:1 on panels) */
   --color-term-subtle:         #3a4557;
   --color-term-accent:         #f59e0b;       /* amber — primary accent */
   --color-term-accent-soft:    #f5b042;

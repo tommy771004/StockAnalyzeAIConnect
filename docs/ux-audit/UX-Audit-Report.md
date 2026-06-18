@@ -5,6 +5,21 @@
 
 ---
 
+## ⏩ 更新（2026-06-18，後續實作）
+
+第一階段（PR #43，已合併）完成審計報告 + 低風險無障礙修正。經使用者授權後，**第二階段**進一步實作了原本「只建議、不動手」的 4 個項目：
+
+| 原編號 | 項目 | 實作 |
+|---|---|---|
+| P0-1 | 啟用 ErrorBoundary | `App.tsx` 以 `<ErrorBoundary key={view}>` 包覆頁面切換（`key` 確保切換頁面時自動復原）；並修正其未定義背景 `--card-bg` → `--color-term-panel`。任一頁 render 例外時改為顯示**可重試的錯誤卡片且外殼（導覽列）保留**，不再整頁空白。見 `screenshots/after-errorboundary.png`。 |
+| P1-1 | 對比達 AA | `--color-term-muted` `#5c6678` → `#7e8a9c`（on panel ≈5.3:1、on bg ≈5.6:1，通過 AA）。`subtle` 維持原值（僅用於邊框/捲軸/裝飾 icon，無正文）。 |
+| P1-2 | 統一主色為琥珀 | Settings 全數 `sky-*` → `--color-term-accent`（Save／Contact／Edit／PRO 徽章／通知開關／輸入框 focus）；Backtest「開始回測 RUN」`indigo-500` → `--color-term-accent`。見 `screenshots/after-settings-amber.png`、`after-backtest-amber.png`。 |
+| P2-1 | 對齊側欄圖示 | `Sidebar` dashboard `Star`→`LayoutDashboard`、market `CalendarDays`→`Globe`，與底部導覽一致且語意正確。 |
+
+> 驗證：`VERCEL=1 npm run build` ✅；4 項皆以 Playwright 重新截圖確認。其餘 P2/P3 建議（alert→toast、補 `<h1>`、Backtest i18n、ARIA combobox、`<html lang>` 同步等）維持為建議。
+
+---
+
 ## 0. 摘要（TL;DR）
 
 整體而言，這是一套**完成度很高、工程基礎扎實**的深色終端機風格介面：語意化 `<button>`/`<section>`/`<header>`、`focus-ring`（focus-visible）、`motion-safe` + `prefers-reduced-motion`、`h-dvh` + safe-area、表格 `overflow-x` 邊到邊捲動、良好的空狀態（empty state）等都做得不錯。

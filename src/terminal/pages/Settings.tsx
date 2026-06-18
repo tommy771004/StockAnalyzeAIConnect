@@ -74,7 +74,7 @@ export function SettingsPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="focus-ring flex items-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-500/50 text-white px-4 py-2 rounded-sm text-sm motion-safe:transition-colors"
+          className="focus-ring flex items-center gap-2 bg-(--color-term-accent) hover:bg-(--color-term-accent-soft) disabled:opacity-50 text-(--color-term-bg) font-semibold px-4 py-2 rounded-sm text-sm motion-safe:transition-colors"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t('settings.saveChanges')}
@@ -119,7 +119,7 @@ export function SettingsPage() {
                     }
                   }
                 }}
-                className="focus-ring text-xs text-sky-400 hover:underline flex items-center gap-1"
+                className="focus-ring text-xs text-(--color-term-accent) hover:underline flex items-center gap-1"
               >
                 <Edit2 className="h-3 w-3" /> {t('settings.editProfile')}
               </button>
@@ -132,7 +132,7 @@ export function SettingsPage() {
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">{t('settings.currentPlan')}</span>
-              <span className="bg-sky-500/20 text-sky-400 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">
+              <span className="bg-(--color-term-accent)/20 text-(--color-term-accent) text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">
                 {user?.tier || 'Free'}
               </span>
             </div>
@@ -141,7 +141,7 @@ export function SettingsPage() {
             </p>
             <button
               onClick={() => window.location.href = `mailto:sales@antigravity.ai?subject=Enterprise%20Plan%20Inquiry%20-%20${user?.email}`}
-              className="focus-ring w-full bg-sky-500 hover:bg-sky-600 py-2 text-xs motion-safe:transition-colors rounded-sm font-bold"
+              className="focus-ring w-full bg-(--color-term-accent) hover:bg-(--color-term-accent-soft) text-(--color-term-bg) py-2 text-xs motion-safe:transition-colors rounded-sm font-bold"
             >
               {t('settings.contactSales')}
             </button>
@@ -161,7 +161,7 @@ export function SettingsPage() {
                 value={settings.OPENROUTER_API_KEY}
                 onChange={e => setSettings({ ...settings, OPENROUTER_API_KEY: e.target.value })}
                 placeholder="sk-or-v1-..."
-                className="w-full bg-(--color-term-panel) border border-(--color-term-border) text-sm p-2 outline-none focus:border-sky-500 transition-colors"
+                className="w-full bg-(--color-term-panel) border border-(--color-term-border) text-sm p-2 outline-none focus:border-(--color-term-accent) transition-colors"
               />
               <p className="text-[10px] text-(--color-term-muted) mt-2 italic">
                 * {t('settings.apiKeyDesc')}
@@ -181,7 +181,7 @@ export function SettingsPage() {
                 onClick={() => setSettings({ ...settings, NOTIFICATION_ENABLED: !settings.NOTIFICATION_ENABLED })}
                 className={cn(
                   'focus-ring w-10 h-5 rounded-full relative cursor-pointer transition-colors shrink-0',
-                  settings.NOTIFICATION_ENABLED ? 'bg-sky-500' : 'bg-zinc-700',
+                  settings.NOTIFICATION_ENABLED ? 'bg-(--color-term-accent)' : 'bg-zinc-700',
                 )}
               >
                 <span className={cn(
