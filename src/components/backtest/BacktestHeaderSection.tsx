@@ -121,7 +121,7 @@ export function BacktestHeaderSection({
               </button>
             )}
             <button type="button" onClick={onRun} disabled={running}
-              className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-indigo-500 text-black shadow-lg shadow-indigo-500/20 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              className="flex-1 lg:flex-none px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest bg-(--color-term-accent) text-(--color-term-bg) shadow-lg shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-50">
               {running ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} className="fill-current" />}
               {running ? '執行中 COMPUTING...' : '開始回測 RUN'}
             </button>

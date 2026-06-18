@@ -18,6 +18,7 @@ import { AutoTradingPage } from './terminal/pages/AutoTrading';
 import { LoginPage } from './terminal/pages/Login';
 import { useAuth } from './contexts/AuthContext';
 import { SEO } from './components/SEO';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 
 const VALID_VIEWS: readonly TerminalView[] = [
@@ -125,20 +126,24 @@ export default function App() {
       />
       <Layout active={view} onChange={handleChange} searchPlaceholder={searchPlaceholder}>
         <ViewTransition default="none" enter="fade-in" exit="fade-out">
-          <div className="h-full w-full">
-            {view === 'dashboard' && <DashboardPage />}
-            {view === 'market' && <MarketPage />}
-            {view === 'crypto' && <CryptoPage />}
-            {view === 'portfolio' && <PortfolioPage />}
-            {view === 'research' && <ResearchPage />}
-            {view === 'smartmoney' && <SmartMoneyPage />}
-            {view === 'backtest' && <BacktestTerminalPage />}
-            {view === 'news' && <NewsPage />}
-            {view === 'settings' && <SettingsPage />}
-            {view === 'alerts' && <AlertsPage />}
-            {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
-            {view === 'autotrading' && <AutoTradingPage />}
-          </div>
+          {/* key={view} remounts the boundary on navigation so a crashed page
+              recovers automatically when the user switches views. */}
+          <ErrorBoundary key={view} name={t(`nav.${view}`, view.toUpperCase())}>
+            <div className="h-full w-full">
+              {view === 'dashboard' && <DashboardPage />}
+              {view === 'market' && <MarketPage />}
+              {view === 'crypto' && <CryptoPage />}
+              {view === 'portfolio' && <PortfolioPage />}
+              {view === 'research' && <ResearchPage />}
+              {view === 'smartmoney' && <SmartMoneyPage />}
+              {view === 'backtest' && <BacktestTerminalPage />}
+              {view === 'news' && <NewsPage />}
+              {view === 'settings' && <SettingsPage />}
+              {view === 'alerts' && <AlertsPage />}
+              {view === 'screener' && <ScreenerPage onNavigate={handleChange} />}
+              {view === 'autotrading' && <AutoTradingPage />}
+            </div>
+          </ErrorBoundary>
         </ViewTransition>
       </Layout>
     </>

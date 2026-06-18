@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <div className="max-w-lg w-full bg-[var(--card-bg)] rounded-2xl border border-rose-500/20 p-6">
+        <div className="max-w-lg w-full bg-(--color-term-panel) rounded-2xl border border-rose-500/20 p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
               <AlertTriangle size={18} className="text-rose-400" />
