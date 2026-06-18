@@ -175,7 +175,7 @@ export function WatchlistPanel({
         </form>
       )}
 
-      <div className="overflow-x-auto w-full scrollbar-thin">
+      <div className="overflow-x-auto w-full scrollbar-thin scroll-shadow-x">
         <table className="w-full text-[12px]">
           <thead className="text-[10px] tracking-widest text-(--color-term-muted)">
             <tr className="border-b border-(--color-term-border)">

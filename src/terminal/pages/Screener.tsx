@@ -476,7 +476,7 @@ export function ScreenerPage({ onNavigate }: ScreenerPageProps) {
         {!loading && results.length > 0 && (
           viewMode === 'list' ? (
             <div className="flex-1 min-h-0 bg-(--color-term-panel) border border-(--color-term-border) rounded-sm overflow-hidden flex flex-col">
-              <div className="overflow-x-auto flex-1">
+              <div className="overflow-x-auto flex-1 scroll-shadow-x">
                 <table className="w-full text-xs sm:text-sm">
                   <thead className="sticky top-0 z-10 bg-(--color-term-panel) border-b border-(--color-term-border)">
                     <tr>
