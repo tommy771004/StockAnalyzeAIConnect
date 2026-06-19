@@ -116,6 +116,18 @@
     "losers": "跌幅榜",
     "marketPulse": "市場熱點",
     "pulseUnavailable": "目前無法產生熱力圖",
+    "best5": {
+      "title": "即時五檔",
+      "price": "價格",
+      "size": "張數",
+      "buyPct": "買",
+      "sellPct": "賣",
+      "empty": "目前非交易時段或無五檔資料"
+    },
+    "sectorHeatmap": {
+      "title": "類股熱力圖",
+      "unavailable": "類股資料暫不可用"
+    },
     "deepResearch": "深入研究",
     "marketNews": "市場新聞",
     "cycleNewsCategory": "切換新聞類別",
