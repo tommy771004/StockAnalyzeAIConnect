@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { Filter, RefreshCw, Plus, Trash2, X, Microscope } from 'lucide-react';
+import { Filter, RefreshCw, Plus, Trash2, X, Microscope, BarChart3 } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { formatPct, toneClass } from '../ui/format';
 import { cn } from '../../lib/utils';
 import type { NewsCategory, WatchlistRow, Mover, CandlePoint, DashboardNews } from '../types';
 import { useDashboardData, type ChartRange } from '../hooks/useDashboardData';
-import { executeTrade } from '../../services/api';
+import { executeTrade, getBest5, getTwSectorHeatmap, getBatchQuotes, type Best5Quote, type SectorHeatCell } from '../../services/api';
+import { parseSymbol } from '../../utils/symbolParser';
+import { summarizeDepth, sectorHeatClass } from './dashboardMarketUtils';
 import ChartWidget from '../../components/ChartWidget';
 import { DataStatusBadge } from '../ui/DataStatusBadge';
 import { SmartMoneyRecentEventsPanel } from '../ui/SmartMoneyRecentEventsPanel';
@@ -71,7 +73,7 @@ export function DashboardPage() {
 
       {/* Center column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-6 md:min-h-0 shrink-0 md:shrink">
-        <MarketPulsePanel watchlist={watchlist} onSelect={setSelected} dataMode={dataMode} lastUpdated={lastUpdated} />
+        <SectorHeatmapPanel symbol={selectedRow.symbol} dataMode={dataMode} lastUpdated={lastUpdated} />
         <SelectedChartPanel
           row={selectedRow}
           candles={candles}
@@ -86,7 +88,9 @@ export function DashboardPage() {
 
       {/* Right column */}
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
-        <MarketNewsPanel news={news} onSelect={setSelected} />
+        {['TW', 'TWO'].includes(parseSymbol(selectedRow.symbol).market)
+          ? <Best5Panel symbol={selectedRow.symbol} />
+          : <MarketNewsPanel news={news} onSelect={setSelected} />}
         <SmartMoneyRecentEventsPanel symbol={selectedRow.symbol} maxEvents={3} compact navigateOnEventClick />
         {canShowUsBrokerageSymbol(selectedRow.symbol) && (
           <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
@@ -336,114 +340,6 @@ export function TopMoversPanel({
   );
 }
 
-// ─── MarketPulsePanel ──────────────────────────────────────────────────────────
-export function MarketPulsePanel({
-  watchlist,
-  onSelect,
-  dataMode,
-  lastUpdated,
-}: {
-  watchlist: WatchlistRow[];
-  onSelect: (s: string) => void;
-  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
-  lastUpdated: string | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Panel
-      title={t('dashboard.marketPulse', 'MARKET PULSE')}
-      actions={<DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />}
-      className="h-[240px]"
-      bodyClassName="p-2"
-    >
-      <Heatmap watchlist={watchlist} onSelect={onSelect} />
-    </Panel>
-  );
-}
-
-// ─── Dynamic Heatmap ────────────────────────────────────────────────────────
-export function Heatmap({ watchlist, onSelect }: { watchlist: WatchlistRow[], onSelect: (s: string) => void }) {
-  const { t } = useTranslation();
-  if (!watchlist || watchlist.length === 0) {
-    return <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">{t('dashboard.pulseUnavailable', 'Pulse unavailable')}</div>;
-  }
-  
-  // Create a grid of up to 6 core items
-  const items = watchlist.slice(0, 6);
-  if (items.length < 6) {
-    // PAD if needed for visual structure
-    while(items.length < 6) items.push({ symbol: '--', last: 0, changePct: 0, volume: '—' });
-  }
-
-  return (
-    <div className="grid h-full grid-rows-[2fr_1fr_1fr] gap-1">
-      <div className="grid grid-cols-12 gap-1">
-        <HeatCell cell={items[0]!} onSelect={onSelect} className="col-span-5 row-span-2" size="lg" />
-        <HeatCell cell={items[1]!} onSelect={onSelect} className="col-span-3" />
-        <HeatCell cell={items[2]!} onSelect={onSelect} className="col-span-4" />
-        <HeatCell cell={items[3]!} onSelect={onSelect} className="col-span-7 row-span-2" size="lg" />
-      </div>
-      <div className="hidden grid-cols-12 gap-1" />
-      <div className="grid grid-cols-12 gap-1">
-        <HeatCell cell={items[4]!} onSelect={onSelect} className="col-span-6" />
-        <HeatCell cell={items[5]!} onSelect={onSelect} className="col-span-6" />
-      </div>
-    </div>
-  );
-}
-
-export function HeatCell({
-  cell,
-  className,
-  onSelect,
-  size = 'md',
-}: {
-  cell: Pick<WatchlistRow, 'symbol' | 'changePct'>;
-  className?: string;
-  onSelect: (s: string) => void;
-  size?: 'md' | 'lg';
-}) {
-  const { t } = useTranslation();
-  const isDummy = cell.symbol === '--';
-  const shade = isDummy
-    ? 'bg-white/[0.02]'
-    : cell.changePct > 0.8
-      ? 'bg-emerald-700/70 hover:bg-emerald-600/80 active:scale-[0.97]'
-      : cell.changePct > 0
-        ? 'bg-emerald-800/60 hover:bg-emerald-700/70 active:scale-[0.97]'
-        : cell.changePct < -0.8
-          ? 'bg-rose-700/70 hover:bg-rose-600/80 active:scale-[0.97]'
-          : cell.changePct < 0
-            ? 'bg-rose-800/60 hover:bg-rose-700/70 active:scale-[0.97]'
-            : 'bg-zinc-700/40 hover:bg-zinc-600/50 active:scale-[0.97]';
-  const glowColor = isDummy ? '' :
-    cell.changePct > 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
-
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-between p-2 text-white/90 rounded-md transition-all duration-200 relative overflow-hidden',
-        !isDummy && 'cursor-pointer',
-        shade,
-        className,
-      )}
-      onClick={() => !isDummy && onSelect(cell.symbol)}
-      style={glowColor ? { boxShadow: `inset 0 0 20px ${glowColor}, 0 0 0 1px rgba(255,255,255,0.06)` } : undefined}
-    >
-      {/* Top highlight line */}
-      <span className="absolute inset-x-0 top-0 h-px bg-white/10 pointer-events-none" />
-      <span className={cn('font-bold tracking-widest relative z-10', size === 'lg' ? 'text-[14px]' : 'text-[11.5px]')}>
-        {cell.symbol}
-      </span>
-      {!isDummy && (
-        <span className={cn('font-medium relative z-10', size === 'lg' ? 'text-[13px]' : 'text-[10.5px]')}>
-          {formatPct(cell.changePct)}
-        </span>
-      )}
-    </div>
-  );
-}
-
 // ─── SelectedChartPanel ────────────────────────────────────────────────────────
 export function SelectedChartPanel({
   row,
@@ -640,6 +536,185 @@ export function MarketNewsPanel({ news, onSelect }: { news: DashboardNews[], onS
             );
           })}
         </ul>
+      )}
+    </Panel>
+  );
+}
+
+// ─── Best5Panel (即時五檔 / DOM) ────────────────────────────────────────────────
+export function Best5Panel({ symbol }: { symbol: string }) {
+  const { t, i18n } = useTranslation();
+  const numberLocale = getNumberLocale(i18n.language);
+  const [best5, setBest5] = useState<Best5Quote | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try { const b = await getBest5(symbol); if (alive) setBest5(b); }
+      catch { if (alive) setBest5(null); }
+      finally { if (alive) setLoading(false); }
+    };
+    setLoading(true);
+    load();
+    const id = setInterval(load, 3000);
+    return () => { alive = false; clearInterval(id); };
+  }, [symbol]);
+
+  const asks = best5?.asks ?? [];
+  const bids = best5?.bids ?? [];
+  const hasDepth = asks.length > 0 || bids.length > 0;
+  const { buyPct, sellPct } = summarizeDepth(asks, bids);
+  const maxSize = Math.max(1, ...asks.map(l => l.size), ...bids.map(l => l.size));
+
+  const Row = ({ level, side }: { level: { price: number; size: number }; side: 'ask' | 'bid' }) => (
+    <div className="relative flex items-center justify-between px-3 py-1.5 text-[11px] tabular-nums">
+      <span
+        className={cn('absolute inset-y-0 right-0', side === 'ask' ? 'bg-rose-500/10' : 'bg-emerald-500/10')}
+        style={{ width: `${(level.size / maxSize) * 100}%` }}
+        aria-hidden="true"
+      />
+      <span className={cn('relative z-10 font-semibold', side === 'ask' ? 'text-rose-300' : 'text-emerald-300')}>
+        {formatFixedLocale(level.price, numberLocale)}
+      </span>
+      <span className="relative z-10 text-(--color-term-muted)">{level.size}</span>
+    </div>
+  );
+
+  return (
+    <Panel
+      title={t('dashboard.best5.title', '即時五檔')}
+      icon={<BarChart3 className="h-3 w-3" aria-hidden="true" />}
+      className="flex-1 min-h-[300px]"
+      bodyClassName="flex flex-col overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+    >
+      {!hasDepth ? (
+        <div className="flex h-full min-h-[200px] items-center justify-center px-4 text-center text-[11px] text-(--color-term-muted)">
+          {loading ? t('common.loading', '載入中...') : t('dashboard.best5.empty', '目前非交易時段或無五檔資料')}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between px-3 py-1 text-[9px] tracking-widest text-(--color-term-muted) uppercase border-b border-(--color-term-border)/60">
+            <span>{t('dashboard.best5.price', '價格')}</span>
+            <span>{t('dashboard.best5.size', '張數')}</span>
+          </div>
+          <div className="flex flex-col-reverse">
+            {asks.map((l, i) => <Row key={`a${i}`} level={l} side="ask" />)}
+          </div>
+          <div className="border-y border-(--color-term-border) px-3 py-1.5 text-center text-[12px] font-bold tabular-nums text-(--color-term-accent)">
+            {best5 ? formatFixedLocale(best5.price, numberLocale) : '—'}
+          </div>
+          <div className="flex flex-col">
+            {bids.map((l, i) => <Row key={`b${i}`} level={l} side="bid" />)}
+          </div>
+          {/* Buy% / Sell% bar */}
+          <div className="mt-2 px-3 pb-3">
+            <div className="flex h-2 overflow-hidden rounded-full">
+              <span className="bg-emerald-500/70" style={{ width: `${buyPct}%` }} />
+              <span className="bg-rose-500/70" style={{ width: `${sellPct}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-[9px] tracking-widest text-(--color-term-muted)">
+              <span className="text-emerald-300">{t('dashboard.best5.buyPct', '買')} {buyPct}%</span>
+              <span className="text-rose-300">{t('dashboard.best5.sellPct', '賣')} {sellPct}%</span>
+            </div>
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+// ─── SectorHeatmapPanel (市場熱點 → 類股熱力圖) ──────────────────────────────────
+const US_SECTOR_ETFS: { etf: string; label: string }[] = [
+  { etf: 'XLK', label: 'TECHNOLOGY' },
+  { etf: 'XLC', label: 'COMMUNICATION' },
+  { etf: 'XLY', label: 'CONSUMER CYCLICAL' },
+  { etf: 'XLF', label: 'FINANCIALS' },
+  { etf: 'XLV', label: 'HEALTHCARE' },
+  { etf: 'XLI', label: 'INDUSTRIALS' },
+  { etf: 'XLP', label: 'CONSUMER DEFENSIVE' },
+  { etf: 'XLE', label: 'ENERGY' },
+  { etf: 'XLRE', label: 'REAL ESTATE' },
+  { etf: 'XLU', label: 'UTILITIES' },
+  { etf: 'XLB', label: 'MATERIALS' },
+];
+
+export function SectorHeatmapPanel({
+  symbol,
+  dataMode,
+  lastUpdated,
+}: {
+  symbol: string;
+  dataMode: 'LIVE' | 'DELAYED' | 'MOCK';
+  lastUpdated: string | null;
+}) {
+  const { t } = useTranslation();
+  const isTw = ['TW', 'TWO'].includes(parseSymbol(symbol).market);
+  const [cells, setCells] = useState<SectorHeatCell[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        if (isTw) {
+          const c = await getTwSectorHeatmap();
+          if (alive) setCells(c);
+        } else {
+          const quotes = await getBatchQuotes(US_SECTOR_ETFS.map(s => s.etf));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const qMap = new Map(quotes.filter(Boolean).map((q: any) => [q.symbol, q]));
+          if (alive) setCells(US_SECTOR_ETFS.map(s => ({
+            id: s.etf,
+            name: s.label,
+            changePct: qMap.get(s.etf)?.regularMarketChangePercent ?? 0,
+          })));
+        }
+      } catch { if (alive) setCells([]); }
+      finally { if (alive) setLoading(false); }
+    };
+    setLoading(true);
+    load();
+    const id = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, [isTw]);
+
+  return (
+    <Panel
+      title={t('dashboard.sectorHeatmap.title', '類股熱力圖')}
+      actions={<DataStatusBadge mode={dataMode} lastUpdated={lastUpdated} />}
+      className="h-[240px]"
+      bodyClassName="p-2 flex flex-col"
+    >
+      {cells.length === 0 ? (
+        <div className="flex h-full items-center justify-center text-[10px] text-(--color-term-muted)">
+          {loading ? t('common.loading', '載入中...') : t('dashboard.sectorHeatmap.unavailable', '類股資料暫不可用')}
+        </div>
+      ) : (
+        <>
+          <div className="grid flex-1 grid-cols-3 gap-1">
+            {cells.map((c) => (
+              <div
+                key={c.id}
+                className={cn(
+                  'flex flex-col items-center justify-center rounded-md p-1.5 text-center text-white/90',
+                  sectorHeatClass(c.changePct, isTw),
+                )}
+              >
+                <span className="text-[9.5px] font-bold leading-tight tracking-wide line-clamp-1">{c.name}</span>
+                <span className="text-[10px] font-medium tabular-nums">{formatPct(c.changePct)}</span>
+              </div>
+            ))}
+          </div>
+          {/* Color scale legend */}
+          <div className="mt-1.5 flex items-center justify-center gap-1 text-[8px] text-(--color-term-muted)">
+            <span>-2%</span>
+            <span className={cn('h-1.5 w-6 rounded-sm', isTw ? 'bg-emerald-700/70' : 'bg-rose-700/70')} />
+            <span className="h-1.5 w-6 rounded-sm bg-zinc-700/40" />
+            <span className={cn('h-1.5 w-6 rounded-sm', isTw ? 'bg-rose-700/70' : 'bg-emerald-700/70')} />
+            <span>+2%</span>
+          </div>
+        </>
       )}
     </Panel>
   );
