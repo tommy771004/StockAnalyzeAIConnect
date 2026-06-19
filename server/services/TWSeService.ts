@@ -35,6 +35,48 @@ export interface TWSeQuote {
   source: 'TWSE' | 'TPEX';
 }
 
+export interface Best5Level { price: number; size: number; }
+
+export interface Best5Quote {
+  symbol: string;
+  name: string;
+  price: number;
+  prevClose: number;
+  asks: Best5Level[]; // index 0 = best (lowest) ask
+  bids: Best5Level[]; // index 0 = best (highest) bid
+  timestamp: number;
+  source: 'TWSE' | 'TPEX';
+}
+
+/** Split a mis.twse `_`-joined level string into numbers, dropping empties/`-`. */
+function splitLevels(s?: string): number[] {
+  if (!s) return [];
+  return s
+    .split('_')
+    .map((x) => x.trim())
+    .filter((x) => x !== '' && x !== '-')
+    .map(Number)
+    .filter((n) => Number.isFinite(n));
+}
+
+/** Pure parser for a mis.twse getStockInfo msgArray item → Best5Quote. */
+export function parseBest5Payload(item: Record<string, string>, source: 'TWSE' | 'TPEX'): Best5Quote {
+  const zip = (prices: number[], sizes: number[]): Best5Level[] =>
+    prices.slice(0, 5).map((price, i) => ({ price, size: sizes[i] ?? 0 })).filter((l) => l.price > 0);
+  const last = Number(item.z);
+  const prevClose = Number(item.y) || 0;
+  return {
+    symbol: item.c ?? '',
+    name: item.n ?? '',
+    price: Number.isFinite(last) && last > 0 ? last : prevClose,
+    prevClose,
+    asks: zip(splitLevels(item.a), splitLevels(item.f)),
+    bids: zip(splitLevels(item.b), splitLevels(item.g)),
+    timestamp: Number(item.tlong) || Date.now(),
+    source,
+  };
+}
+
 /** 判斷是否為上市 (TSE) 或上櫃 (OTC/TPEx) */
 function isTSE(code: string): boolean {
   return /^\d{4}$/.test(code) && parseInt(code) < 9000;
@@ -209,6 +251,42 @@ export async function realtimePrices(symbols: string[]): Promise<TWSeQuote[]> {
   }
 
   return results;
+}
+
+/** 取得單一台股即時五檔（買賣五檔價量）；非交易時段可能回傳空檔位。 */
+export async function realtimeBest5(symbol: string): Promise<Best5Quote | null> {
+  const parsed = parseTwSymbol(symbol);
+  if (!parsed) {
+    recordAutotradingDiagnostic('twse.skipped_non_tw_symbol', 1, Date.now(), symbol);
+    return null;
+  }
+  const { code, market } = parsed;
+  const channel = market === 'TSE' ? `tse_${code}.tw` : `otc_${code}.tw`;
+  const url = `${TWSE_REALTIME_URL}?ex_ch=${encodeURIComponent(channel)}&json=1&delay=0`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': UA,
+        'Referer': 'https://mis.twse.com.tw/',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Origin': 'https://mis.twse.com.tw',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`TWSE HTTP ${res.status}`);
+    const json = await res.json();
+    const arr: Record<string, string>[] = json?.msgArray ?? [];
+    const item = arr.find((x) => x.c === code) ?? arr[0];
+    if (!item) return null;
+    return parseBest5Payload(item, market === 'TSE' ? 'TWSE' : 'TPEX');
+  } catch (err) {
+    const msg = (err as Error).message;
+    recordAutotradingDiagnostic(/aborted|timeout/i.test(msg) ? 'twse.timeout' : 'twse.error', 1, Date.now(), symbol);
+    console.warn(`[TWSE] realtimeBest5(${symbol}) failed:`, msg);
+    return null;
+  }
 }
 
 /** 檢查 TWSE 服務是否可用（不保證即時，只 ping 一次） */
