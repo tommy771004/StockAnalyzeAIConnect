@@ -28,7 +28,20 @@ export function startDailySettlementSchedule() {
 async function executeDailySettlement(date: string) {
   console.log(`[DailySettlement] 執行每日結算: ${date}`);
   
-  // 1. 重設風控每日額度
+  // 1. EOD 回撤疲勞保護：先結算當日回撤（連續多日超標會自動啟動 Kill Switch），再重設每日額度
+  const fatigue = riskManager.settleDailyDrawdown();
+  if (fatigue.fatigueTriggered) {
+    console.warn(`[DailySettlement] 操作者回撤疲勞保護觸發（連續 ${fatigue.consecutiveDays} 日），已啟動 Kill Switch`);
+    try {
+      await notifier.dispatch('system', 'daily_report', {
+        title: '⚠️ 回撤疲勞保護觸發',
+        content: `連續 ${fatigue.consecutiveDays} 日回撤超標，已自動啟動 Kill Switch 暫停交易，需人工檢視後解除。`,
+        data: { consecutiveDays: fatigue.consecutiveDays, drawdownPct: fatigue.drawdownPct },
+      });
+    } catch (err) {
+      console.error('[DailySettlement] 疲勞保護通知失敗:', err);
+    }
+  }
   riskManager.resetDaily();
 
   // 2. 產生報告並發送通知 (預設 userId='system')

@@ -53,7 +53,7 @@ import { runBacktestWithBestEngine } from './server/services/backtestEngine.js';
 import { processCommanderCommand } from './server/services/commanderService.js';
 import { runOptimizationScan } from './server/services/optimizerService.js';
 import { generateWeeklyReport } from './server/services/reportService.js';
-import { getPerformance, type Period as PerformancePeriod } from './server/services/performanceService.js';
+import { getPerformance, getUserTrades, computePerformance, type Period as PerformancePeriod } from './server/services/performanceService.js';
 import { copyTradingService } from './server/services/copyTradingService.js';
 import { notifier } from './server/services/notifier/index.js';
 import {
@@ -781,11 +781,86 @@ app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res)
 });
 
 app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
+
+  const allowedPeriods = new Set<PerformancePeriod>(['1d', '1w', '1m', '3m', 'ytd', 'all']);
+  const periodRaw = String(req.query.period ?? '1m') as PerformancePeriod;
+  const period = allowedPeriods.has(periodRaw) ? periodRaw : '1m';
+
+  try {
+    const result = await getPerformance(req.userId, period);
+    res.json(result);
+  } catch (e) {
+    handleApiError(res, e);
+  }
+});
+
+// drift helpers：將 performanceService 指標轉成 driftService 輸入（回撤轉正值百分比）。
+function zeroMetric() {
+  return { winRate: 0, sharpe: 0, maxDrawdownPct: 0, profitFactor: 0 };
+}
+function toDriftLive(m: { winRate: number; sharpe: number; maxDrawdown: number; profitFactor: number }) {
+  return {
+    winRate: m.winRate,
+    sharpe: m.sharpe,
+    maxDrawdownPct: Math.abs(m.maxDrawdown * 100), // performanceService 為負分數，轉正值百分比
+    profitFactor: Number.isFinite(m.profitFactor) ? m.profitFactor : 0,
+  };
+}
+
+// 實盤 vs 回測偏移：對使用者「最常交易標的」跑回測基準，與實盤績效逐項比對。
+app.get('/api/autotrading/drift', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId ?? 'mock-user-id';
-    const period = (req.query.period as PerformancePeriod) || '1m';
-    const result = await getPerformance(userId, period);
-    res.json(result);
+    const period = (req.query.period as PerformancePeriod) || 'all';
+    const userTrades = await getUserTrades(userId, period);
+
+    const { computeDrift } = await import('./server/services/evaluation/driftService.js');
+
+    if (userTrades.length === 0) {
+      return res.json(computeDrift('-', zeroMetric(), zeroMetric(), 0));
+    }
+
+    // 取最常交易標的作為回測基準
+    const counts = new Map<string, number>();
+    for (const t of userTrades) counts.set(t.ticker, (counts.get(t.ticker) ?? 0) + 1);
+    const topSymbol = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+    // 實盤指標：僅取該標的的交易，與回測基準同標的可比
+    const symbolTrades = userTrades.filter((t) => t.ticker === topSymbol);
+    const live = computePerformance(symbolTrades);
+
+    // 回測基準：同標的近一年歷史 + 進階引擎
+    const { quotes } = await NativeYahooApi.chart(topSymbol);
+    if (!quotes || quotes.length < 50) {
+      return res.json(computeDrift(topSymbol, zeroMetric(), toDriftLive(live.metrics), symbolTrades.length));
+    }
+    const history = quotes.map((q) => ({
+      close: q.close,
+      volume: q.volume,
+      date: q.date instanceof Date ? q.date.toISOString().split('T')[0] : String(q.date),
+    }));
+    const { runBacktestWithBestEngine } = await import('./server/services/backtestEngine.js');
+    const bt = await runBacktestWithBestEngine(topSymbol, history, {
+      strategies: ['RSI_REVERSION', 'MACD_CROSS', 'BOLLINGER_BREAKOUT'],
+      params: {},
+      _ablation_quantumEnabled: true,
+      _ablation_aiEnabled: false,
+    });
+
+    const report = computeDrift(
+      topSymbol,
+      {
+        winRate: bt.metrics.winRate,
+        sharpe: bt.metrics.sharpe,
+        maxDrawdownPct: Math.abs(bt.metrics.maxDrawdown), // backtestEngine 為正值百分比
+        profitFactor: Number.isFinite(bt.metrics.profitFactor) ? bt.metrics.profitFactor : 0,
+      },
+      toDriftLive(live.metrics),
+      symbolTrades.length,
+    );
+    res.json(report);
   } catch (e) {
     handleApiError(res, e);
   }
@@ -928,22 +1003,6 @@ app.get('/api/autotrading/report', authMiddleware, async (req: AuthRequest, res)
 
 app.get('/api/autotrading/followers', authMiddleware, (_req, res) => {
   res.json({ ok: true, followers: copyTradingService.getFollowers() });
-});
-
-app.get('/api/autotrading/performance', authMiddleware, async (req: AuthRequest, res) => {
-  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-  if (!dbAvailable) return res.status(503).json({ error: 'Database unavailable' });
-
-  const allowedPeriods = new Set<PerformancePeriod>(['1d', '1w', '1m', '3m', 'ytd', 'all']);
-  const periodRaw = String(req.query.period ?? '1m') as PerformancePeriod;
-  const period = allowedPeriods.has(periodRaw) ? periodRaw : '1m';
-
-  try {
-    const result = await getPerformance(req.userId, period);
-    res.json(result);
-  } catch (e) {
-    handleApiError(res, e);
-  }
 });
 
 app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
@@ -2263,6 +2322,7 @@ app.post('/api/backtest', authMiddleware, async (req: AuthRequest, res) => {
       const { runBacktestWithBestEngine } = await import('./server/services/backtestEngine.js');
       const history = data.quotes.map((q: any) => ({
         close: q.close,
+        volume: q.volume,
         date: q.date instanceof Date ? q.date.toISOString().split('T')[0] : String(q.date),
       }));
       const config = {

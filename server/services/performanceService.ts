@@ -14,17 +14,21 @@
 import { eq, and, gte, desc } from 'drizzle-orm';
 import { db } from '../../src/db/index.js';
 import { trades, type Trade } from '../../src/db/schema.js';
+import { computeTwStockFees } from './twFees.js';
 
 export type Period = '1d' | '1w' | '1m' | '3m' | 'ytd' | 'all';
 
 export interface PerformanceMetrics {
   totalTrades: number;
   winRate: number;            // 0-100
-  totalPnL: number;
+  totalPnL: number;           // 已扣交易成本（淨損益）
   avgPnL: number;
   sharpe: number;
   maxDrawdown: number;        // -1..0 例 -0.12 = -12%
   profitFactor: number;
+  totalFees: number;          // 估算總交易成本（手續費+證交稅）
+  grossPnL: number;           // 未扣成本前損益 = totalPnL + totalFees
+  turnover: number;           // 換手率 = 總成交金額 / 起始權益
   bestTrade: { ticker: string; pnl: number } | null;
   worstTrade: { ticker: string; pnl: number } | null;
 }
@@ -124,6 +128,29 @@ export function computePerformance(rawTrades: Trade[], startingEquity = 10_000_0
   const sharpe = computeSharpe(dailyReturns);
   const maxDrawdown = computeMaxDrawdown(equityCurve);
 
+  // 估算交易成本：pnl 已為淨值，依各腿成交金額用台股費率反推手續費+稅。
+  // 換手率：兩腿成交金額總和 / 起始權益。
+  let totalFees = 0;
+  let totalNotional = 0;
+  for (const t of sorted) {
+    const qty = Number(t.qty ?? 0);
+    const entry = Number(t.entry ?? 0);
+    const exitPx = Number(t.exit ?? 0);
+    const isETF = /^00\d/.test(t.ticker);
+    if (qty > 0 && entry > 0) {
+      const v = qty * entry;
+      totalNotional += v;
+      totalFees += computeTwStockFees(v, { side: 'BUY', isETF }).totalFee;
+    }
+    if (qty > 0 && exitPx > 0) {
+      const v = qty * exitPx;
+      totalNotional += v;
+      totalFees += computeTwStockFees(v, { side: 'SELL', isETF }).totalFee;
+    }
+  }
+  const grossPnL = totalPnL + totalFees;
+  const turnover = startingEquity > 0 ? totalNotional / startingEquity : 0;
+
   const bestTrade = sorted.reduce<{ ticker: string; pnl: number } | null>((best, t) => {
     const pnl = Number(t.pnl ?? 0);
     if (!best || pnl > best.pnl) return { ticker: t.ticker, pnl };
@@ -158,6 +185,9 @@ export function computePerformance(rawTrades: Trade[], startingEquity = 10_000_0
       sharpe: Math.round(sharpe * 100) / 100,
       maxDrawdown: Math.round(maxDrawdown * 10000) / 10000,
       profitFactor: Number.isFinite(profitFactor) ? Math.round(profitFactor * 100) / 100 : profitFactor,
+      totalFees: Math.round(totalFees),
+      grossPnL: Math.round(grossPnL),
+      turnover: Math.round(turnover * 100) / 100,
       bestTrade,
       worstTrade,
     },

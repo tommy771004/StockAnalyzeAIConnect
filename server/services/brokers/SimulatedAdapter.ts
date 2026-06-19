@@ -14,7 +14,8 @@ import type {
   OrderResult, Position, OrderStatus, MarketType,
 } from './BrokerAdapter.js';
 import * as TWSeService from '../TWSeService.js';
-import { computeTwStockFees } from '../twFees.js';
+import { computeTwStockFees, applySlippage } from '../twFees.js';
+import { DEFAULT_SLIPPAGE_BPS } from '../autotradingDefaults.js';
 
 interface SimPositionInternal {
   symbol: string;
@@ -71,11 +72,13 @@ export class SimulatedAdapter implements IBrokerAdapter {
     this._orderCounter++;
     const orderId = `SIM-${Date.now()}-${this._orderCounter}`;
 
-    // 模擬即時成交（MARKET order）
-    const fillPrice = order.price && order.price > 0 ? order.price : await this._getSimulatedMarketPrice(order.symbol);
-    if (!fillPrice || fillPrice <= 0) {
+    // 模擬即時成交：LIMIT 以委託價成交、MARKET 以即時報價並套用滑點（對交易者不利的偏移）
+    const isLimit = !!(order.price && order.price > 0);
+    const rawFill = isLimit ? order.price! : await this._getSimulatedMarketPrice(order.symbol);
+    if (!rawFill || rawFill <= 0) {
       return { orderId, status: 'REJECTED', filledQty: 0, filledPrice: 0, timestamp: Date.now(), message: '無法取得報價' };
     }
+    const fillPrice = isLimit ? rawFill : applySlippage(rawFill, order.side, DEFAULT_SLIPPAGE_BPS);
 
     const orderValue = order.qty * fillPrice;
     const today = new Date().toISOString().slice(0, 10);

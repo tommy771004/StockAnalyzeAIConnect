@@ -295,6 +295,7 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                   <th className="pb-6 text-right">{t('backtestEngine.col.avgWin', '平均盈%')}</th>
                   <th className="pb-6 text-right">{t('backtestEngine.col.avgLoss', '平均虧%')}</th>
                   <th className="pb-6 text-right">{t('backtestEngine.col.pf', '獲利因子 (PF)')}</th>
+                  <th className="pb-6 text-right">{t('backtestEngine.col.costDrag', '成本拖累')}</th>
                   <th className="pb-6 text-right pr-4">{t('backtestEngine.col.trades', '交易次數')}</th>
                 </tr>
               </thead>
@@ -338,6 +339,13 @@ export default function BacktestPage({ initialSymbol }: { initialSymbol?: string
                       </td>
                       <td className="py-6 text-right font-mono font-bold text-base" style={{ color: (m?.profitFactor ?? 0) >= 1.5 ? 'var(--color-down)' : (m?.profitFactor ?? 0) >= 1 ? 'var(--md-tertiary)' : 'var(--color-up)' }}>
                         {m?.profitFactor ?? 0}
+                      </td>
+                      <td
+                        className="py-6 text-right font-mono font-bold text-base"
+                        style={{ color: (m?.costSharePct ?? 0) > 30 ? 'var(--color-up)' : 'var(--md-on-surface-variant)' }}
+                        title={`Gross ROI ${m?.grossRoi ?? '-'}% → Net ${m?.roi ?? '-'}%`}
+                      >
+                        {m?.costSharePct ?? 0}%
                       </td>
                       <td className="py-6 text-right font-mono font-bold pr-4" style={{ color: 'var(--md-on-surface-variant)' }}>
                         {m?.totalTrades ?? 0}

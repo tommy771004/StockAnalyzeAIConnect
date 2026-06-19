@@ -4,6 +4,8 @@
  */
 import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
 import type { SignalObservation } from '../types/signal.js';
+import { applySlippage } from './twFees.js';
+import { DEFAULT_SLIPPAGE_BPS, DEFAULT_LIQUIDITY_CAP_PCT } from './autotradingDefaults.js';
 
 interface BacktestResult {
   metrics: {
@@ -13,6 +15,9 @@ interface BacktestResult {
     winRate: number;
     totalTrades: number;
     profitFactor: number;
+    grossRoi?: number;      // 未扣成本的毛報酬率（%）
+    totalCost?: number;     // 手續費+稅+滑點總成本（TWD）
+    costSharePct?: number;  // 成本佔毛利比例（%）— 量化「成本吃掉多少 edge」
   };
   equityCurve: { date: string; portfolio: number; benchmark: number }[];
   trades: any[];
@@ -68,12 +73,19 @@ export async function runAdvancedBacktest(
   config: any     // 包含 strategies, params 等
 ): Promise<BacktestResult> {
   const initialCapital = 1000000;
+  const slippageBps = Number(config?.params?.slippageBps ?? DEFAULT_SLIPPAGE_BPS);
+  const liquidityCapPct = Number(config?.params?.liquidityCapPct ?? DEFAULT_LIQUIDITY_CAP_PCT);
   let balance = initialCapital;
   let shares = 0;
   let highWaterMark = 0;
-  let entryPrice = 0;
+  let entryPrice = 0;        // 攤入手續費+滑點後的成本
+  let rawEntryPrice = 0;     // 未含成本的市價（供毛/淨拆解）
   let entryDate = '';
-  
+
+  // 成本 vs 訊號拆解：量化「成本吃掉多少 edge」（自評：把 finding #1 從方向性變可量測）
+  let grossPnlTotal = 0;     // 不含任何成本的毛損益
+  let totalCostTotal = 0;    // 手續費 + 稅 + 滑點 的總成本
+
   const trades: any[] = [];
   const equityCurve: any[] = [];
   
@@ -108,15 +120,21 @@ export async function runAdvancedBacktest(
       }
 
       if (shouldExit) {
-        const tradeValue = shares * currentPrice;
+        const exitPrice = applySlippage(currentPrice, 'SELL', slippageBps);
+        const tradeValue = shares * exitPrice;
         const commission = Math.max(20, tradeValue * 0.001425); // 0.1425% fee
         const tax = tradeValue * 0.003; // 0.3% tax
-        
+
         balance += (tradeValue - commission - tax);
-        const pnl = (currentPrice - entryPrice) * shares - commission - tax;
-        
+        const pnl = (exitPrice - entryPrice) * shares - commission - tax;
+
+        // 毛損益＝以未含成本的市價計算；成本＝毛 − 淨（含手續費/稅/滑點）
+        const grossTradePnl = (currentPrice - rawEntryPrice) * shares;
+        grossPnlTotal += grossTradePnl;
+        totalCostTotal += grossTradePnl - pnl;
+
         trades.push({
-          symbol, entryPrice, exitPrice: currentPrice,
+          symbol, entryPrice, exitPrice,
           entryDate, exitDate: currentDate,
           pnl, pnlPct, reason: exitReason,
           type: pnl > 0 ? 'WIN' : 'LOSS'
@@ -214,24 +232,33 @@ export async function runAdvancedBacktest(
       });
 
       if (fused.action === 'BUY' && fused.confidence >= 60) {
+        const fillPrice = applySlippage(currentPrice, 'BUY', slippageBps);
         const targetInvest = balance * 0.9;
         // 先計算預估股數
-        let estShares = Math.floor(targetInvest / currentPrice);
+        let estShares = Math.floor(targetInvest / fillPrice);
         // 考慮手續費
-        const estCommission = Math.max(20, estShares * currentPrice * 0.001425);
-        if (estShares * currentPrice + estCommission > balance) {
-           estShares = Math.floor((balance - 20) / (currentPrice * 1.001425));
+        const estCommission = Math.max(20, estShares * fillPrice * 0.001425);
+        if (estShares * fillPrice + estCommission > balance) {
+           estShares = Math.floor((balance - 20) / (fillPrice * 1.001425));
+        }
+
+        // 流動性容量上限：單筆建倉最多吃當根成交量的 liquidityCapPct（盲點：小型股流動性天花板）。
+        // 歷史未含 volume 時優雅略過。
+        const barVolume = Number(history[i]?.volume ?? 0);
+        if (liquidityCapPct > 0 && barVolume > 0) {
+          estShares = Math.min(estShares, Math.floor(liquidityCapPct * barVolume));
         }
 
         if (estShares > 0) {
           shares = estShares;
-          const tradeValue = shares * currentPrice;
+          const tradeValue = shares * fillPrice;
 
           const commission = Math.max(20, tradeValue * 0.001425);
-          
+
           balance -= (tradeValue + commission);
           // 買入成本需要攤平手續費
           entryPrice = (tradeValue + commission) / shares;
+          rawEntryPrice = currentPrice; // 未含成本的進場市價
           entryDate = currentDate;
           highWaterMark = currentPrice;
         }
@@ -271,6 +298,12 @@ export async function runAdvancedBacktest(
   const grossLoss = Math.abs(trades.filter(t => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
   const profitFactor = grossLoss === 0 ? (grossWin > 0 ? Infinity : 0) : grossWin / grossLoss;
 
+  // 成本 vs 訊號拆解
+  const grossRoi = Number(((grossPnlTotal / initialCapital) * 100).toFixed(2));
+  const costSharePct = Math.abs(grossPnlTotal) > 1e-6
+    ? Number(((totalCostTotal / Math.abs(grossPnlTotal)) * 100).toFixed(1))
+    : 0;
+
   return {
     metrics: {
       roi,
@@ -279,6 +312,9 @@ export async function runAdvancedBacktest(
       winRate,
       totalTrades: trades.length,
       profitFactor: Number.isFinite(profitFactor) ? Math.round(profitFactor * 100) / 100 : profitFactor,
+      grossRoi,
+      totalCost: Math.round(totalCostTotal),
+      costSharePct,
     },
     equityCurve,
     trades
@@ -332,6 +368,29 @@ export function riskAdjustedScore(metrics: {
 }): number {
   const mddPenalty = Math.max(0, 1 - metrics.maxDrawdown / 100);
   return metrics.sharpe * mddPenalty * (metrics.winRate / 100);
+}
+
+/**
+ * 多重測試造成的 Sharpe 膨脹量（Deflated Sharpe 概念，Bailey & López de Prado）。
+ * 從 N 組試驗取最大值會系統性高估 Sharpe；回傳「年化 Sharpe 單位」的預期膨脹量。
+ *   expectedMax(N 個 iid 標準常態) ≈ √(2·ln N)
+ *   年化 Sharpe 估計標準誤 ≈ √(252 / 樣本長度)
+ */
+export function trialSharpeHaircut(numTrials: number, sampleLength: number): number {
+  if (numTrials <= 1 || sampleLength < 2) return 0;
+  const expectedMaxZ = Math.sqrt(2 * Math.log(numTrials));
+  const sharpeStdErr = Math.sqrt(252 / sampleLength);
+  return expectedMaxZ * sharpeStdErr;
+}
+
+/** riskAdjustedScore，但將被挑選出的 Sharpe 先扣除多重測試膨脹量再評分。 */
+export function deflatedRiskAdjustedScore(
+  metrics: { roi: number; sharpe: number; maxDrawdown: number; winRate: number },
+  numTrials: number,
+  sampleLength: number,
+): number {
+  const haircut = trialSharpeHaircut(numTrials, sampleLength);
+  return riskAdjustedScore({ ...metrics, sharpe: Math.max(0, metrics.sharpe - haircut) });
 }
 
 /**

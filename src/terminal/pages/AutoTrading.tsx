@@ -23,6 +23,7 @@ import { cn } from '../../lib/utils';
 import { DecisionAnalysisPanel } from '../../components/AutoTrading/DecisionAnalysisPanel';
 import { TradeToast } from '../../components/AutoTrading/TradeToast';
 import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
+import { canShowUsBrokerageSymbol } from '../../config/marketFeatures';
 
 const SIDEBAR_WIDTH_KEY = 'autotrading.sidebarWidthPx';
 const SIDEBAR_MIN_PX = 260;
@@ -111,11 +112,19 @@ export function AutoTradingPage() {
   };
 
   const handleUpdateConfig = async (cfg: Record<string, unknown>) => {
-    return await api.updateAutotradingConfig(cfg);
+    const symbols = Array.isArray(cfg.symbols)
+      ? cfg.symbols.filter((symbol): symbol is string => (
+          typeof symbol === 'string' && canShowUsBrokerageSymbol(symbol)
+        ))
+      : undefined;
+    return await api.updateAutotradingConfig(symbols ? { ...cfg, symbols } : cfg);
   };
 
   // 監控標的優先序：WS 載入 > /defaults > 空陣列
-  const currentSymbols = ws.config?.symbols ?? defaults?.config.symbols ?? [];
+  const currentSymbols = (ws.config?.symbols ?? defaults?.config.symbols ?? [])
+    .filter(canShowUsBrokerageSymbol);
+  const visiblePositions = ws.positions.filter((position) => canShowUsBrokerageSymbol(position.symbol));
+  const visibleOrderEvents = ws.orderEvents.filter((event) => canShowUsBrokerageSymbol(event.symbol));
   const autoTradingDataMode: DataMode = ws.connected
     ? 'LIVE'
     : ws.transport === 'polling'
@@ -146,7 +155,7 @@ export function AutoTradingPage() {
   return (
     <div className="autotrading-pane h-full flex flex-col gap-2 overflow-hidden">
       <h1 className="sr-only">{t('nav.autotrading', 'Auto Trading')}</h1>
-      <TradeToast events={ws.orderEvents} />
+      <TradeToast events={visibleOrderEvents} />
       {/* Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border border-(--color-term-border) rounded-sm shrink-0">
         <div className="flex items-center gap-4">
@@ -262,14 +271,14 @@ export function AutoTradingPage() {
                 )}>
                   <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-hidden">
                     <AssetMonitor
-                      positions={ws.positions}
+                      positions={visiblePositions}
                       symbols={currentSymbols}
                       decisionFusions={ws.decisionFusions}
                       highlightedSymbols={highlightedSymbols}
                     />
                   </div>
                   <div className="h-52 shrink-0 border border-(--color-term-border) rounded-sm overflow-hidden">
-                    <OrderBookPanel events={ws.orderEvents} />
+                    <OrderBookPanel events={visibleOrderEvents} />
                   </div>
                 </div>
 

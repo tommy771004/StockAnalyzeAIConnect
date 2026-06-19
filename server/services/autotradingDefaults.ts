@@ -35,8 +35,16 @@ export const DEFAULT_BUDGET_LIMIT_TWD = 10_000_000;
 export const DEFAULT_MAX_DAILY_LOSS_TWD = 200_000;
 export const DEFAULT_MAX_SINGLE_POSITION_TWD = 500_000;
 export const DEFAULT_MAX_POSITION_PCT = 0.3;
+/** 最多同時持有的不同標的數（避免相關性集中＝隱形單一押注，歷史學家視角）。 */
+export const DEFAULT_MAX_CONCURRENT_POSITIONS = 8;
+/** 單一產業最大佔總資金比例（需呼叫端提供 sector 標籤才會生效）。 */
+export const DEFAULT_MAX_SECTOR_CONCENTRATION_PCT = 0.4;
 export const DEFAULT_STOP_LOSS_PCT = 0.05;
 export const DEFAULT_TICK_INTERVAL_MS = 60_000;
+/** 市價成交預設滑點（basis points）。5 bps = 0.05%，台股流動標的保守估計。 */
+export const DEFAULT_SLIPPAGE_BPS = 5;
+/** 回測單筆建倉最多吃當根成交量的比例（流動性容量上限；需歷史含 volume 才生效）。 */
+export const DEFAULT_LIQUIDITY_CAP_PCT = 0.05;
 
 export const DEFAULT_SYMBOLS: string[] = ['2330.TW', '2317.TW'];
 
@@ -58,6 +66,8 @@ export const DEFAULT_RISK_CONFIG = {
   maxSinglePositionTWD: DEFAULT_MAX_SINGLE_POSITION_TWD,
   maxPositionPct: DEFAULT_MAX_POSITION_PCT,
   stopLossPct: DEFAULT_STOP_LOSS_PCT,
+  maxConcurrentPositions: DEFAULT_MAX_CONCURRENT_POSITIONS,
+  maxSectorConcentrationPct: DEFAULT_MAX_SECTOR_CONCENTRATION_PCT,
 };
 
 export const DEFAULT_MODEL_RISK_CONFIG = {

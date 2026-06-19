@@ -12,6 +12,7 @@ import { executeTrade } from '../../services/api';
 import ChartWidget from '../../components/ChartWidget';
 import { DataStatusBadge } from '../ui/DataStatusBadge';
 import { SmartMoneyRecentEventsPanel } from '../ui/SmartMoneyRecentEventsPanel';
+import { canShowUsBrokerageSymbol } from '../../config/marketFeatures';
 
 const CATEGORY_STYLE: Record<NewsCategory['id'], { className: string }> = {
   EARNINGS: { className: 'text-(--color-term-accent) border-(--color-term-accent)' },
@@ -87,7 +88,9 @@ export function DashboardPage() {
       <div className="col-span-12 flex flex-col gap-3 lg:col-span-3 md:min-h-0 shrink-0 md:shrink">
         <MarketNewsPanel news={news} onSelect={setSelected} />
         <SmartMoneyRecentEventsPanel symbol={selectedRow.symbol} maxEvents={3} compact navigateOnEventClick />
-        <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
+        {canShowUsBrokerageSymbol(selectedRow.symbol) && (
+          <QuickTradePanel symbol={selectedRow.symbol} price={selectedRow.last} />
+        )}
       </div>
     </div>
   );

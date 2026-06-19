@@ -10,6 +10,9 @@ import riskControl from '../../../components/AutoTrading/RiskControlPanel.tsx?ra
 import smartMoneySettings from '../../ui/SmartMoneyAlertSettingsPanel.tsx?raw';
 import research from '../Research.tsx?raw';
 import crypto from '../Crypto.tsx?raw';
+import autoTrading from '../AutoTrading.tsx?raw';
+import sectorSelector from '../../../components/AutoTrading/SectorSelector.tsx?raw';
+import orderBook from '../../../components/AutoTrading/OrderBookPanel.tsx?raw';
 import englishRaw from '../../../../public/locales/en/translation.json?raw';
 import chineseRaw from '../../../../public/locales/zh/translation.json?raw';
 
@@ -101,5 +104,15 @@ describe('UX accessibility contracts', () => {
     expect(strategyFlow).not.toContain('text-[10px]');
     expect(riskControl).not.toContain('text-[9px]');
     expect(riskControl).not.toContain('text-[10px]');
+  });
+
+  it('omits unavailable US realtime and brokerage modules without hiding other US data', () => {
+    expect(dashboard).toContain('canShowUsBrokerageSymbol(selectedRow.symbol) &&');
+    expect(autoTrading).toContain('.filter(canShowUsBrokerageSymbol)');
+    expect(orderBook).toContain('.filter((row) => canShowUsBrokerageSymbol(row.symbol))');
+    expect(sectorSelector).toContain('{marketFeatures.usBrokerage && (');
+    expect(sectorSelector).toContain("marketBucket === 'TW'");
+    expect(dashboard).toContain('<SelectedChartPanel');
+    expect(dashboard).toContain('<SmartMoneyRecentEventsPanel');
   });
 });

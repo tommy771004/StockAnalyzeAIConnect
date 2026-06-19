@@ -20,6 +20,10 @@ import { ORCHESTRATOR_PROMPT, buildOrchestratorPrompt } from '../utils/tradingPr
 import type { IBrokerAdapter } from './brokers/BrokerAdapter.js';
 import type { AgentConfig, AgentStatus, AgentLog } from '../../src/components/AutoTrading/types.js';
 import { riskManager } from './RiskManager.js';
+import { sectorOf } from './sectorMap.js';
+import { copyTradingService } from './copyTradingService.js';
+import { checkRealModeCapacity } from './evaluation/capacityGate.js';
+import { checkRealModeCompliance } from './evaluation/complianceGate.js';
 import { anyMarketOpen, isTradingSession } from './tradingSession.js';
 import { DEFAULT_AGENT_CONFIG } from './autotradingDefaults.js';
 import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
@@ -991,6 +995,7 @@ async function agentTick() {
           const maxAlloc = agentConfig.params.maxAllocationPerTrade ?? 100_000;
           const defensiveScale = signal.defensiveMode ? 0.4 : 1;
           const monteCarloScale = riskManager.getDynamicPositionScaling();
+          const capacityScale = riskManager.getCapacityScaling(); // 資本規模遞減
           const sizingMethod = agentConfig.params.sizingMethod ?? 'fixed';
           let baseTradeAmount: number;
           if (sizingMethod === 'risk_base' && signalPrice > 0) {
@@ -1002,7 +1007,7 @@ async function agentTick() {
           } else {
             baseTradeAmount = availableMargin * 0.1;
           }
-          const tradeAmount = Math.min(baseTradeAmount, maxAlloc) * defensiveScale * monteCarloScale;
+          const tradeAmount = Math.min(baseTradeAmount, maxAlloc) * defensiveScale * monteCarloScale * capacityScale;
           const isTaiwanSymbol = /\.(TW|TWO)$/i.test(symbol);
 
           // 台股使用整張(1000股)；美股允許零股(小數股)
@@ -1048,10 +1053,14 @@ async function agentTick() {
             continue;
           }
 
-          // 訂單前置風控檢查
+          // 訂單前置風控檢查（含集中度：同時持倉檔數 / 產業集中度）
+          const openPositions = Array.from(posTrack.entries())
+            .filter(([, p]) => p.qty > 0)
+            .map(([sym, p]) => ({ symbol: sym, value: p.qty * p.avgCost, sector: sectorOf(sym) }));
           const riskCheck = riskManager.validateOrder(
             { symbol, side: signal.action as 'BUY' | 'SELL', quantity: finalQty, price: signalPrice },
             balance.totalAssets,
+            { positions: openPositions, newSymbolSector: sectorOf(symbol) },
           );
           if (!riskCheck.allowed) {
             emitLog({ level: 'RISK_CHK', source: 'RISK', symbol, message: `🛑 風控攔截：${riskCheck.reason}` });
@@ -1200,7 +1209,25 @@ export function startAgent(c?: any) {
     const v = updateAgentConfig(c, true); // silent=true: status broadcast happens after agentStatus = 'running'
     if (!v.ok) return v;
   }
-  
+
+  // 實盤閘門：上實盤前硬性檢查 — (1) 法遵/轄區 (2) 容量/群聚 + 操作者狀態。任一未過自動降級為模擬。
+  if (agentConfig.mode === 'real') {
+    const compliance = checkRealModeCompliance({
+      complianceAck: agentConfig.complianceAck === true,
+      jurisdiction: agentConfig.jurisdiction,
+    });
+    const capacity = checkRealModeCapacity({
+      killSwitchActive: riskManager.isKillSwitchActive(),
+      activeFollowers: copyTradingService.getFollowers().filter(f => f.enabled).length,
+      consecutiveDrawdownDays: riskManager.getConsecutiveDrawdownDays(),
+    });
+    const gate = !compliance.allowed ? compliance : capacity;
+    if (!gate.allowed) {
+      agentConfig = { ...agentConfig, mode: 'simulated' };
+      emitLog({ level: 'CRITICAL', source: 'RISK', symbol: 'ALL', message: `🚧 實盤閘門攔截：${gate.reason}。已自動降級為模擬模式。` });
+    }
+  }
+
   agentStatus = 'running';
   isTickRunning = false; // 重置鎖
   agentTick();

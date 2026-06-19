@@ -477,6 +477,9 @@ export const activateStrategy = (id: number): Promise<void> =>
 export const getPerformance = (period: string = '1m'): Promise<any> =>
   fetchJ<any>(`/api/autotrading/performance?period=${period}`);
 
+export const getDrift = (period: string = 'all'): Promise<any> =>
+  fetchJ<any>(`/api/autotrading/drift?period=${period}`);
+
 // ── Misc ──────────────────────────────────────────────────────────────────────
 export const openExternal  = (url: string): void => {
   if (IS_ELECTRON) E().openExternal(url);

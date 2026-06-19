@@ -21,6 +21,9 @@ interface Metrics {
   sharpe: number;
   maxDrawdown: number;
   profitFactor: number;
+  totalFees: number;
+  grossPnL: number;
+  turnover: number;
   bestTrade: { ticker: string; pnl: number } | null;
   worstTrade: { ticker: string; pnl: number } | null;
 }
@@ -41,6 +44,22 @@ interface PerformanceData {
   ablation?: AblationVariantSummary[];
 }
 
+interface DriftMetric {
+  metric: 'winRate' | 'sharpe' | 'maxDrawdown' | 'profitFactor';
+  backtest: number;
+  live: number;
+  delta: number;
+  degraded: boolean;
+}
+interface DriftReport {
+  symbol: string;
+  liveTrades: number;
+  metrics: DriftMetric[];
+  degradedCount: number;
+  verdict: 'aligned' | 'mild_drift' | 'severe_drift' | 'insufficient_data';
+  summary: string;
+}
+
 const PERIODS: { key: Period; label: string }[] = [
   { key: '1d', label: '1D' },
   { key: '1w', label: '1W' },
@@ -54,6 +73,7 @@ export function PerformanceDashboard() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<Period>('1m');
   const [data, setData] = useState<PerformanceData | null>(null);
+  const [drift, setDrift] = useState<DriftReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +91,15 @@ export function PerformanceDashboard() {
   }
 
   useEffect(() => { load(); }, [period]);
+
+  // 偏移分析以整體實盤樣本（all）為基準，與所選期間無關，僅載入一次
+  useEffect(() => {
+    let cancelled = false;
+    api.getDrift('all')
+      .then((res) => { if (!cancelled) setDrift(res); })
+      .catch(() => { /* 偏移分析為輔助資訊，失敗時靜默略過 */ });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -138,6 +167,82 @@ export function PerformanceDashboard() {
             <MetricCard label={t('autotrading.performance.sharpe', 'Sharpe')} value={data.metrics.sharpe.toFixed(2)} sub={data.metrics.sharpe >= 1 ? t('autotrading.performance.sharpeGood', '優於水準') : t('autotrading.performance.sharpeWeak', '待提升')} positive={data.metrics.sharpe >= 1} />
             <MetricCard label={t('autotrading.performance.maxDrawdown', 'Max Drawdown')} value={`${(data.metrics.maxDrawdown * 100).toFixed(2)}%`} sub={data.metrics.maxDrawdown > -0.1 ? t('autotrading.performance.drawdownGood', '良好') : t('autotrading.performance.drawdownWarn', '警戒')} positive={data.metrics.maxDrawdown > -0.1} icon={<ShieldAlert className="h-3 w-3" />} />
           </div>
+
+          {/* Cost & turnover: gross vs net, fee drag, turnover (Barber-Odean / 經濟學家視角) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <MetricCard
+              label={t('autotrading.performance.grossNet', 'Gross → Net')}
+              value={fmtTwd(data.metrics.grossPnL)}
+              sub={`${t('autotrading.performance.net', '淨')} ${fmtTwd(data.metrics.totalPnL)}`}
+              positive={data.metrics.totalPnL >= 0}
+            />
+            <MetricCard
+              label={t('autotrading.performance.feeDrag', 'Fee Drag')}
+              value={fmtTwd(data.metrics.totalFees)}
+              sub={data.metrics.grossPnL > 0
+                ? `${((data.metrics.totalFees / data.metrics.grossPnL) * 100).toFixed(1)}% ${t('autotrading.performance.ofGross', 'of gross')}`
+                : t('autotrading.performance.feesEstimated', '估算成本')}
+              positive={false}
+              icon={<TrendingDown className="h-3 w-3" />}
+            />
+            <MetricCard
+              label={t('autotrading.performance.turnover', 'Turnover')}
+              value={`${data.metrics.turnover.toFixed(2)}×`}
+              sub={data.metrics.turnover > 5 ? t('autotrading.performance.turnoverHigh', '高換手') : t('autotrading.performance.turnoverOk', '正常')}
+              positive={data.metrics.turnover <= 5}
+              icon={<RefreshCw className="h-3 w-3" />}
+            />
+          </div>
+
+          {/* Friction-first：成本吃掉 edge 時，比 ROI 更大聲地警示（反轉「鼓勵交易」的產業誘因） */}
+          {data.metrics.grossPnL > 0 && data.metrics.totalPnL <= 0 && (
+            <div className="p-3 rounded border border-rose-500/40 bg-rose-500/10 flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="text-[10px] text-rose-200">
+                <div className="font-bold">{t('autotrading.performance.edgeGoneTitle', 'Edge 已被成本吃光')}</div>
+                <div className="text-rose-300/80 mt-0.5">
+                  {t('autotrading.performance.edgeGoneBody', '毛利 {{gross}} 在扣除手續費/稅後變為淨 {{net}}。降低交易頻率或提高進場門檻。', {
+                    gross: fmtTwd(data.metrics.grossPnL),
+                    net: fmtTwd(data.metrics.totalPnL),
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live vs Backtest drift — 置頂（懷疑論者視角：最能建立信任的數字＝回測說 X、實盤是 Y） */}
+          {drift && drift.verdict !== 'insufficient_data' && drift.metrics.length > 0 && (
+            <div className="border border-(--color-term-border) rounded">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-(--color-term-border)">
+                <span className="text-[9px] text-(--color-term-muted) uppercase">
+                  {t('autotrading.performance.driftTitle', '實盤 vs 回測偏移')} · {drift.symbol}
+                </span>
+                <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-widest',
+                  drift.verdict === 'aligned' ? 'bg-emerald-500/15 text-emerald-300'
+                  : drift.verdict === 'mild_drift' ? 'bg-amber-500/15 text-amber-300'
+                  : 'bg-rose-500/15 text-rose-300')}>
+                  {t(`autotrading.performance.drift_${drift.verdict}`, drift.verdict)}
+                </span>
+              </div>
+              <div className="divide-y divide-(--color-term-border)">
+                {drift.metrics.map((m) => (
+                  <div key={m.metric} className="flex items-center justify-between px-3 py-2 text-[10px]">
+                    <span className="font-bold text-white/80 w-24">{t(`autotrading.performance.${m.metric}`, m.metric)}</span>
+                    <div className="flex items-center gap-4 font-mono text-[9px]">
+                      <span className="text-(--color-term-muted)">{t('autotrading.performance.bt', '回測')} {m.backtest}</span>
+                      <span className={m.degraded ? 'text-rose-400' : 'text-emerald-400'}>{t('autotrading.performance.live', '實盤')} {m.live}</span>
+                      <span className={m.degraded ? 'text-rose-400' : 'text-(--color-term-muted)'}>
+                        Δ{m.delta > 0 ? '+' : ''}{m.delta}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2 text-[9px] text-(--color-term-muted) border-t border-(--color-term-border)">
+                {drift.summary}
+              </div>
+            </div>
+          )}
 
           {/* Equity curve sparkline */}
           {data.equityCurve.length > 1 && (

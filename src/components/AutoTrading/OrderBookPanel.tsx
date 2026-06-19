@@ -12,6 +12,7 @@ import { Activity, X, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { OrderLifecycleEvent } from './useAutotradingWS';
 import * as api from '../../services/api';
+import { canShowUsBrokerageSymbol } from '../../config/marketFeatures';
 
 interface OrderRow {
   id: number;
@@ -65,7 +66,10 @@ export function OrderBookPanel({ events }: Props) {
     setError(null);
     try {
       const data = await api.getAutotradingOrders(false);
-      if (data.ok) setRows((data.orders ?? []) as OrderRow[]);
+      if (data.ok) {
+        setRows(((data.orders ?? []) as OrderRow[])
+          .filter((row) => canShowUsBrokerageSymbol(row.symbol)));
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -79,6 +83,7 @@ export function OrderBookPanel({ events }: Props) {
   useEffect(() => {
     if (events.length === 0) return;
     const last = events[events.length - 1];
+    if (!canShowUsBrokerageSymbol(last.symbol)) return;
     setRows(prev => {
       const i = prev.findIndex(r => r.id === last.orderId);
       if (i < 0) {

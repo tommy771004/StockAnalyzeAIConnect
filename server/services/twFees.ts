@@ -29,6 +29,16 @@ export const TW_TAX_STOCK = 0.003;
 export const TW_TAX_STOCK_DAYTRADE = 0.0015;
 export const TW_TAX_ETF = 0.001;
 
+/**
+ * 滑點：市價成交時成交價對交易者不利的偏移（單位 basis points，1 bps = 0.01%）。
+ * BUY 成交價上移、SELL 成交價下移。LIMIT 單請勿套用（成交價已由委託價決定）。
+ */
+export function applySlippage(price: number, side: 'BUY' | 'SELL', slippageBps = 0): number {
+  if (!Number.isFinite(price) || price <= 0 || !slippageBps) return price;
+  const factor = side === 'BUY' ? 1 + slippageBps / 10000 : 1 - slippageBps / 10000;
+  return roundTo(price * factor, 4);
+}
+
 export function computeTwStockFees(orderValue: number, opts: FeeOptions): FeeBreakdown {
   const discount = opts.commissionDiscount ?? 1;
   const commission = Math.max(TW_COMMISSION_MIN, orderValue * TW_COMMISSION_RATE * discount);

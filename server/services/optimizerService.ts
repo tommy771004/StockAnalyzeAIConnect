@@ -2,14 +2,16 @@
  * server/services/optimizerService.ts
  * 策略自動優化器：透過參數變異與回測尋找最優配置
  */
-import { runBacktestWithBestEngine, riskAdjustedScore } from './backtestEngine.js';
+import { runBacktestWithBestEngine, riskAdjustedScore, deflatedRiskAdjustedScore } from './backtestEngine.js';
 import { getAgentConfig } from './autonomousAgent.js';
 
 interface OptimizationProposal {
   originalParams: any;
   betterParams: any;
   improvementPct: number;
-  riskAdjustedScore: number;
+  riskAdjustedScore: number;     // 多重測試校正後（Deflated）— 決策用
+  rawRiskAdjustedScore: number;  // 未校正原始分數 — 透明揭露過擬合稅
+  trials: number;                // 試驗組數（含基準）
   reason: string;
 }
 
@@ -96,14 +98,20 @@ export async function runOptimizationScan(symbol: string, history: any[]): Promi
 
   const improvementPct = Number((bestMetrics.roi - baseResult.metrics.roi).toFixed(2));
 
-  // 3. 只有風險調整後評分有顯著提升才提出建議
-  if (bestScore > baseScore * 1.05) {
+  // 3. 多重測試校正：從 CANDIDATES+1 組挑最優會膨脹 Sharpe，扣除預期膨脹量後才比較
+  const numTrials = CANDIDATES + 1;
+  const deflatedBest = deflatedRiskAdjustedScore(bestMetrics, numTrials, history.length);
+
+  // 只有「校正後」風險調整評分仍顯著勝過基準才提出建議（防止過擬合提案）
+  if (deflatedBest > baseScore * 1.05) {
     return {
       originalParams: currentParams,
       betterParams: bestParams,
       improvementPct,
-      riskAdjustedScore: Number(bestScore.toFixed(4)),
-      reason: `在 ${symbol} 的歷史數據中，這組新參數展現了更好的風險調整後績效（Sharpe×(1-MDD)×勝率）。`
+      riskAdjustedScore: Number(deflatedBest.toFixed(4)),
+      rawRiskAdjustedScore: Number(bestScore.toFixed(4)),
+      trials: numTrials,
+      reason: `在 ${symbol} 的歷史數據中，這組新參數在多重測試校正（Deflated Sharpe，${numTrials} 組試驗）後仍展現更佳的風險調整績效。`
     };
   }
 
@@ -154,13 +162,18 @@ export async function runExplicitOptimizationScan(
     }
   });
 
-  if (bestScore > baseScore * 1.05) {
+  const numTrials = CANDIDATES + 1;
+  const deflatedBest = deflatedRiskAdjustedScore(bestMetrics, numTrials, history.length);
+
+  if (deflatedBest > baseScore * 1.05) {
     return {
       originalParams: currentParams,
       betterParams: bestParams,
       improvementPct: Number((bestMetrics.roi - baseResult.metrics.roi).toFixed(2)),
-      riskAdjustedScore: Number(bestScore.toFixed(4)),
-      reason: `在 ${symbol} 的歷史數據中，新參數風險調整後績效提升了 ${((bestScore / Math.max(baseScore, 1e-9) - 1) * 100).toFixed(1)}%（Sharpe×(1-MDD)×勝率）。`,
+      riskAdjustedScore: Number(deflatedBest.toFixed(4)),
+      rawRiskAdjustedScore: Number(bestScore.toFixed(4)),
+      trials: numTrials,
+      reason: `在 ${symbol} 的歷史數據中，新參數經多重測試校正（Deflated Sharpe，${numTrials} 組試驗）後風險調整績效提升了 ${((deflatedBest / Math.max(baseScore, 1e-9) - 1) * 100).toFixed(1)}%。`,
     };
   }
 

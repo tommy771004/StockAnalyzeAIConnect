@@ -956,7 +956,9 @@
         "stopLoss": "Stop Loss",
         "takeProfit": "Take Profit"
       },
-      "riskAdjustedScore": "Risk-Adjusted Score"
+      "riskAdjustedScore": "Risk-Adjusted Score",
+      "rawScoreHint": "Raw uncorrected score",
+      "deflated": "Deflated · {{n}}-trial corrected"
     },
     "signalAttribution": {
       "quantumDisabled": "Quantum signal disabled (ENABLE_QUANTUM_SIGNAL=false)",
@@ -977,6 +979,23 @@
       "maxDrawdown": "Max Drawdown",
       "drawdownGood": "Healthy",
       "drawdownWarn": "Warning",
+      "grossNet": "Gross → Net",
+      "net": "Net",
+      "feeDrag": "Fee Drag",
+      "ofGross": "of gross",
+      "feesEstimated": "Est. cost",
+      "turnover": "Turnover",
+      "turnoverHigh": "High turnover",
+      "turnoverOk": "Normal",
+      "edgeGoneTitle": "Edge erased by cost",
+      "edgeGoneBody": "Gross {{gross}} became net {{net}} after fees/tax. Cut trade frequency or raise the entry bar.",
+      "driftTitle": "Live vs Backtest Drift",
+      "drift_aligned": "Aligned",
+      "drift_mild_drift": "Mild drift",
+      "drift_severe_drift": "Severe drift",
+      "bt": "BT",
+      "live": "Live",
+      "profitFactor": "Profit Factor",
       "equityCurve": "Equity Curve",
       "drawdown": "Drawdown",
       "strategyAttribution": "Strategy Attribution",
@@ -1144,6 +1163,7 @@
       "avgWin": "Avg Win %",
       "avgLoss": "Avg Loss %",
       "pf": "Profit Factor (PF)",
+      "costDrag": "Cost Drag",
       "trades": "Trades"
     },
     "chart": {

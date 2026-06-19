@@ -100,9 +100,19 @@ export function OptimizationPanel({ symbol, onApply }: Props) {
           </div>
 
           {proposal.riskAdjustedScore !== undefined && (
-            <div className="flex items-center gap-2 text-[9px] text-emerald-400/70 px-1">
-              <span>{t('autotrading.optimizer.riskAdjustedScore', '風險調整後評分')}</span>
+            <div className="flex flex-wrap items-center gap-2 text-[9px] px-1">
+              <span className="text-emerald-400/70">{t('autotrading.optimizer.riskAdjustedScore', '風險調整後評分')}</span>
+              {proposal.rawRiskAdjustedScore !== undefined && proposal.rawRiskAdjustedScore !== proposal.riskAdjustedScore && (
+                <span className="font-mono text-white/30 line-through" title={t('autotrading.optimizer.rawScoreHint', '未校正原始分數')}>
+                  {proposal.rawRiskAdjustedScore}
+                </span>
+              )}
               <span className="font-mono text-emerald-400">{proposal.riskAdjustedScore}</span>
+              {proposal.trials !== undefined && (
+                <span className="text-amber-400/80">
+                  {t('autotrading.optimizer.deflated', 'Deflated · {{n}} 組試驗校正', { n: proposal.trials })}
+                </span>
+              )}
               <span className="text-white/30">= Sharpe × (1-MDD) × WinRate</span>
             </div>
           )}

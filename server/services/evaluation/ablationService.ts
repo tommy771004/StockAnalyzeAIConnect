@@ -3,7 +3,7 @@
  * Ablation 分析：技術指標 only vs +AI vs +AI+Quantum。
  * 每次優化任務都附帶此報告，決定是否 promote 進 live。
  */
-import { runBacktestWithBestEngine, riskAdjustedScore } from '../backtestEngine.js';
+import { runBacktestWithBestEngine, riskAdjustedScore, deflatedRiskAdjustedScore } from '../backtestEngine.js';
 
 export type AblationVariant = 'technical_only' | 'technical_plus_ai' | 'full';
 
@@ -68,10 +68,12 @@ export async function runAblation(
   const baseline = results.find((r) => r.variant === 'technical_only')!;
   const full = results.find((r) => r.variant === 'full')!;
 
-  // Promotable: full variant has better risk-adjusted score than baseline,
-  // AND max drawdown does not exceed baseline + 2%
+  // Promotable: full variant must beat baseline AFTER a multiple-testing haircut
+  // (more model components = more researcher degrees of freedom), AND max drawdown
+  // does not exceed baseline + 2%
+  const deflatedFullScore = deflatedRiskAdjustedScore(full.metrics, variants.length, history.length);
   const promotable =
-    full.metrics.riskAdjustedScore > baseline.metrics.riskAdjustedScore &&
+    deflatedFullScore > baseline.metrics.riskAdjustedScore &&
     full.metrics.maxDrawdown <= baseline.metrics.maxDrawdown + 2;
 
   const roiDiff = (full.metrics.roi - baseline.metrics.roi).toFixed(2);

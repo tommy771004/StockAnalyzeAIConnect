@@ -42,6 +42,16 @@ export interface RiskConfig {
   maxSinglePositionTWD: number; // 單筆最大部位（台幣）
   maxPositionPct: number;       // 最大部位佔總資金比例（0~1）
   stopLossPct: number;          // 個股停損比例（0~1, 例如 0.05 = 5%）
+  maxConcurrentPositions: number;   // 最多同時持有不同標的數
+  maxSectorConcentrationPct: number; // 單一產業最大佔比（0~1，需提供 sector 才生效）
+}
+
+/** 下單當下的投資組合快照，供集中度風控使用（選填）。 */
+export interface PortfolioSnapshot {
+  /** 目前持有的部位（qty>0）。 */
+  positions: Array<{ symbol: string; value: number; sector?: string }>;
+  /** 本次下單標的所屬產業；未提供則略過產業集中度檢查。 */
+  newSymbolSector?: string;
 }
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = { ...SHARED_DEFAULTS };
@@ -112,6 +122,19 @@ class RiskManager {
     return 1;
   }
 
+  /**
+   * 資本規模遞減：已部署資金佔總預算比例越高，單筆配置越保守。
+   * （盲點：alpha 與流動性容量會隨 AUM 上升而衰減 — 部位越大越難不衝擊價格地建立。）
+   */
+  getCapacityScaling(): number {
+    const budget = this.config.budgetLimitTWD > 0 ? this.config.budgetLimitTWD : 1;
+    const deployed = this.totalUsed / budget;
+    if (deployed >= 0.9) return 0.4;
+    if (deployed >= 0.75) return 0.6;
+    if (deployed >= 0.5) return 0.8;
+    return 1;
+  }
+
   resetDaily() {
     this.currentDailyLoss = 0;
     this.currentDailyTrade = 0;
@@ -161,12 +184,39 @@ checkMaintenanceMargin(
       return alerts;
     }
   
-    validateOrder(order: OrderRequest, totalAssets: number): RiskCheckResult {
+    validateOrder(order: OrderRequest, totalAssets: number, portfolio?: PortfolioSnapshot): RiskCheckResult {
     if (this.killSwitchActive) {
       return { allowed: false, reason: '緊急停機開關已啟動，所有交易已暫停', level: 'KILL' };
     }
 
     const orderValue = order.quantity * order.price;
+
+    // 0. 集中度風控（僅 BUY；歷史學家視角：避免相關性集中＝隱形單一押注）
+    if (order.side === 'BUY' && portfolio) {
+      const heldSymbols = new Set(portfolio.positions.map((p) => p.symbol));
+      // 0a. 同時持倉檔數上限（建立新標的時才檢查）
+      if (!heldSymbols.has(order.symbol) && heldSymbols.size >= this.config.maxConcurrentPositions) {
+        return {
+          allowed: false,
+          reason: `同時持倉檔數已達上限 ${this.config.maxConcurrentPositions}（目前 ${heldSymbols.size} 檔）`,
+          level: 'BLOCK',
+        };
+      }
+      // 0b. 單一產業集中度上限（需提供 sector 標籤）
+      if (portfolio.newSymbolSector && totalAssets > 0) {
+        const sectorValue = portfolio.positions
+          .filter((p) => p.sector === portfolio.newSymbolSector)
+          .reduce((sum, p) => sum + p.value, 0);
+        const projectedPct = (sectorValue + orderValue) / totalAssets;
+        if (projectedPct > this.config.maxSectorConcentrationPct) {
+          return {
+            allowed: false,
+            reason: `產業「${portfolio.newSymbolSector}」集中度 ${(projectedPct * 100).toFixed(1)}% 超過上限 ${(this.config.maxSectorConcentrationPct * 100).toFixed(0)}%`,
+            level: 'BLOCK',
+          };
+        }
+      }
+    }
 
     // 1. 單筆上限
     if (orderValue > this.config.maxSinglePositionTWD) {
@@ -285,12 +335,32 @@ checkMaintenanceMargin(
       this.consecutiveDrawdownDays++;
       if (this.consecutiveDrawdownDays >= this.modelRisk.rollbackDrawdownDays) {
         console.warn(
-          `[RiskManager] ⚠️ Rollback condition met: ${this.consecutiveDrawdownDays} consecutive days exceeded drawdown limit. Current stage: ${this.modelRisk.rolloutStage}`,
+          `[RiskManager] ⚠️ 操作者回撤疲勞保護：連續 ${this.consecutiveDrawdownDays} 日超過回撤上限（stage=${this.modelRisk.rolloutStage}）— 啟動 Kill Switch。`,
         );
+        // 多日連續回撤＝操作者疲勞訊號（盲點：系統與有限、會疲勞之操作者的長期互動）。
+        // 自動暫停並強制人工檢視，模擬「應退場休息」而非任其在回撤中持續下單。
+        this.activateKillSwitch();
       }
     } else {
       this.consecutiveDrawdownDays = 0;
     }
+  }
+
+  /**
+   * EOD 結算：以「當日虧損 / 總預算」估算當日回撤幅度，記入連續回撤計數。
+   * 連續超標達門檻時 recordDailyDrawdown 會自動啟動 Kill Switch。
+   * 需在 resetDaily() 之前呼叫（讀取尚未歸零的 currentDailyLoss）。
+   */
+  settleDailyDrawdown(): { drawdownPct: number; consecutiveDays: number; fatigueTriggered: boolean } {
+    const budget = this.config.budgetLimitTWD > 0 ? this.config.budgetLimitTWD : 1;
+    const drawdownPct = this.currentDailyLoss / budget;
+    const wasKilled = this.killSwitchActive;
+    this.recordDailyDrawdown(drawdownPct);
+    return {
+      drawdownPct: Number(drawdownPct.toFixed(4)),
+      consecutiveDays: this.consecutiveDrawdownDays,
+      fatigueTriggered: !wasKilled && this.killSwitchActive,
+    };
   }
 
   getConsecutiveDrawdownDays(): number { return this.consecutiveDrawdownDays; }

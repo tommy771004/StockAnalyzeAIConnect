@@ -90,6 +90,10 @@ export interface AgentConfig {
   maxDailyLossTWD: number;
   tradingHours?: { start: string; end: string };
   decisionHeat?: DecisionHeat;
+  /** 法遵/風險預告確認 — 上實盤的硬性前提（見 complianceGate）。 */
+  complianceAck?: boolean;
+  /** 監管轄區代碼（預設 TW）。 */
+  jurisdiction?: string;
 }
 
 

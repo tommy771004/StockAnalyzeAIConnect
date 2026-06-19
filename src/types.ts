@@ -234,6 +234,9 @@ export interface BacktestMetrics {
   avgWin: number;
   avgLoss: number;
   profitFactor: number;
+  grossRoi?: number;      // 未扣成本的毛報酬率（%）
+  totalCost?: number;     // 手續費+稅+滑點總成本（TWD）
+  costSharePct?: number;  // 成本佔毛利比例（%）
 }
 
 export interface BacktestForecast {

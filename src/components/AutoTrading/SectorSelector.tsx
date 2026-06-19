@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { Layers, Plus, X } from 'lucide-react';
 import * as api from '../../services/api';
+import { marketFeatures } from '../../config/marketFeatures';
 
 interface Props {
   selectedSymbols: string[];
@@ -180,17 +181,19 @@ export function SectorSelector({ selectedSymbols, onSelectSymbols, disabled }: P
         >
           {t('autotrading.strategy.marketTabs.tw', '台股（整股）')}
         </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handleChangeMarketBucket('US')}
-          className={cn(
-            'px-3 py-1 text-[10px] font-bold tracking-widest rounded-sm border border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-            marketBucket === 'US' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' : 'text-white/45 hover:text-white/80'
-          )}
-        >
-          {t('autotrading.strategy.marketTabs.us', '美股（零股）')}
-        </button>
+        {marketFeatures.usBrokerage && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => handleChangeMarketBucket('US')}
+            className={cn(
+              'px-3 py-1 text-[10px] font-bold tracking-widest rounded-sm border border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+              marketBucket === 'US' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' : 'text-white/45 hover:text-white/80'
+            )}
+          >
+            {t('autotrading.strategy.marketTabs.us', '美股（零股）')}
+          </button>
+        )}
       </div>
       {error && (
         <div className="text-[10px] text-rose-300 border border-rose-500/30 bg-rose-500/10 rounded-sm px-2 py-1.5">
@@ -222,7 +225,7 @@ export function SectorSelector({ selectedSymbols, onSelectSymbols, disabled }: P
             </button>
           ))}
         </div>
-      ) : (
+      ) : marketFeatures.usBrokerage ? (
         <div className="space-y-2">
           {inputError && (
             <div className="text-[10px] text-rose-300 border border-rose-500/30 bg-rose-500/10 rounded-sm px-2 py-1.5">
@@ -278,7 +281,7 @@ export function SectorSelector({ selectedSymbols, onSelectSymbols, disabled }: P
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
