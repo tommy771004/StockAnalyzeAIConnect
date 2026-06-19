@@ -384,6 +384,27 @@ export const getSectors = (): Promise<SectorItem[]> => fetchJ<SectorItem[]>('/ap
 export const getSectorSymbols = (id: string): Promise<string[]> =>
   fetchJ<string[]>(`/api/sectors/${encodeURIComponent(id)}/symbols`);
 
+export interface Best5Level { price: number; size: number; }
+export interface Best5Quote {
+  symbol: string;
+  name: string;
+  price: number;
+  prevClose: number;
+  asks: Best5Level[];
+  bids: Best5Level[];
+  timestamp: number;
+  source: 'TWSE' | 'TPEX';
+}
+export const getBest5 = (symbol: string): Promise<Best5Quote | null> =>
+  fetchJ<{ ok: boolean; best5: Best5Quote | null }>(
+    `/api/twse/best5/${encodeURIComponent(symbol)}`,
+  ).then((r) => r.best5);
+
+export interface SectorHeatCell { id: string; name: string; changePct: number; }
+export const getTwSectorHeatmap = (): Promise<SectorHeatCell[]> =>
+  fetchJ<{ ok: boolean; sectors: SectorHeatCell[] }>('/api/sectors/heatmap')
+    .then((r) => r.sectors ?? []);
+
 export const runScreener = (symbols: string[], filters?: ScreenerFilters): Promise<{ results: ScreenerResult[] }> =>
   fetchJ<{ results: ScreenerResult[] }>('/api/screener', {
     method: 'POST',
