@@ -5,6 +5,42 @@ export interface Sector {
   name: string;
 }
 
+export interface SectorHeatCell {
+  id: string;
+  name: string;
+  changePct: number;
+}
+
+/** Curated TWSE 類股 for the dashboard heatmap (exact MI_INDEX `指數` names → short label). */
+const TW_HEATMAP_SECTORS: { match: string; label: string }[] = [
+  { match: '半導體類指數', label: '半導體' },
+  { match: '金融保險類指數', label: '金融保險' },
+  { match: '電子工業類指數', label: '電子' },
+  { match: '航運類指數', label: '航運' },
+  { match: '鋼鐵類指數', label: '鋼鐵' },
+  { match: '塑膠類指數', label: '塑膠' },
+  { match: '食品類指數', label: '食品' },
+  { match: '電腦及週邊設備類指數', label: '電腦週邊' },
+  { match: '光電類指數', label: '光電' },
+  { match: '通信網路類指數', label: '通信網路' },
+  { match: '生技醫療類指數', label: '生技醫療' },
+];
+
+/** Pure: TWSE MI_INDEX rows → curated sector cells (signed change%). */
+export function mapMiIndexToSectors(rows: Array<Record<string, string>>): SectorHeatCell[] {
+  const byName = new Map(rows.map((r) => [String(r['指數']).trim(), r]));
+  const out: SectorHeatCell[] = [];
+  for (const s of TW_HEATMAP_SECTORS) {
+    const row = byName.get(s.match);
+    if (!row) continue;
+    let pct = parseFloat(String(row['漲跌百分比']).replace(/[+\s]/g, '')) || 0;
+    // 漲跌百分比 is usually already signed; defensively apply 漲跌 sign if magnitude-only.
+    if (String(row['漲跌']).includes('-') && pct > 0) pct = -pct;
+    out.push({ id: s.match, name: s.label, changePct: pct });
+  }
+  return out;
+}
+
 /**
  * Map WantGoo 行業指數 ID → 證交所/櫃買中心公佈的「產業類別」中文字串，
  * 用於以 TWSE/TPEX OpenAPI 取代被 Cloudflare 阻擋的 WantGoo HTML 抓取。
@@ -389,6 +425,23 @@ const SECTORS: Sector[] = [
 
 export async function getSectors(): Promise<Sector[]> {
   return SECTORS;
+}
+
+let _twHeatCache: { at: number; cells: SectorHeatCell[] } | null = null;
+const TW_HEAT_TTL = 5 * 60 * 1000; // MI_INDEX is daily; cheap to hold
+
+/** TWSE 類股漲跌熱力圖（資料來源：MI_INDEX，盤後日資料）。 */
+export async function getTwSectorHeatmap(): Promise<SectorHeatCell[]> {
+  if (_twHeatCache && Date.now() - _twHeatCache.at < TW_HEAT_TTL) return _twHeatCache.cells;
+  const r = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX', {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error(`MI_INDEX HTTP ${r.status}`);
+  const rows = (await r.json()) as Array<Record<string, string>>;
+  const cells = mapMiIndexToSectors(rows);
+  if (cells.length > 0) _twHeatCache = { at: Date.now(), cells };
+  return cells;
 }
 
 /**

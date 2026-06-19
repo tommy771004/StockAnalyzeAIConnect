@@ -116,6 +116,18 @@
     "losers": "LOSERS",
     "marketPulse": "MARKET PULSE",
     "pulseUnavailable": "Pulse unavailable",
+    "best5": {
+      "title": "ORDER BOOK",
+      "price": "PRICE",
+      "size": "SIZE",
+      "buyPct": "BUY",
+      "sellPct": "SELL",
+      "empty": "Market closed or no depth data"
+    },
+    "sectorHeatmap": {
+      "title": "SECTOR HEATMAP",
+      "unavailable": "Sector data unavailable"
+    },
     "deepResearch": "Deep Research",
     "marketNews": "MARKET NEWS",
     "cycleNewsCategory": "Cycle news category",

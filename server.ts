@@ -1400,6 +1400,13 @@ app.get('/api/quotes', authMiddleware, async (req: AuthRequest, res) => {
   } catch (e) { handleApiError(res, e); }
 });
 
+app.get('/api/twse/best5/:symbol', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const best5 = await TWSE.realtimeBest5(req.params.symbol);
+    res.json({ ok: true, best5 });
+  } catch (e) { handleApiError(res, e); }
+});
+
 // IMPORTANT: /api/news/feed must be declared BEFORE /api/news/:symbol,
 // otherwise Express routes "feed" as a `:symbol` and the feed endpoint is shadowed.
 app.get('/api/news/feed', authMiddleware, async (req, res) => {
@@ -2093,6 +2100,13 @@ app.get('/api/sectors', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const list = await Sectors.getSectors();
     res.json(list);
+  } catch (e) { handleApiError(res, e); }
+});
+
+app.get('/api/sectors/heatmap', authMiddleware, async (_req: AuthRequest, res) => {
+  try {
+    const sectors = await Sectors.getTwSectorHeatmap();
+    res.json({ ok: true, market: 'tw', sectors });
   } catch (e) { handleApiError(res, e); }
 });
 
