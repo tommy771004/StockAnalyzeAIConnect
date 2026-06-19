@@ -158,9 +158,9 @@ export function AutoTradingPage() {
       <TradeToast events={visibleOrderEvents} />
       {/* Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 border border-(--color-term-border) rounded-sm shrink-0">
-        <div className="flex items-center gap-4">
-          <span className="text-[11px] font-bold text-(--color-term-accent) tracking-[0.25em]">QUANTUM_CORE_V1</span>
-          <nav className="flex gap-3">
+        <div className="flex items-center gap-4 min-w-0">
+          <span className="text-[11px] font-bold text-(--color-term-accent) tracking-[0.25em] shrink-0">QUANTUM_CORE_V1</span>
+          <nav className="flex gap-3 min-w-0 overflow-x-auto">
             {[
               { id: 'LIVE_VIEW', label: t('autotrading.tabs.liveView') },
               { id: 'STRATEGY', label: t('autotrading.tabs.strategy') },
@@ -172,7 +172,7 @@ export function AutoTradingPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setMainTab(tab.id)}
-                className={`focus-ring text-[10px] uppercase tracking-widest pb-0.5 motion-safe:transition-colors ${
+                className={`focus-ring text-[10px] uppercase tracking-widest pb-0.5 whitespace-nowrap shrink-0 motion-safe:transition-colors ${
                   mainTab === tab.id
                     ? 'text-(--color-term-accent) border-b border-(--color-term-accent)'
                     : 'text-(--color-term-muted) hover:text-(--color-term-text)'

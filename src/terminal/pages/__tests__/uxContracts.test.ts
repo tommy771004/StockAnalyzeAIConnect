@@ -115,4 +115,13 @@ describe('UX accessibility contracts', () => {
     expect(dashboard).toContain('<SelectedChartPanel');
     expect(dashboard).toContain('<SmartMoneyRecentEventsPanel');
   });
+
+  it('keeps portfolio allocation visible and signals horizontal holdings overflow', () => {
+    expect(portfolio).toContain('<AllocationPanel positions={enrichedPositions} />');
+    expect(portfolio).toContain('if (total <= 0)');
+    expect(portfolio).toContain('h-24 w-24 lg:h-20 lg:w-20');
+    expect(portfolio).toContain('sm:flex-row sm:items-center');
+    expect(portfolio).toContain('aria-label={t(\'portfolio.scrollHint\'');
+    expect(portfolio).toContain('sm:hidden');
+  });
 });

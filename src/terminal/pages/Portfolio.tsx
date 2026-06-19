@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { Plus, Edit2, Trash2, Check, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Loader2, AlertCircle, RefreshCw, ChevronRight } from 'lucide-react';
 import { Panel } from '../ui/Panel';
 import { Sparkline } from '../ui/Sparkline';
 import { formatPct, toneClass } from '../ui/format';
@@ -177,7 +177,7 @@ export function PortfolioPage() {
       )}
 
       <div className="col-span-12 lg:col-span-4 md:min-h-0 shrink-0 md:shrink">
-        <AllocationPanel positions={positions} />
+        <AllocationPanel positions={enrichedPositions} />
       </div>
       <div className="col-span-12 md:min-h-0 shrink-0 md:shrink">
         <TradeLogPanel trades={trades} />
@@ -328,8 +328,9 @@ export function HoldingsPanel({
       className="h-full"
       bodyClassName="overflow-auto"
     >
-      <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scroll-shadow-x">
-        <table className="w-full text-[12px]">
+      <div className="relative">
+        <div className="overflow-x-auto w-full -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-thin scroll-shadow-x">
+          <table className="w-full text-[12px]">
           <thead className="sticky top-0 bg-(--color-term-panel) text-[10px] tracking-widest text-(--color-term-muted) z-10">
             <tr className="border-b border-(--color-term-border)">
               <th className="px-4 py-3 text-left font-medium whitespace-nowrap">{t('portfolio.symbol', 'Symbol')}</th>
@@ -453,8 +454,16 @@ export function HoldingsPanel({
             );
           })}
         </tbody>
-      </table>
-    </div>
+          </table>
+        </div>
+        <div
+          role="note"
+          aria-label={t('portfolio.scrollHint', 'Scroll horizontally to see more columns')}
+          className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-end bg-gradient-to-l from-(--color-term-panel) via-(--color-term-panel)/85 to-transparent pr-1 sm:hidden"
+        >
+          <ChevronRight className="h-4 w-4 text-(--color-term-accent)" aria-hidden="true" />
+        </div>
+      </div>
     </Panel>
   );
 }
@@ -471,6 +480,10 @@ export function AllocationPanel({ positions }: { positions: any[] }) {
        total += (p.marketValueTWD || 0);
     });
 
+    if (total <= 0) {
+      return [{ label: t('portfolio.cash', 'Cash'), pct: 100, color: '#374151' }];
+    }
+
     return Object.entries(groups).map(([label, val], i) => ({
       label,
       pct: (val / total) * 100,
@@ -479,8 +492,8 @@ export function AllocationPanel({ positions }: { positions: any[] }) {
   }, [positions, t]);
 
   return (
-    <Panel title={t('portfolio.allocationMarketTitle', 'Asset Allocation (Market)')} collapsible className="h-full" bodyClassName="flex flex-col p-4 gap-4">
-      <div className="flex items-center justify-center">
+    <Panel title={t('portfolio.allocationMarketTitle', 'Asset Allocation (Market)')} collapsible className="h-full" bodyClassName="flex flex-col gap-3 px-3 py-1 sm:flex-row sm:items-center sm:justify-center">
+      <div className="flex shrink-0 items-center justify-center">
         <Donut sectors={allocation} />
       </div>
       <ul className="space-y-1.5 text-[12px]">
@@ -508,7 +521,7 @@ export function Donut({ sectors }: { sectors: any[] }) {
   const circumference = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="h-24 w-24 lg:h-20 lg:w-20 shrink-0 -rotate-90">
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke} />
       {sectors.map((s) => {
         const dash = (s.pct / 100) * circumference;
