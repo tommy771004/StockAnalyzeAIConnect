@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { createChart, IChartApi, ISeriesApi, ColorType, Time, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries } from 'lightweight-charts';
 import { useSettings } from '../contexts/SettingsContext';
 import { HistoricalData } from '../types';
-import { cn as safeCn } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { Loader2, Settings2, BarChart3, TrendingUp, Activity, Plus, Maximize2, Layers } from 'lucide-react';
 import { calcSMA, calcRSI, calcMACD } from '../lib/indicators';
 import type { TickData } from '../workers/socket.worker';
@@ -560,7 +560,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
   }, [processedData, chartType, showSMA5, showSMA20, showSMA60, showVolume, isDark, symbol]);
 
   return (
-    <div className={safeCn(
+    <div className={cn(
       "w-full h-full flex flex-col overflow-hidden relative",
       focusMode && "bg-[#131722]"
     )}>
@@ -571,14 +571,14 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
           <div className="flex items-center gap-1">
             <button 
               onClick={() => setChartType('candle')}
-              className={safeCn("p-2 rounded-md transition-all active:scale-95", chartType === 'candle' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
+              className={cn("p-2 rounded-md transition-all active:scale-95", chartType === 'candle' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
               title={t('chart.candle', 'K線圖')}
             >
               <BarChart3 size={18} />
             </button>
             <button 
               onClick={() => setChartType('area')}
-              className={safeCn("p-2 rounded-md transition-all active:scale-95", chartType === 'area' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
+              className={cn("p-2 rounded-md transition-all active:scale-95", chartType === 'area' ? "bg-indigo-500/20 text-indigo-400" : "text-zinc-500 hover:bg-white/5")}
               title={t('chart.area', '面積圖')}
             >
               <TrendingUp size={18} />
@@ -600,7 +600,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
                   key={label}
                   onClick={() => canCompute && setShow(!show)}
                   title={canCompute ? undefined : `需要至少 ${period} 根 K 棒（目前 ${processedData.length} 根）`}
-                  className={safeCn(
+                  className={cn(
                     'px-2 py-1 text-[10px] font-bold rounded transition-all border shrink-0',
                     !canCompute
                       ? 'border-zinc-200/10 dark:border-zinc-800/20 text-zinc-600/50 cursor-not-allowed'
@@ -615,7 +615,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
             })}
             <button 
               onClick={() => setShowVolume(!showVolume)}
-              className={safeCn(
+              className={cn(
                 "px-3 py-1.5 text-xs font-bold rounded-md transition-all border shrink-0",
                 showVolume 
                   ? "bg-blue-500/20 border-blue-500/40 text-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.1)]" 
@@ -653,7 +653,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
                 setTimeframe(t);
                 onTimeframeChange?.(t);
               }}
-              className={safeCn(
+              className={cn(
                 "px-2 py-1 text-[11px] font-bold transition-all text-center leading-none h-6 min-w-[28px] flex items-center justify-center rounded-md",
                 timeframe === t 
                   ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 scale-105" 
@@ -734,7 +734,7 @@ const ChartWidget: React.FC<Props> = ({ symbol = "AAPL", data = [], liveMode = f
              {hoverData.macd !== undefined && hoverData.macd !== null && (
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] text-emerald-400 font-bold uppercase">MACD:</span>
-                  <span className={safeCn("text-[11px] font-mono font-bold", Number(hoverData.macd) >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  <span className={cn("text-[11px] font-mono font-bold", Number(hoverData.macd) >= 0 ? "text-emerald-400" : "text-rose-400")}>
                     {Number(hoverData.macd).toFixed(2)}
                   </span>
                 </div>

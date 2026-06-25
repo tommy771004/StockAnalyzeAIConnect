@@ -40,9 +40,7 @@ const UNCERTAINTY_GATE_THRESHOLD = 0.65;
 const MIN_LEVERAGE = 0.25;
 const MAX_LEVERAGE = 1.0;
 
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n));
-}
+import { clamp } from './quantumUtils.js';
 
 /**
  * Derive leverage multiplier from uncertainty_penalty.

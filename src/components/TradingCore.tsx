@@ -6,9 +6,10 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as api from '../services/api';
-import { STORAGE_KEYS, saveToStorage, loadFromStorage } from '../utils/storage';
+
 import { chatWithAI } from '../services/aiService';
-import { safeCn, safeN, vibrate } from '../utils/helpers';
+import { cn } from '../lib/utils';
+import { safeN, vibrate } from '../utils/helpers';
 import { motion } from 'motion/react';
 import { Watchlist } from './Watchlist';
 import { PriceBar } from './PriceBar';
@@ -81,7 +82,12 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
     loadData(t);
   }, [setTimeframe, loadData]);
 
-  const [portfolio, setPortfolio] = useState<Order[]>(() => loadFromStorage(STORAGE_KEYS.PORTFOLIO, []));
+  const [portfolio, setPortfolio] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem('liquid_intel_portfolio');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const { data: rawWatchlist = EMPTY_WATCHLIST } = useWatchlist();
   // Enrich watchlist items with live quote prices
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -111,7 +117,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
   }, [rawWatchlist]);
 
   useEffect(() => {
-    saveToStorage(STORAGE_KEYS.PORTFOLIO, portfolio);
+    try { localStorage.setItem('liquid_intel_portfolio', JSON.stringify(portfolio)); } catch {}
   }, [portfolio]);
 
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
@@ -231,23 +237,23 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className={safeCn("h-full w-full flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden", isLandscape ? "p-0 gap-0" : compact ? "p-2 sm:p-4 gap-2 lg:gap-4" : "p-2 sm:p-4 gap-4 lg:gap-6")}
+      className={cn("h-full w-full flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden", isLandscape ? "p-0 gap-0" : compact ? "p-2 sm:p-4 gap-2 lg:gap-4" : "p-2 sm:p-4 gap-4 lg:gap-6")}
     >
 
 
       {/* ── LEFT: Watchlist + Portfolio Summary ── */}
       {!isFocusActive && !isLandscape && (
-        <div className={safeCn("w-full lg:w-[320px] flex flex-col shrink-0 lg:overflow-y-auto custom-scrollbar lg:pr-2 lg:-mr-2", compact ? "gap-3" : "gap-5", mobilePanel !== 'list' && "hidden lg:flex")}>
+        <div className={cn("w-full lg:w-[320px] flex flex-col shrink-0 lg:overflow-y-auto custom-scrollbar lg:pr-2 lg:-mr-2", compact ? "gap-3" : "gap-5", mobilePanel !== 'list' && "hidden lg:flex")}>
           {/* Portfolio Summary Group */}
           <div className="flex flex-col gap-3">
              <div className="px-4">
                 <span className="text-heading-xs text-zinc-500">{compact ? '概覽' : '資產概覽 ASSET OVERVIEW'}</span>
              </div>
-             <div className={safeCn("glass-card border border-white/5 rounded-3xl shadow-2xl relative overflow-hidden group", compact ? "p-4" : "p-6")}>
+             <div className={cn("glass-card border border-white/5 rounded-3xl shadow-2xl relative overflow-hidden group", compact ? "p-4" : "p-6")}>
                 <div className="absolute inset-0 bg-indigo-500/[0.03] pointer-events-none group-hover:bg-indigo-500/[0.05] transition-colors" />
                 <div className="relative z-10 flex flex-col">
                   <div className="label-meta font-black text-zinc-600 uppercase tracking-widest mb-2 text-data-xs">當前權益 EQUITY</div>
-                  <div className={safeCn("font-black text-white tracking-tighter tabular-nums flex items-baseline gap-2", compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl")} style={{ fontFamily: 'var(--font-data)' }}>
+                  <div className={cn("font-black text-white tracking-tighter tabular-nums flex items-baseline gap-2", compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl")} style={{ fontFamily: 'var(--font-data)' }}>
                     <span className="text-xs sm:text-sm opacity-30 font-medium">NT$</span>
                     {portfolio.length > 0 ? format.number(portfolioValue, 0) : '0'}
                   </div>
@@ -290,9 +296,9 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
       )}
 
       {/* ── CENTER: Chart ── */}
-      <div className={safeCn("flex-1 flex flex-col min-w-0 min-h-[400px] lg:min-h-0 lg:overflow-y-auto custom-scrollbar", isLandscape ? "gap-0" : compact ? "gap-3" : "gap-5", (!isFocusActive && !isLandscape) && mobilePanel !== 'chart' && "hidden lg:flex")}>
+      <div className={cn("flex-1 flex flex-col min-w-0 min-h-[400px] lg:min-h-0 lg:overflow-y-auto custom-scrollbar", isLandscape ? "gap-0" : compact ? "gap-3" : "gap-5", (!isFocusActive && !isLandscape) && mobilePanel !== 'chart' && "hidden lg:flex")}>
         {/* Main Display Unit */}
-        <div className={safeCn(
+        <div className={cn(
           "shrink-0 flex flex-col overflow-hidden relative", 
           isFocusActive ? "flex-1" : "h-[60vh] lg:h-[calc(100vh-8rem)] min-h-[400px]",
           (isLandscape || isFocusActive) ? "p-0 rounded-none border-none bg-[#050505]" : "glass-card border border-white/5 rounded-3xl shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)]"
@@ -335,7 +341,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
         
         {/* Sub-Data Grid */}
         {!isLandscape && (
-          <div className={safeCn("flex flex-col gap-4 pb-32", isFocusActive && "px-4 animate-in fade-in slide-in-from-bottom-4 duration-700")}>
+          <div className={cn("flex flex-col gap-4 pb-32", isFocusActive && "px-4 animate-in fade-in slide-in-from-bottom-4 duration-700")}>
              
              {/* Mobile-Only Pro Metrics Grid */}
              {mobilePanel === 'chart' && (
@@ -343,7 +349,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
                  {technicalSummary?.map((s) => (
                    <div key={s.label} className="glass-card p-4 border border-white/5 bg-white/[0.02] rounded-2xl flex flex-col gap-1">
                      <span className="text-data-xs font-black text-zinc-600 uppercase tracking-widest">{s.label}</span>
-                     <span className={safeCn(
+                     <span className={cn(
                        "text-base font-black tabular-nums tracking-tighter",
                        s.status === 'bullish' ? 'text-emerald-400' : s.status === 'bearish' ? 'text-rose-400' : 'text-zinc-300'
                      )}>
@@ -366,7 +372,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
 
       {/* ── RIGHT: Analysis Engine ── */}
       {!isFocusActive && !isLandscape && (
-        <div className={safeCn("w-full lg:w-[340px] flex flex-col shrink-0 relative lg:overflow-y-auto custom-scrollbar lg:pl-1 lg:-ml-1", compact ? "gap-3" : "gap-5", mobilePanel !== 'panel' && "hidden lg:flex")}>
+        <div className={cn("w-full lg:w-[340px] flex flex-col shrink-0 relative lg:overflow-y-auto custom-scrollbar lg:pl-1 lg:-ml-1", compact ? "gap-3" : "gap-5", mobilePanel !== 'panel' && "hidden lg:flex")}>
           <div className="glass-card rounded-3xl border border-white/5 overflow-hidden shadow-2xl relative">
             <div className="absolute inset-0 bg-amber-500/[0.02] pointer-events-none" />
             <BacktestPanel history={hist} />
@@ -436,7 +442,7 @@ export default function TradingCore({ model, symbol, onSymbolChange, onGoBacktes
               { id: 'panel' as const, label: '面板 TRADE', icon: '⚡' },
             ]).map(p => (
               <button key={p.id} type="button" onClick={(e) => { setMobilePanel(p.id); vibrate(20); }}
-                className={safeCn(
+                className={cn(
                   'flex-1 py-3 px-2 rounded-[1.5rem] text-[10px] font-black tracking-widest uppercase transition flex flex-col items-center gap-1',
                   mobilePanel === p.id
                     ? 'bg-white/10 text-white shadow-inner ring-1 ring-white/10'

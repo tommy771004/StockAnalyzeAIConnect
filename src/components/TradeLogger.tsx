@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, Activity, CheckCircle, XCircle } from 'lucide-react';
-import { safeCn } from '../utils/helpers';
+import { cn } from '../lib/utils';
 
 interface LogEntry {
   id: string;
@@ -96,7 +96,7 @@ export default function TradeLogger() {
               <div className="shrink-0 mt-0.5">{getIcon(log.type)}</div>
               <div className="flex flex-wrap gap-x-2 gap-y-0.5 leading-tight">
                 <span className="text-zinc-600">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                <span className={safeCn("font-bold", getSourceColor(log.source))}>[{log.source}]</span>
+                <span className={cn("font-bold", getSourceColor(log.source))}>[{log.source}]</span>
                 <span className={getColor(log.type)}>{log.message}</span>
               </div>
             </motion.div>

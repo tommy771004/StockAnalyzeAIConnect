@@ -120,7 +120,7 @@ export function sanitizeSmartMoneySettings(raw: unknown): SmartMoneySettings {
 
   const trackedManagerIds = hasTrackedManagerIds
     ? Array.from(new Set(
-        source.trackedManagerIds
+        (source.trackedManagerIds as unknown[])
           .map((value) => String(value ?? '').trim())
           .filter((value) => availableManagerIds.has(value)),
       ))
@@ -128,8 +128,8 @@ export function sanitizeSmartMoneySettings(raw: unknown): SmartMoneySettings {
 
   const insiderSymbols = Array.isArray(source.insiderSymbols)
     ? Array.from(new Set(
-        source.insiderSymbols
-          .map((value) => normalizeSymbol(value))
+        (source.insiderSymbols as unknown[])
+          .map((value) => normalizeSymbol(value as string))
           .filter((value): value is string => value !== null),
       ))
     : defaults.insiderSymbols;

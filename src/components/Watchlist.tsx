@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, X, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-import { safeCn, safeN } from '../utils/helpers';
+import { cn } from '../lib/utils';
+import { safeN } from '../utils/helpers';
 import { motion, AnimatePresence, useAnimation } from 'motion/react';
 import { vibrate } from '../utils/helpers';
 import { useSettings } from '../contexts/SettingsContext';
@@ -55,7 +56,7 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
 
   return (
     <div className="relative overflow-hidden rounded-2xl col-span-1 border border-transparent">
-      <div className={safeCn("absolute inset-0 flex items-center px-4 transition duration-300 backdrop-blur-md", swipeSide === 'buy' ? 'bg-emerald-500/80 justify-start' : swipeSide === 'sell' ? 'bg-rose-500/80 justify-end' : 'bg-transparent')}>
+      <div className={cn("absolute inset-0 flex items-center px-4 transition duration-300 backdrop-blur-md", swipeSide === 'buy' ? 'bg-emerald-500/80 justify-start' : swipeSide === 'sell' ? 'bg-rose-500/80 justify-end' : 'bg-transparent')}>
         {swipeSide === 'buy' && <span className="font-black text-black text-[10px] tracking-[0.2em] uppercase">BUY EXEC</span>}
         {swipeSide === 'sell' && <span className="font-black text-white text-[10px] tracking-[0.2em] uppercase">SELL EXEC</span>}
       </div>
@@ -85,7 +86,7 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
         tabIndex={0}
         role="option"
         aria-selected={isActive}
-        className={safeCn(
+        className={cn(
           'stock-card flex flex-col rounded-2xl cursor-pointer transition active:scale-[0.98] bg-[#0a0a0c]/40 z-10 relative overflow-hidden',
           compact ? 'p-2' : 'p-3',
           isActive
@@ -93,13 +94,13 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
             : 'border border-white/5 hover:border-white/10'
         )}>
         {/* Flash Background layer */}
-        <div className={safeCn(
+        <div className={cn(
           "absolute inset-0 transition-opacity duration-300 pointer-events-none z-0",
           flashDir === 'up' ? "bg-emerald-500/10 opacity-100" : flashDir === 'down' ? "bg-rose-500/10 opacity-100" : "opacity-0"
         )} />
         
         <div className="flex justify-between items-start mb-1.5 relative z-10 min-w-0">
-          <div className={safeCn('font-black tracking-tighter truncate pr-1', compact ? 'text-xs md:text-sm' : 'text-sm md:text-base', isActive ? 'text-indigo-300' : 'text-white')} style={{ fontFamily: 'var(--font-heading)' }}>
+          <div className={cn('font-black tracking-tighter truncate pr-1', compact ? 'text-xs md:text-sm' : 'text-sm md:text-base', isActive ? 'text-indigo-300' : 'text-white')} style={{ fontFamily: 'var(--font-heading)' }}>
             {w.shortName ?? w.name ?? ''}
           </div>
           <div className="text-[9px] font-black tracking-widest text-zinc-600 uppercase shrink-0" style={{ fontFamily: 'var(--font-data)' }}>{w.symbol}</div>
@@ -107,7 +108,7 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
         
         <div className="flex items-end justify-between relative z-10 w-full">
           <div className="flex flex-col">
-            <div className={safeCn(
+            <div className={cn(
               'font-black tabular-nums tracking-tighter transition-colors duration-150 leading-none mb-1', 
               compact ? 'text-lg md:text-xl' : 'text-xl md:text-2xl', 
               flashDir === 'up' ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]' : flashDir === 'down' ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.8)]' : isActive ? 'text-indigo-300' : 'text-white'
@@ -115,7 +116,7 @@ const SwipeableWatchlistItem = React.memo(({ w, isActive, wUp, compact, onClick,
               {w.price?.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '—'}
             </div>
             
-            <div className={safeCn(
+            <div className={cn(
               'font-black tabular-nums flex items-center gap-1.5 leading-none text-data-xs', 
               wUp ? 'text-emerald-400' : 'text-rose-400'
             )} style={{ fontFamily: 'var(--font-data)' }}>
@@ -152,7 +153,7 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
   }, [watchlist, filter]);
 
   return (
-    <div className={safeCn("flex-1 flex flex-col min-h-0 bg-transparent", compact ? "p-2" : "p-3")}>
+    <div className={cn("flex-1 flex flex-col min-h-0 bg-transparent", compact ? "p-2" : "p-3")}>
       <div className="flex items-center justify-between shrink-0 mb-3 px-1">
         <div className="flex flex-col">
           <span className="text-heading-xs text-zinc-500" style={{ fontFamily: 'var(--font-heading)' }}>{compact ? '追蹤 WATCH' : '追蹤清單 WATCHLIST'}</span>
@@ -170,7 +171,7 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
             <option value="bearish">BEAR</option>
           </select>
           <button type="button" onClick={(e) => { setWlAdding(v => !v); vibrate(20); }} 
-            className={safeCn(
+            className={cn(
               "w-8 h-8 flex items-center justify-center rounded-xl transition border",
               wlAdding ? "bg-indigo-500 text-black border-indigo-400 rotate-45 shadow-lg" : "bg-white/5 text-zinc-400 border-white/10 hover:text-white"
             )}
@@ -241,7 +242,7 @@ export const Watchlist: React.FC<WatchlistProps> = React.memo(({
         )}
       </AnimatePresence>
 
-      <div className={safeCn("flex-1 overflow-y-auto grid grid-cols-2 gap-2 min-h-0 content-start p-1 custom-scrollbar", compact ? "gap-1.5" : "gap-2")} role="listbox" aria-label="追蹤清單">
+      <div className={cn("flex-1 overflow-y-auto grid grid-cols-2 gap-2 min-h-0 content-start p-1 custom-scrollbar", compact ? "gap-1.5" : "gap-2")} role="listbox" aria-label="追蹤清單">
         <AnimatePresence mode="popLayout">
           {filteredWatchlist.length === 0
             ? <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="col-span-2 flex flex-col items-center justify-center gap-4 py-20 opacity-30">

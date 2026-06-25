@@ -11,9 +11,7 @@
  *  - flow_bias   : passed through as-is
  */
 
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n));
-}
+import { clamp } from './quantumUtils.js';
 
 function logReturn(a: number, b: number): number {
   if (a <= 0 || b <= 0) return 0;

@@ -3,11 +3,11 @@ import { runBacktest, BacktestConfig } from '../services/backtestEngine';
 import { BacktestResult, HistoricalData } from '../types';
 import { motion } from 'motion/react';
 import { useSettings } from '../contexts/SettingsContext';
-import { safeCn } from '../utils/helpers';
+import { cn } from '../lib/utils';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, XAxis } from 'recharts';
 import { Activity, Code, Settings2 } from 'lucide-react';
 import { pushLog } from './TradeLogger';
-import { STORAGE_KEYS } from '../utils/storage';
+
 
 interface Props {
   history: HistoricalData[];
@@ -28,7 +28,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
     setGeneratedCode(null);
     pushLog('info', 'AGENT', `Starting Dynamic Backtest Generator...`);
     try {
-      const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+      const token = localStorage.getItem('auth_token');
       const res = await fetch('/api/agent/dynamic-strategy', {
         method: 'POST',
         headers: { 
@@ -105,7 +105,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className={safeCn("flex flex-col h-full", compact ? "gap-2" : "gap-4")}
+      className={cn("flex flex-col h-full", compact ? "gap-2" : "gap-4")}
     >
       <div className="flex flex-col gap-2 pb-2 border-b border-white/10">
          <div className="flex items-center justify-between">
@@ -182,7 +182,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
                 )}
                <div className="bg-black/30 border border-white/5 p-2 rounded-xl">
                  <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Total Return</div>
-                 <div className={safeCn("text-lg font-black tracking-tighter", result.metrics.roi > 0 ? "text-emerald-400" : "text-rose-400")} style={{ fontFamily: 'var(--font-data)' }}>
+                 <div className={cn("text-lg font-black tracking-tighter", result.metrics.roi > 0 ? "text-emerald-400" : "text-rose-400")} style={{ fontFamily: 'var(--font-data)' }}>
                    {result.metrics.roi > 0 ? '+' : ''}{result.metrics.roi.toFixed(1)}%
                  </div>
                </div>
@@ -200,7 +200,7 @@ const BacktestPanelInner: React.FC<Props> = ({ history }) => {
                </div>
                <div className="bg-black/30 border border-white/5 p-2 rounded-xl">
                  <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Sharpe Ratio</div>
-                 <div className={safeCn("text-sm font-black tracking-tighter mt-1", result.metrics.sharpe > 1 ? "text-emerald-400" : "text-white")} style={{ fontFamily: 'var(--font-data)' }}>
+                 <div className={cn("text-sm font-black tracking-tighter mt-1", result.metrics.sharpe > 1 ? "text-emerald-400" : "text-white")} style={{ fontFamily: 'var(--font-data)' }}>
                    {result.metrics.sharpe.toFixed(2)}
                  </div>
                </div>

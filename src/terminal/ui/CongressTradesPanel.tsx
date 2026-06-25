@@ -175,29 +175,29 @@ export function CongressTradesPanel({ symbol }: Props) {
                   : t('congress.emptyLatest', '尚無最新交易資料')}
               </li>
             )}
-            {data.trades.map((t, i) => {
-              const action = ACTION_CONFIG[t.action] ?? ACTION_CONFIG.Exchange;
+            {data.trades.map((trade, i) => {
+              const action = ACTION_CONFIG[trade.action] ?? ACTION_CONFIG.Exchange;
               const Icon   = action.icon;
-              const chamberLabel = t.chamber === 'House'
+              const chamberLabel = trade.chamber === 'House'
                 ? t('congress.chamberHouse', 'House')
                 : t('congress.chamberSenate', 'Senate');
               return (
                 <li key={i} className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
                   {/* Party badge */}
-                  <span className={cn('mt-0.5 shrink-0 rounded px-1.5 text-[9px] font-bold', PARTY_COLOR[t.party])}>
-                    {t.party}
+                  <span className={cn('mt-0.5 shrink-0 rounded px-1.5 text-[9px] font-bold', PARTY_COLOR[trade.party])}>
+                    {trade.party}
                   </span>
 
                   {/* Politician + ticker */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="inline-block truncate max-w-[120px] sm:max-w-[200px] text-[12px] font-semibold text-(--color-term-text) align-bottom">{t.politician}</span>
+                      <span className="inline-block truncate max-w-[120px] sm:max-w-[200px] text-[12px] font-semibold text-(--color-term-text) align-bottom">{trade.politician}</span>
                       {!symbol && (
-                        <span className="shrink-0 text-[11px] font-bold text-(--color-term-accent)">{t.ticker}</span>
+                        <span className="shrink-0 text-[11px] font-bold text-(--color-term-accent)">{trade.ticker}</span>
                       )}
                     </div>
                     <div className="text-[10px] text-(--color-term-muted) mt-0.5 break-words text-pretty">
-                      {chamberLabel} · {t.state} · {t('congress.tradeDate', '交易: {{date}}', { date: t.tradeDate })} · {t('congress.reportedDate', '申報: {{date}}', { date: t.reportedDate })}
+                      {chamberLabel} · {trade.state} · {t('congress.tradeDate', '交易: {{date}}', { date: trade.tradeDate })} · {t('congress.reportedDate', '申報: {{date}}', { date: trade.reportedDate })}
                     </div>
                   </div>
 
@@ -205,9 +205,9 @@ export function CongressTradesPanel({ symbol }: Props) {
                   <div className="shrink-0 text-right">
                     <div className={cn('flex items-center gap-1 justify-end text-[12px] font-semibold', action.color)}>
                       <Icon size={12} />
-                      {actionLabels[t.action] ?? actionLabels.Exchange}
+                      {actionLabels[trade.action] ?? actionLabels.Exchange}
                     </div>
-                    <div className="text-[10px] text-(--color-term-muted) mt-0.5">{t.amountFormatted}</div>
+                    <div className="text-[10px] text-(--color-term-muted) mt-0.5">{trade.amountFormatted}</div>
                   </div>
                 </li>
               );

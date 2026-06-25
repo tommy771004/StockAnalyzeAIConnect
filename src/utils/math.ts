@@ -1,4 +1,4 @@
-import { Decimal } from 'decimal.js';
+
 
 export function _ema(closes: number[], p: number): number[] {
   if (!closes.length) return [];

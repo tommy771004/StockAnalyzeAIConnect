@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { safeCn } from '../utils/helpers';
+import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 import { useSettings } from '../contexts/SettingsContext';
 import { HistoricalData } from '../types';
@@ -30,7 +30,7 @@ export const ChartSection: React.FC<ChartSectionProps> = React.memo(({ data, foc
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className={safeCn(
+      className={cn(
         "liquid-glass no-swipe flex-1 relative overflow-hidden transition flex flex-col", 
         focusMode ? "rounded-none p-0" : compact ? "rounded-2xl p-1" : "rounded-2xl p-2 sm:p-4"
       )}

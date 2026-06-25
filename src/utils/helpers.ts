@@ -1,9 +1,4 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
-export function safeCn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export function safeN(val: unknown, fallback = 0): number {
   if (typeof val === 'number' && !isNaN(val)) return val;

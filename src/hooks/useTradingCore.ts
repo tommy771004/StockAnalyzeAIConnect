@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
-import { STORAGE_KEYS } from '../utils/storage';
 import { Order, WatchlistItem, Position } from '../types';
 import { pushLog } from '../components/TradeLogger';
 import { useStockSymbolSearch } from './useStockSymbolSearch';
@@ -122,7 +121,7 @@ export function useWatchlistManagement(
       if (!normalized || typedWatchlist.find((w: WatchlistItem) => w.symbol === normalized)) return;
       try {
         await api.addWatchlistItem(normalized);
-        queryClient.invalidateQueries({ queryKey: [STORAGE_KEYS.WATCHLIST] });
+        queryClient.invalidateQueries({ queryKey: ['liquid_intel_watchlist'] });
         setWlSearch('');
         setWlAdding(false);
         showToast(`已新增 ${normalized} 至自選股`, 'success');

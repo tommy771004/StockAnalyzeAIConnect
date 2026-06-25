@@ -9,34 +9,69 @@ interface Condition {
   value: string;
 }
 
-const INDICATORS = ['MACD', 'RSI', 'MA_Fast', 'MA_Slow', 'Bollinger_Upper', 'Bollinger_Lower'];
+const INDICATOR_VAR_MAP: Record<string, string> = {
+  MACD: 'macd',
+  MACD_Signal: 'signal',
+  RSI: 'rsi',
+  MA_Fast: 'ma_fast',
+  MA_Slow: 'ma_slow',
+  Bollinger_Upper: 'bb_upper',
+  Bollinger_Lower: 'bb_lower',
+};
+
+const INDICATORS = Object.keys(INDICATOR_VAR_MAP);
 const OPERATORS = ['>', '<', '==', 'cross_over', 'cross_under'];
+
+const INDICATOR_SETUP: Record<string, string> = {
+  MACD: 'macd, signal = le.indicators.MACD()',
+  MACD_Signal: 'macd, signal = le.indicators.MACD()',
+  RSI: 'rsi = le.indicators.RSI()',
+  MA_Fast: 'ma_fast = le.indicators.MA(period=20)',
+  MA_Slow: 'ma_slow = le.indicators.MA(period=50)',
+  Bollinger_Upper: 'bb_upper, bb_lower = le.indicators.Bollinger()',
+  Bollinger_Lower: 'bb_upper, bb_lower = le.indicators.Bollinger()',
+};
 
 export default function VisualStrategyBuilder({ onChange }: { onChange: (script: string) => void }) {
   const [conditions, setConditions] = useState<Condition[]>([
-    { id: '1', indicator: 'MACD', operator: 'cross_over', value: 'Signal' }
+    { id: '1', indicator: 'MACD', operator: 'cross_over', value: 'MACD_Signal' }
   ]);
 
   const generateScript = (conds: Condition[]) => {
-    let script = `import liquid_engine as le\n\nstrategy = le.Strategy("VisualStrategy")\n\n`;
+    // 收集所有被左側或右側使用到的指標
+    const usedKeys = new Set<string>();
+    conds.forEach(c => {
+      if (INDICATOR_SETUP[c.indicator]) usedKeys.add(c.indicator);
+      if (INDICATOR_SETUP[c.value]) usedKeys.add(c.value);
+    });
     
-    // Define indicators (simplified mapping)
-    script += `# Indicators\nmacd, signal = le.indicators.MACD()\n`;
-    script += `rsi = le.indicators.RSI()\n`;
-    script += `ma_fast = le.indicators.MA(period=20)\n\n`;
+    const indicatorLines = Array.from(usedKeys)
+      .map(i => INDICATOR_SETUP[i])
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i) // dedupe
+      .join('\n');
 
-    // Build conditions
     const condString = conds.map(c => {
+      const leftVar = INDICATOR_VAR_MAP[c.indicator] || c.indicator;
+      const rightVar = INDICATOR_VAR_MAP[c.value] || c.value;
+
       if (c.operator === 'cross_over' || c.operator === 'cross_under') {
-        return `le.${c.operator}(${c.indicator.toLowerCase()}, ${c.value.toLowerCase()})`;
+        return `le.${c.operator}(${leftVar}, ${rightVar})`;
       }
-      return `${c.indicator.toLowerCase()} ${c.operator} ${c.value}`;
+      return `${leftVar} ${c.operator} ${rightVar}`;
     }).join(' and ');
 
-    script += `# Logic\nif ${condString}:\n    strategy.emit_order("BUY", quantity=1000, type="MARKET")\n`;
-    
-    return script;
+    const logicCode = condString 
+      ? `if ${condString}:\n    strategy.emit_order("BUY", quantity=1000, type="MARKET")` 
+      : 'pass';
+
+    return (
+      `import liquid_engine as le\n\nstrategy = le.Strategy("VisualStrategy")\n\n` +
+      `# Indicators\n${indicatorLines}\n\n` +
+      `# Logic\n${logicCode}\n`
+    );
   };
+
 
   const generatedScript = useMemo(() => generateScript(conditions), [conditions]);
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, ArrowRight, Zap } from 'lucide-react';
-import { safeCn, safeN } from '../utils/helpers';
+import { cn } from '../lib/utils';
+import { safeN } from '../utils/helpers';
 import { vibrate } from '../utils/helpers';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
 import { useSettings } from '../contexts/SettingsContext';
@@ -12,12 +13,12 @@ const SwipeToConfirm = ({ onConfirm, loading, side }: { onConfirm: () => void, l
   const controls = useAnimation();
 
   return (
-    <div ref={containerRef} className={safeCn(
+    <div ref={containerRef} className={cn(
       "relative h-14 w-full rounded-2xl overflow-hidden border transition touch-none select-none",
       side === 'buy' ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
     )}>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className={safeCn(
+        <span className={cn(
           "text-[10px] font-black uppercase tracking-[0.3em] opacity-40",
           side === 'buy' ? 'text-emerald-400' : 'text-rose-400'
         )} style={{ fontFamily: 'var(--font-heading)' }}>
@@ -50,7 +51,7 @@ const SwipeToConfirm = ({ onConfirm, loading, side }: { onConfirm: () => void, l
             controls.start({ x: 0 });
           }
         }}
-        className={safeCn(
+        className={cn(
           "absolute top-1 bottom-1 left-1 w-14 rounded-xl shadow-xl flex items-center justify-center cursor-grab active:cursor-grabbing z-10 transition-shadow",
           side === 'buy' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20',
           loading && "opacity-50"
@@ -100,12 +101,12 @@ const PortfolioSummary = React.memo(({ portfolio, compact, sentiment }: { portfo
   }, 0), [portfolio]);
 
   return (
-    <div className={safeCn("glass-card border border-white/5 rounded-3xl overflow-hidden relative group", compact ? "p-4" : "p-6")}>
+    <div className={cn("glass-card border border-white/5 rounded-3xl overflow-hidden relative group", compact ? "p-4" : "p-6")}>
       <div className="absolute inset-0 bg-indigo-500/[0.03] pointer-events-none group-hover:bg-indigo-500/[0.05] transition-colors" />
       <div className="flex justify-between items-start relative z-10">
         <div>
           <div className="text-heading-xs mb-1.5" style={{ color: 'var(--md-outline)' }}>{compact ? '資產' : '資產總值 PORTFOLIO VALUE'}</div>
-          <div className={safeCn("font-black text-white tabular-nums tracking-tighter leading-none flex items-baseline gap-1.5", compact ? "text-xl md:text-2xl" : "text-2xl md:text-3xl")} style={{ fontFamily: 'var(--font-data)' }}>
+          <div className={cn("font-black text-white tabular-nums tracking-tighter leading-none flex items-baseline gap-1.5", compact ? "text-xl md:text-2xl" : "text-2xl md:text-3xl")} style={{ fontFamily: 'var(--font-data)' }}>
             <span className="text-xs md:text-sm opacity-40 font-medium">NT$</span>
             {format.number(totalValue, 0)}
           </div>
@@ -116,7 +117,7 @@ const PortfolioSummary = React.memo(({ portfolio, compact, sentiment }: { portfo
           const isBear = sStr.includes('bearish') || sStr.includes('悲觀');
 
           return (
-            <div className={safeCn(
+            <div className={cn(
               "px-3 py-1.5 rounded-xl border flex flex-col items-end",
               isBull
                 ? "bg-emerald-500/10 border-emerald-500/20"
@@ -125,7 +126,7 @@ const PortfolioSummary = React.memo(({ portfolio, compact, sentiment }: { portfo
                   : "bg-zinc-500/10 border-zinc-500/20"
             )}>
               <div className="text-data-xs font-black tracking-widest opacity-40 uppercase leading-none mb-1">AI SENTIMENT</div>
-              <div className={safeCn(
+              <div className={cn(
                 "font-black leading-none uppercase tracking-tighter",
                 compact ? "text-xs" : "text-sm",
                 isBull ? "text-emerald-400" : isBear ? "text-rose-400" : "text-zinc-400"
@@ -142,13 +143,13 @@ const PortfolioSummary = React.memo(({ portfolio, compact, sentiment }: { portfo
 
 const InfoTabs = React.memo(({ news, newsStatus, tab, setTab, mtfData, mtfStatus, eDateFmt, compact }: any) => {
   return (
-    <div className={safeCn("glass-card border border-white/5 rounded-3xl flex-1 flex flex-col min-h-0 relative", compact ? "p-0.5" : "p-1")}>
+    <div className={cn("glass-card border border-white/5 rounded-3xl flex-1 flex flex-col min-h-0 relative", compact ? "p-0.5" : "p-1")}>
       <div className="flex p-1.5 gap-1 bg-black/40 rounded-[1.25rem] m-2 mb-1 border border-white/5 shadow-inner">
         {(['news', 'calendar', 'mtf'] as const).map(t => (
           <button type="button" key={t} onClick={(e) => { setTab(t); vibrate(15); }}
             role="tab"
             aria-selected={tab === t}
-            className={safeCn(
+            className={cn(
               'flex-1 py-2 text-data-xs font-black uppercase tracking-[0.2em] transition rounded-xl',
               tab === t ? 'bg-indigo-500 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-200'
             )}
@@ -212,7 +213,7 @@ const InfoTabs = React.memo(({ news, newsStatus, tab, setTab, mtfData, mtfStatus
                   key={tf} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5"
                 >
                   <span className="text-xs font-black text-zinc-400 tracking-widest uppercase" style={{ fontFamily: 'var(--font-heading)' }}>{tf}</span>
-                  <div className={safeCn(
+                  <div className={cn(
                     'px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase shadow-sm',
                     signal === 'bullish' ? 'bg-emerald-500 text-black' :
                       signal === 'bearish' ? 'bg-rose-500 text-black' : 'bg-zinc-500/20 text-zinc-400'
@@ -248,7 +249,7 @@ const InfoTabs = React.memo(({ news, newsStatus, tab, setTab, mtfData, mtfStatus
 
 const AIChat = React.memo(({ chat, setChat, chatRep, chatStatus, handleChat, compact }: any) => {
   return (
-    <div className={safeCn("shrink-0 relative overflow-hidden", compact ? "mt-1 space-y-1" : "mt-2 space-y-2")}>
+    <div className={cn("shrink-0 relative overflow-hidden", compact ? "mt-1 space-y-1" : "mt-2 space-y-2")}>
       <AnimatePresence>
         {(chatRep || chatStatus === 'busy') && (
           <motion.div
@@ -258,7 +259,7 @@ const AIChat = React.memo(({ chat, setChat, chatRep, chatStatus, handleChat, com
             className="text-zinc-300 bg-indigo-500/[0.05] rounded-3xl p-4 border border-indigo-500/10 max-h-48 overflow-y-auto custom-scrollbar relative overflow-hidden"
           >
             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/20" />
-            <div className={safeCn("font-medium relative z-10 leading-relaxed", compact ? "text-[11px]" : "text-xs")}>
+            <div className={cn("font-medium relative z-10 leading-relaxed", compact ? "text-[11px]" : "text-xs")}>
               {chatStatus === 'busy' ? (
                 <span className="flex items-center gap-3 text-indigo-400 font-black tracking-widest uppercase italic text-[10px]">
                   <Loader2 size={16} className="animate-spin" /> PROXYING ANALYTICS...
@@ -274,7 +275,7 @@ const AIChat = React.memo(({ chat, setChat, chatRep, chatStatus, handleChat, com
           onChange={e => setChat(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleChat()}
           placeholder="詢問策略分析 COMMAND..."
-          className={safeCn(
+          className={cn(
             "w-full bg-black/40 border border-white/5 hover:border-indigo-500/30 rounded-2xl pl-5 pr-14 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition",
             compact ? "py-3 text-xs" : "py-4 text-sm"
           )}
@@ -282,7 +283,7 @@ const AIChat = React.memo(({ chat, setChat, chatRep, chatStatus, handleChat, com
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <button type="button" onClick={(e) => { handleChat(); vibrate(20); }}
             disabled={chatStatus === 'busy'}
-            className={safeCn(
+            className={cn(
               "rounded-xl bg-indigo-500 text-black flex items-center justify-center disabled:opacity-50 transition shadow-lg active:scale-90",
               compact ? "w-8 h-8" : "w-10 h-10",
               chatStatus === 'busy' ? "opacity-30" : "hover:bg-indigo-400"
@@ -301,13 +302,13 @@ const OrderPanel = React.memo(({ price, symbol, oSide, setOSide, orderQty, setOr
   const { format } = useSettings();
 
   return (
-    <div className={safeCn("glass-card border border-white/5 rounded-3xl overflow-hidden relative", compact ? "p-3" : "p-4")}>
+    <div className={cn("glass-card border border-white/5 rounded-3xl overflow-hidden relative", compact ? "p-3" : "p-4")}>
       <div className="flex items-center justify-between mb-4 relative z-10">
         <span className="text-heading-xs text-zinc-500" style={{ fontFamily: 'var(--font-heading)' }}>{compact ? '下單' : '終端交易 TERMINAL'}</span>
         <div className="flex gap-1 bg-black/40 rounded-xl p-1 border border-white/5 overflow-hidden">
           {(['buy', 'sell'] as const).map(s => (
             <button type="button" key={s} onClick={(e) => { setOSide(s); vibrate(15); }}
-              className={safeCn(
+              className={cn(
                 'px-4 py-1.5 font-black rounded-lg transition text-[10px] uppercase tracking-widest active:scale-95',
                 oSide === s
                   ? (s === 'buy' ? 'bg-emerald-500 text-black shadow-lg' : 'bg-rose-500 text-white shadow-lg')
@@ -323,7 +324,7 @@ const OrderPanel = React.memo(({ price, symbol, oSide, setOSide, orderQty, setOr
       <div className="space-y-4 relative z-10">
         <div className="flex justify-between items-baseline bg-white/5 p-2.5 rounded-xl border border-white/5">
           <span className="text-data-xs font-black text-zinc-500 uppercase tracking-widest">市場報價</span>
-          <span className={safeCn('font-black tracking-tighter tabular-nums', compact ? 'text-base md:text-lg' : 'text-lg md:text-xl', isUp ? 'text-rose-400' : 'text-emerald-400')} style={{ fontFamily: 'var(--font-data)' }}>
+          <span className={cn('font-black tracking-tighter tabular-nums', compact ? 'text-base md:text-lg' : 'text-lg md:text-xl', isUp ? 'text-rose-400' : 'text-emerald-400')} style={{ fontFamily: 'var(--font-data)' }}>
             <span className="text-[9px] md:text-[10px] opacity-40 mr-1 font-medium italic">LAST</span>
             {safeN(price)}
           </span>
@@ -388,7 +389,7 @@ export const RightPanel: React.FC<RightPanelProps> = React.memo(({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className={safeCn("w-full flex flex-col", compact ? "gap-1" : "gap-3")}
+      className={cn("w-full flex flex-col", compact ? "gap-1" : "gap-3")}
     >
       <PortfolioSummary portfolio={portfolio} compact={compact} sentiment={sentiment} />
 

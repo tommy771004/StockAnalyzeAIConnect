@@ -17,7 +17,7 @@ import {
   Plus, X, Search, Zap, AlertCircle, Sun, Moon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { safeCn, safeN, vibrate } from '../utils/helpers';
+import { safeN, vibrate } from '../utils/helpers';
 import * as api from '../services/api';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -72,16 +72,16 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
       tabIndex={0}
       onClick={() => onSelect(idx.symbol)}
       onKeyDown={e => e.key === 'Enter' && onSelect(idx.symbol)}
-      className={safeCn(
+      className={cn(
         "relative flex flex-col glass-card cursor-pointer transition group overflow-hidden border border-white/5 hover:border-indigo-500/30 active:scale-[0.98] rounded-[1.5rem] sm:rounded-[2rem]",
         compact ? "p-3" : "p-4 sm:p-5"
       )}
     >
       <div className="absolute inset-0 bg-indigo-500/[0.02] pointer-events-none group-hover:bg-indigo-500/[0.04] transition-colors" />
       
-      <div className={safeCn("flex items-start justify-between relative z-10", compact ? "mb-3" : "mb-5")}>
+      <div className={cn("flex items-start justify-between relative z-10", compact ? "mb-3" : "mb-5")}>
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <div className={safeCn(
+          <div className={cn(
             "shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 shadow-lg border",
             isUp ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
           )}>
@@ -114,7 +114,7 @@ const IndexCard = memo(({ idx, compact, onSelect }: { idx: MarketIndex; compact:
           <div className="text-lg sm:text-xl md:text-2xl font-black tabular-nums tracking-tighter text-white" style={{ fontFamily: 'var(--font-data)' }}>
             {idx.price != null ? formatters.formatPrice(idx.price, 'USD') : '---'}
           </div>
-          <div className={safeCn(
+          <div className={cn(
             "flex items-center gap-1.5 mt-1 text-data-xs font-black uppercase tracking-widest",
             isUp ? "text-rose-400" : "text-emerald-400"
           )}>
@@ -141,7 +141,7 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
       tabIndex={0}
       onClick={() => onSelect(s)}
       onKeyDown={e => e.key === 'Enter' && onSelect(s)}
-      className={safeCn(
+      className={cn(
         "relative glass-card rounded-[1.2rem] sm:rounded-[1.5rem] p-3 sm:p-4 cursor-pointer transition group overflow-hidden border border-white/5 active:scale-[0.99]",
         isSelected ? 'bg-indigo-500/10 border-indigo-500/40 ring-4 ring-indigo-500/5' : 'hover:border-white/10'
       )}
@@ -158,7 +158,7 @@ const WatchlistStockCard = memo(({ s, isSelected, onSelect, onRemove }: {
           <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-0.5" style={{ fontFamily: 'var(--font-heading)' }}>{s.symbol}</div>
           <div className="text-xs font-black text-white tracking-tight truncate uppercase" style={{ fontFamily: 'var(--font-heading)' }}>{s.shortName || s.name}</div>
         </div>
-        <div className={safeCn(
+        <div className={cn(
           "text-[10px] font-black px-2 py-0.5 rounded-lg border tabular-nums shrink-0",
           isUp ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
         )} style={{ fontFamily: 'var(--font-data)' }}>
@@ -663,7 +663,7 @@ export default function MarketOverview({ onSelectSymbol }: Props) {
           <div className="flex items-center gap-2 flex-wrap">
             {BROKERS.map((b, i) => (
               <button type="button" key={b} onClick={(e) => { setBroker(b); vibrate(20); }}
-                className={safeCn(
+                className={cn(
                   "px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition border shadow-lg",
                   broker === b ? "bg-indigo-500 text-black border-indigo-400" : "bg-black/40 text-zinc-400 border-white/5 hover:text-white"
                 )}>
