@@ -6,6 +6,7 @@ import {
   pgTable,
   pgEnum,
   serial,
+  integer,
   uuid,
   text,
   numeric,
@@ -38,6 +39,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   alerts:         many(alerts),
   settings:       many(userSettings),
   strategies:     many(strategies),
+  strategyVersions: many(strategyVersions),
+  backtestJobs: many(backtestJobs),
   agentMemories:  many(agentMemories),
   portfolioHistory: many(portfolioHistory),
   paymentOrders:  many(paymentOrders),
@@ -190,8 +193,66 @@ export const strategies = pgTable('strategies', {
   index('strategies_user_id_idx').on(t.userId),
 ]);
 
-export const strategiesRelations = relations(strategies, ({ one }) => ({
+export const strategiesRelations = relations(strategies, ({ one, many }) => ({
   user: one(users, { fields: [strategies.userId], references: [users.id] }),
+  versions: many(strategyVersions),
+}));
+
+// ─── immutable strategy versions ──────────────────────────────────────────────
+export const strategyVersions = pgTable('strategy_versions', {
+  id:                uuid('id').defaultRandom().primaryKey(),
+  strategyId:        integer('strategy_id').notNull().references(() => strategies.id, { onDelete: 'cascade' }),
+  userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  version:           integer('version').notNull(),
+  runtime:           text('runtime').notNull(),
+  source:            text('source').notNull(),
+  sourceHash:        text('source_hash').notNull(),
+  parameterSchema:   jsonb('parameter_schema').notNull().default({}),
+  defaultParameters: jsonb('default_parameters').notNull().default({}),
+  executionPolicy:   jsonb('execution_policy').notNull().default({}),
+  validationStatus:  text('validation_status').notNull().default('pending'),
+  diagnostics:       jsonb('diagnostics').notNull().default([]),
+  provenance:        text('provenance').notNull().default('human'),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('strategy_versions_strategy_version_uidx').on(t.strategyId, t.version),
+  index('strategy_versions_user_created_idx').on(t.userId, t.createdAt),
+  index('strategy_versions_strategy_idx').on(t.strategyId),
+]);
+
+export const strategyVersionsRelations = relations(strategyVersions, ({ one, many }) => ({
+  strategy: one(strategies, { fields: [strategyVersions.strategyId], references: [strategies.id] }),
+  user: one(users, { fields: [strategyVersions.userId], references: [users.id] }),
+  backtestJobs: many(backtestJobs),
+}));
+
+// ─── persisted asynchronous backtest jobs ─────────────────────────────────────
+export const backtestJobs = pgTable('backtest_jobs', {
+  id:                uuid('id').defaultRandom().primaryKey(),
+  userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  strategyVersionId: uuid('strategy_version_id').notNull().references(() => strategyVersions.id, { onDelete: 'restrict' }),
+  symbol:            text('symbol').notNull(),
+  status:            text('status').notNull().default('queued'),
+  request:           jsonb('request').notNull(),
+  result:            jsonb('result'),
+  error:             text('error'),
+  sourceHash:        text('source_hash').notNull(),
+  dataHash:          text('data_hash').notNull(),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+  startedAt:         timestamp('started_at'),
+  completedAt:       timestamp('completed_at'),
+}, (t) => [
+  index('backtest_jobs_user_created_idx').on(t.userId, t.createdAt),
+  index('backtest_jobs_version_idx').on(t.strategyVersionId),
+  index('backtest_jobs_status_idx').on(t.status),
+]);
+
+export const backtestJobsRelations = relations(backtestJobs, ({ one }) => ({
+  user: one(users, { fields: [backtestJobs.userId], references: [users.id] }),
+  strategyVersion: one(strategyVersions, {
+    fields: [backtestJobs.strategyVersionId],
+    references: [strategyVersions.id],
+  }),
 }));
 
 // ─── agent_memory_type enum ───────────────────────────────────────────────────
@@ -322,6 +383,10 @@ export type NewAlert     = typeof alerts.$inferInsert;
 export type UserSetting  = typeof userSettings.$inferSelect;
 export type Strategy     = typeof strategies.$inferSelect;
 export type NewStrategy  = typeof strategies.$inferInsert;
+export type StrategyVersion = typeof strategyVersions.$inferSelect;
+export type NewStrategyVersion = typeof strategyVersions.$inferInsert;
+export type BacktestJob = typeof backtestJobs.$inferSelect;
+export type NewBacktestJob = typeof backtestJobs.$inferInsert;
 export type AgentMemory    = typeof agentMemories.$inferSelect;
 export type NewAgentMemory = typeof agentMemories.$inferInsert;
 export type AgentMemoryType = 'PREFERENCE' | 'SKILL' | 'CONTEXT';
