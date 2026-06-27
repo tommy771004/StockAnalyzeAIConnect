@@ -39,6 +39,7 @@ import { agentRouter }    from './server/api/agent.js';
 import { ecpayRouter }    from './server/api/ecpay.js';
 import { researchRouter } from './server/api/research.js';
 import { strategiesRouter } from './server/api/strategies.js';
+import { dataSourcesRouter } from './server/api/dataSources.js';
 import { configureStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
 import { createRegistryBarLoader } from './server/services/registryBarLoader.js';
 import {
@@ -2302,6 +2303,7 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
 
 app.use('/api/agent', authMiddleware, agentRouter);
 app.use('/api', authMiddleware, strategiesRouter);
+app.use('/api', authMiddleware, dataSourcesRouter);
 
 // ECPay payment routes — notify endpoint is called by ECPay server (no auth),
 // checkout endpoint requires auth to associate order with user.
