@@ -7,6 +7,9 @@ dist/
 .vercel
 .cache/
 .worktrees/
+.venv/
+__pycache__/
+*.py[cod]
 skills-lock.json
 .agents/skills/*
 .agents/rules/*
