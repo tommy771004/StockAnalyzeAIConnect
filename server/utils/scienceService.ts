@@ -27,7 +27,7 @@ function setCache<T>(key: string, payload: T, ttl = CACHE_TTL_MS) {
   cacheStore.set(key, { payload, expiresAt: Date.now() + ttl });
 }
 
-async function requestScience<T>(
+export async function requestScience<T>(
   path: string,
   init?: RequestInit,
   opts?: { retries?: number; timeoutMs?: number; cacheKey?: string; cacheTtlMs?: number },

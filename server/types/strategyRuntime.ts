@@ -69,51 +69,57 @@ export const StrategyBacktestRequestSchema = StrategySourceSchema.extend({
   execution: ExecutionPolicySchema,
 });
 
-export type StrategyValidationRequest = z.infer<typeof StrategyValidationRequestSchema>;
-export type StrategyBacktestRequest = z.infer<typeof StrategyBacktestRequestSchema>;
+export type StrategyValidationRequest = z.input<typeof StrategyValidationRequestSchema>;
+export type StrategyBacktestRequest = z.input<typeof StrategyBacktestRequestSchema>;
 
-export interface StrategyDiagnostic {
-  code: string;
-  message: string;
-  line?: number;
-  severity: 'error' | 'warning';
-}
+export const StrategyDiagnosticSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+  line: z.number().int().positive().optional(),
+  severity: z.enum(['error', 'warning']),
+});
 
-export interface StrategyValidationResult {
-  valid: boolean;
-  diagnostics: StrategyDiagnostic[];
-  sourceHash: string;
-  engineVersion: string;
-}
+export const StrategyValidationResultSchema = z.object({
+  valid: z.boolean(),
+  diagnostics: z.array(StrategyDiagnosticSchema),
+  sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+  engineVersion: z.string().min(1),
+});
 
-export interface StrategyEquityPoint {
-  timestamp: string;
-  equity: number;
-  drawdownPct: number;
-}
+export const StrategyEquityPointSchema = z.object({
+  timestamp: z.string().min(1),
+  equity: z.number().finite(),
+  drawdownPct: z.number().finite().nonnegative(),
+});
 
-export interface StrategyTrade {
-  side: 'long' | 'short';
-  entryTimestamp: string;
-  exitTimestamp: string;
-  entryPrice: number;
-  exitPrice: number;
-  quantity: number;
-  grossPnl: number;
-  fees: number;
-  netPnl: number;
-  returnPct: number;
-  exitReason: string;
-}
+export const StrategyTradeSchema = z.object({
+  side: z.enum(['long', 'short']),
+  entryTimestamp: z.string().min(1),
+  exitTimestamp: z.string().min(1),
+  entryPrice: z.number().finite().positive(),
+  exitPrice: z.number().finite().positive(),
+  quantity: z.number().finite().positive(),
+  grossPnl: z.number().finite(),
+  fees: z.number().finite().nonnegative(),
+  netPnl: z.number().finite(),
+  returnPct: z.number().finite(),
+  exitReason: z.string().min(1),
+});
 
-export interface StrategyBacktestResult {
-  runId: string;
-  strategyVersionId: string;
-  sourceHash: string;
-  engineVersion: string;
-  equityCurve: StrategyEquityPoint[];
-  trades: StrategyTrade[];
-  metrics: Record<string, number>;
-  assumptions: Record<string, unknown>;
-  warnings: string[];
-}
+export const StrategyBacktestResultSchema = z.object({
+  runId: z.string().min(1),
+  strategyVersionId: z.string().min(1),
+  sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+  engineVersion: z.string().min(1),
+  equityCurve: z.array(StrategyEquityPointSchema).min(1),
+  trades: z.array(StrategyTradeSchema),
+  metrics: z.record(z.string(), z.number().finite()),
+  assumptions: z.record(z.string(), z.unknown()),
+  warnings: z.array(z.string()),
+});
+
+export type StrategyDiagnostic = z.infer<typeof StrategyDiagnosticSchema>;
+export type StrategyValidationResult = z.infer<typeof StrategyValidationResultSchema>;
+export type StrategyEquityPoint = z.infer<typeof StrategyEquityPointSchema>;
+export type StrategyTrade = z.infer<typeof StrategyTradeSchema>;
+export type StrategyBacktestResult = z.infer<typeof StrategyBacktestResultSchema>;

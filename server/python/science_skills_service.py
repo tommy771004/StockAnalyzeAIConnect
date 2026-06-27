@@ -12,6 +12,13 @@ from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
 
 from quantum_signal import compute_quantum_signal
+from strategy_runtime.backtest import run_backtest
+from strategy_runtime.contracts import (
+    ENGINE_VERSION,
+    StrategyBacktestPayload,
+    StrategySource,
+)
+from strategy_runtime.validator import validate_source
 from timesfm_predictor import TimesFMPredictor
 
 app = FastAPI(title="Science Skills Service")
@@ -63,6 +70,43 @@ class PolarsBacktestPayload(BaseModel):
     data: list[dict[str, Any]] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
     strategies: list[str] = Field(default_factory=list)
+
+
+@app.post("/strategy/validate")
+def strategy_validate(payload: StrategySource):
+    result = validate_source(payload.runtime, payload.source)
+    if result.source_hash != payload.sourceHash:
+        return err("source hash mismatch")
+    return ok(result.model_dump(by_alias=True))
+
+
+@app.post("/strategy/backtest")
+def strategy_backtest(payload: StrategyBacktestPayload):
+    validation = validate_source(payload.runtime, payload.source)
+    if validation.source_hash != payload.sourceHash:
+        return err("source hash mismatch")
+    if not validation.valid:
+        return err(
+            "strategy validation failed",
+            errors=[item.message for item in validation.diagnostics],
+        )
+    try:
+        result = run_backtest(
+            runtime=payload.runtime,
+            source=payload.source,
+            bars=[bar.model_dump() for bar in payload.bars],
+            params=payload.parameters,
+            policy=payload.execution.model_dump(),
+        )
+        return ok({
+            "runId": payload.runId,
+            "strategyVersionId": payload.strategyVersionId,
+            "sourceHash": payload.sourceHash,
+            "engineVersion": ENGINE_VERSION,
+            **result,
+        })
+    except Exception as exc:  # noqa: BLE001
+        return err("strategy backtest failed", errors=[str(exc)])
 
 
 @app.get("/arxiv/search")
