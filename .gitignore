@@ -6,6 +6,7 @@ dist/
 .DS_Store
 .vercel
 .cache/
+.worktrees/
 skills-lock.json
 .agents/skills/*
 .agents/rules/*
