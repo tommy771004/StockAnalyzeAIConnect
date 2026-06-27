@@ -9,6 +9,11 @@ import * as TV from './server/services/TradingViewService.js';
 import * as TWSE from './server/services/TWSeService.js';
 import * as Sectors from './server/services/SectorService.js';
 import * as WantGoo from './server/services/WantGooService.js';
+import * as News from './server/services/NewsService.js';
+import * as Edgar from './server/utils/edgarApi.js';
+import * as SmartMoney from './server/utils/smartMoneyApi.js';
+import * as CapitolTrades from './server/utils/capitolTrades.js';
+import * as Fred from './server/utils/fredApi.js';
 import { initCalendar } from './server/services/twCalendar.js';
 import { startDailySettlementSchedule } from './server/services/dailySettlement.js';
 import { parseSymbol, toYahoo } from './src/utils/symbolParser.js';
@@ -35,6 +40,11 @@ import { ecpayRouter }    from './server/api/ecpay.js';
 import { researchRouter } from './server/api/research.js';
 import { strategiesRouter } from './server/api/strategies.js';
 import { configureStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
+import { createRegistryBarLoader } from './server/services/registryBarLoader.js';
+import {
+  configureDataRegistry,
+  createDefaultDataProviders,
+} from './server/data/configure.js';
 import {
   startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
   getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
@@ -111,7 +121,6 @@ try {
 
 import { getBestFreeModel, getTopFreeModels } from './server/utils/modelSelector.js';
 export { getBestFreeModel };
-import * as News from './server/services/NewsService.js';
 
 /**
  * Converts various symbol formats to TradingView canonical format
@@ -549,39 +558,20 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-configureStrategyRuntimeService(async ({ symbol, period1, period2 }) => {
-  const history = await NativeYahooApi.chart(symbol, {
-    interval: '1d',
-    period1: period1 ?? Date.now() - 365 * 24 * 60 * 60 * 1_000,
-    period2,
-  });
-  const bars = history.quotes
-    .map((quote: HistoricalData) => ({
-      timestamp: quote.date instanceof Date
-        ? quote.date.toISOString()
-        : String(quote.date),
-      open: Number(quote.open),
-      high: Number(quote.high),
-      low: Number(quote.low),
-      close: Number(quote.close),
-      volume: Number(quote.volume),
-    }))
-    .filter((bar) => (
-      Number.isFinite(bar.open)
-      && Number.isFinite(bar.high)
-      && Number.isFinite(bar.low)
-      && Number.isFinite(bar.close)
-      && Number.isFinite(bar.volume)
-      && bar.open > 0
-      && bar.high >= Math.max(bar.open, bar.close)
-      && bar.low <= Math.min(bar.open, bar.close)
-      && bar.volume >= 0
-    ));
-  if (bars.length < 2) {
-    throw new Error(`Insufficient normalized OHLCV data for ${symbol}`);
-  }
-  return bars;
-});
+const dataRegistry = configureDataRegistry(createDefaultDataProviders({
+  yahoo: NativeYahooApi,
+  twse: TWSE,
+  tradingView: TV,
+  sec: Edgar,
+  smartMoney: SmartMoney,
+  congress: CapitolTrades,
+  cnyes: News,
+  wantGooNews: News,
+  wantGooChip: WantGoo,
+  fred: Fred,
+}));
+
+configureStrategyRuntimeService(createRegistryBarLoader(dataRegistry));
 
 const rtMeta = getAutotradingRealtimeMeta();
 console.log(

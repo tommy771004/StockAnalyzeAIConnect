@@ -9,7 +9,7 @@ import type {
 
 type Now = () => number;
 
-interface YahooClient {
+export interface YahooClient {
   quote(symbol: string | string[]): Promise<unknown>;
   chart(symbol: string, options?: {
     interval?: string;
@@ -19,39 +19,46 @@ interface YahooClient {
   search(query: string): Promise<unknown>;
 }
 
-interface TwseClient {
+export interface TwseClient {
   realtimeQuote(symbol: string): Promise<unknown>;
 }
 
-interface TradingViewClient {
-  getIndicators(symbol: string, timeframe?: never): Promise<unknown>;
+export interface TradingViewClient {
+  getIndicators(
+    symbol: string,
+    timeframe?: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1W' | '1M',
+  ): Promise<unknown>;
   getNewsHeadlines(symbol: string): Promise<unknown>;
   getCalendarEarnings?(countries?: string[], days?: number): Promise<unknown>;
 }
 
-interface SecClient {
+export interface SecClient {
   getFinancialSummary(ticker: string): Promise<unknown>;
   getCompanyFilings(ticker: string): Promise<unknown>;
 }
 
-interface SmartMoneyClient {
+export interface SmartMoneyClient {
   getRecentInsiderActivity(ticker: string): Promise<unknown>;
   getLatest13FOverview(managerId: string): Promise<unknown>;
 }
 
-interface CongressClient {
+export interface CongressClient {
   getRecentCongressTrades(ticker?: string, limit?: number): Promise<unknown>;
 }
 
-interface CnyesClient {
+export interface CnyesClient {
   getCnyesNews(category?: string, limit?: number): Promise<unknown>;
 }
 
-interface WantGooClient {
+export interface WantGooClient {
   getWantGooNews(category?: string): Promise<unknown>;
 }
 
-interface FredClient {
+export interface WantGooChipClient {
+  getChipData(symbol: string): Promise<unknown>;
+}
+
+export interface FredClient {
   getFredSeries(series: string, limit?: number): Promise<unknown>;
 }
 
@@ -167,6 +174,11 @@ export function createYahooProvider(client: YahooClient, now: Now = Date.now): D
       timeoutMs: 12_000,
       cacheTtlMs: 30_000,
       maxAgeMs: 60 * minute,
+      maxAgeByOperation: {
+        bars: 7 * day,
+        news: 7 * day,
+        search: day,
+      },
       rateLimit: { limit: 90, windowMs: minute },
       circuitBreaker: { failureThreshold: 2, cooldownMs: 5 * minute },
     }),
@@ -449,6 +461,9 @@ function createNewsProvider(
     }),
     async (request, signal) => {
       ensureActive(signal);
+      if (request.params.scope === 'symbol') {
+        throw new Error(`${id} does not provide symbol-specific news`);
+      }
       const news = array(await load(
         String(request.params.category ?? request.symbol),
         typeof request.params.limit === 'number' ? request.params.limit : 30,
@@ -478,6 +493,41 @@ export function createWantGooProvider(
     20,
     (category) => client.getWantGooNews(category),
     now,
+  );
+}
+
+export function createWantGooChipProvider(
+  client: WantGooChipClient,
+  now: Now = Date.now,
+): DataProvider {
+  return descriptor(
+    'wantgoo-chip',
+    ['institutional'],
+    ['tw_stock'],
+    10,
+    policy({
+      timeoutMs: 15_000,
+      cacheTtlMs: 30 * minute,
+      maxAgeMs: 7 * day,
+      rateLimit: { limit: 20, windowMs: minute },
+    }),
+    async (request, signal) => {
+      ensureActive(signal);
+      const data = object(await client.getChipData(request.symbol));
+      ensureActive(signal);
+      if (!data) throw new Error('WantGoo chip data unavailable');
+      const requiredFields = ['foreignNet', 'trustNet', 'dealerNet'];
+      if (!requiredFields.every((field) => Number.isFinite(Number(data[field])))) {
+        throw new Error('WantGoo chip data malformed');
+      }
+      return result(
+        data,
+        iso(now()),
+        true,
+        now,
+        ['Some unavailable chip fields may be represented as zero by the upstream adapter.'],
+      );
+    },
   );
 }
 

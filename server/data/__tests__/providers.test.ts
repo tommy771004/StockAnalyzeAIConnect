@@ -10,7 +10,12 @@ import {
   createYahooProvider,
   createCnyesProvider,
   createWantGooProvider,
+  createWantGooChipProvider,
 } from '../providers.js';
+import {
+  configureDataRegistry,
+  getDataRegistry,
+} from '../configure.js';
 import { DataRequestSchema } from '../types.js';
 
 const now = () => Date.parse('2026-01-02T12:00:00.000Z');
@@ -185,5 +190,45 @@ describe('filing, flow, news, and macro providers', () => {
     expect(cnyesResult.marketTimestamp).toBe('2026-01-02T00:00:00.000Z');
     expect(wantGooResult.marketTimestamp).toBe('2026-01-02T00:01:40.000Z');
     expect(fredResult.marketTimestamp).toBe('2025-12-31T00:00:00.000Z');
+  });
+
+  it('returns real Taiwan institutional fields without random synthesis', async () => {
+    const provider = createWantGooChipProvider({
+      getChipData: async () => ({
+        foreignNet: 1_200,
+        trustNet: -300,
+        dealerNet: 100,
+        mainPlayersNet: 900,
+      }),
+    }, now);
+
+    const value = await provider.fetch(
+      request('institutional', '2330.TW', 'tw_stock'),
+      signal,
+    );
+
+    expect(value.data).toMatchObject({
+      foreignNet: 1_200,
+      trustNet: -300,
+      dealerNet: 100,
+    });
+    expect(value.warnings).toEqual([
+      'Some unavailable chip fields may be represented as zero by the upstream adapter.',
+    ]);
+  });
+});
+
+describe('data registry configuration', () => {
+  it('rejects access before configuration and remains idempotent', () => {
+    expect(() => getDataRegistry()).toThrow('Data registry is not configured');
+    const provider = createYahooProvider({
+      quote: async () => ({ regularMarketPrice: 1 }),
+      chart: async () => ({ quotes: [] }),
+      search: async () => ({ quotes: [{ symbol: 'AAPL' }] }),
+    }, now);
+
+    const configured = configureDataRegistry([provider]);
+    expect(getDataRegistry()).toBe(configured);
+    expect(configureDataRegistry([])).toBe(configured);
   });
 });

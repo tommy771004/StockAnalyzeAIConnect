@@ -123,9 +123,11 @@ export class DataProviderRegistry {
           && typeof request.params.end === 'string'
           ? Date.parse(request.params.end)
           : this.now();
+        const maxAgeMs = provider.policy.maxAgeByOperation?.[request.operation]
+          ?? provider.policy.maxAgeMs;
         if (
           freshnessReference - Date.parse(validated.marketTimestamp)
-          > provider.policy.maxAgeMs
+          > maxAgeMs
         ) {
           runtime.breaker.recordFailure();
           runtime.lastFailureAt = this.toIso(this.now());

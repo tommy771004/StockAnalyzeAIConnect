@@ -105,6 +105,10 @@ export const ProviderPolicySchema = z.object({
   timeoutMs: z.number().int().positive(),
   cacheTtlMs: z.number().int().nonnegative(),
   maxAgeMs: z.number().int().nonnegative(),
+  maxAgeByOperation: z.partialRecord(
+    DataOperationSchema,
+    z.number().int().nonnegative(),
+  ).optional(),
   rateLimit: RateLimitPolicySchema,
   circuitBreaker: CircuitBreakerPolicySchema,
 });
