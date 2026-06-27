@@ -7,6 +7,7 @@ PYTHON_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PYTHON_ROOT))
 
 from strategy_runtime.indicator_runtime import run_indicator
+from strategy_runtime.backtest import run_backtest
 from strategy_runtime.validator import validate_source
 
 
@@ -104,6 +105,122 @@ class StrategyRuntimeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "exactly one signal form"):
             run_indicator(source, VALID_DATA, {})
+
+    def test_script_orders_execute_on_next_bar_open_with_fees(self):
+        source = (
+            "def on_init(ctx):\n"
+            "    ctx.state['seen'] = 0\n"
+            "def on_bar(ctx, bar):\n"
+            "    ctx.state['seen'] += 1\n"
+            "    if ctx.state['seen'] == 1:\n"
+            "        ctx.buy()\n"
+            "    if ctx.state['seen'] == 3:\n"
+            "        ctx.close_position()\n"
+        )
+        bars = [
+            {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            {"timestamp": "2", "open": 101, "high": 102, "low": 100, "close": 101, "volume": 1000},
+            {"timestamp": "3", "open": 102, "high": 103, "low": 101, "close": 102, "volume": 1000},
+            {"timestamp": "4", "open": 103, "high": 104, "low": 102, "close": 103, "volume": 1000},
+        ]
+
+        result = run_backtest(
+            runtime="script",
+            source=source,
+            bars=bars,
+            params={},
+            policy={
+                "initialCapital": 10_000,
+                "feeRate": 0.001,
+                "slippageBps": 0,
+                "entryPct": 1,
+                "tradeDirection": "long",
+                "exitOwner": "strategy",
+            },
+        )
+
+        self.assertEqual(len(result["trades"]), 1)
+        trade = result["trades"][0]
+        self.assertEqual(trade["entryTimestamp"], "2")
+        self.assertEqual(trade["exitTimestamp"], "4")
+        self.assertEqual(trade["entryPrice"], 101)
+        self.assertEqual(trade["exitPrice"], 103)
+        self.assertGreater(trade["fees"], 0)
+        self.assertLess(trade["netPnl"], trade["grossPnl"])
+
+    def test_engine_stop_loss_precedes_queued_strategy_exit(self):
+        source = (
+            "def on_init(ctx):\n"
+            "    ctx.state['seen'] = 0\n"
+            "def on_bar(ctx, bar):\n"
+            "    ctx.state['seen'] += 1\n"
+            "    if ctx.state['seen'] == 1:\n"
+            "        ctx.buy()\n"
+            "    if ctx.state['seen'] == 2:\n"
+            "        ctx.close_position()\n"
+        )
+        bars = [
+            {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            {"timestamp": "2", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            {"timestamp": "3", "open": 100, "high": 100, "low": 90, "close": 92, "volume": 1000},
+        ]
+
+        result = run_backtest(
+            runtime="script",
+            source=source,
+            bars=bars,
+            params={},
+            policy={
+                "initialCapital": 10_000,
+                "feeRate": 0,
+                "slippageBps": 0,
+                "entryPct": 1,
+                "stopLossPct": 0.05,
+                "tradeDirection": "long",
+                "exitOwner": "engine",
+            },
+        )
+
+        self.assertEqual(len(result["trades"]), 1)
+        self.assertEqual(result["trades"][0]["exitReason"], "stop_loss")
+        self.assertEqual(result["trades"][0]["exitPrice"], 95)
+
+    def test_indicator_runtime_supports_short_round_trip(self):
+        source = (
+            "def run(data, params):\n"
+            "    n = len(data['close'])\n"
+            "    return {\n"
+            "        'open_long': [False] * n,\n"
+            "        'close_long': [False] * n,\n"
+            "        'open_short': [True] + [False] * (n - 1),\n"
+            "        'close_short': [False, False, True, False],\n"
+            "    }\n"
+        )
+        bars = [
+            {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            {"timestamp": "2", "open": 99, "high": 100, "low": 98, "close": 99, "volume": 1000},
+            {"timestamp": "3", "open": 98, "high": 99, "low": 97, "close": 98, "volume": 1000},
+            {"timestamp": "4", "open": 97, "high": 98, "low": 96, "close": 97, "volume": 1000},
+        ]
+
+        result = run_backtest(
+            runtime="indicator",
+            source=source,
+            bars=bars,
+            params={},
+            policy={
+                "initialCapital": 10_000,
+                "feeRate": 0,
+                "slippageBps": 0,
+                "entryPct": 1,
+                "tradeDirection": "both",
+                "exitOwner": "strategy",
+            },
+        )
+
+        self.assertEqual(len(result["trades"]), 1)
+        self.assertEqual(result["trades"][0]["side"], "short")
+        self.assertGreater(result["trades"][0]["netPnl"], 0)
 
 
 if __name__ == "__main__":
