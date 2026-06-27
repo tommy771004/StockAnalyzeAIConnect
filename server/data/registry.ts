@@ -119,7 +119,14 @@ export class DataProviderRegistry {
       try {
         const payload = await this.fetchWithTimeout(provider, request);
         const validated = ProviderPayloadSchema.parse(payload);
-        if (this.now() - Date.parse(validated.marketTimestamp) > provider.policy.maxAgeMs) {
+        const freshnessReference = request.operation === 'bars'
+          && typeof request.params.end === 'string'
+          ? Date.parse(request.params.end)
+          : this.now();
+        if (
+          freshnessReference - Date.parse(validated.marketTimestamp)
+          > provider.policy.maxAgeMs
+        ) {
           runtime.breaker.recordFailure();
           runtime.lastFailureAt = this.toIso(this.now());
           attempts.push(this.attempt(

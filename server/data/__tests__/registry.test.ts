@@ -200,6 +200,33 @@ describe('DataProviderRegistry', () => {
     });
   });
 
+  it('judges historical bars against the requested end time', async () => {
+    const registry = new DataProviderRegistry([
+      provider('historical-bars', 10, async () => payload(
+        [{ timestamp: '2020-01-02T00:00:00.000Z', close: 100 }],
+        '2020-01-02T00:00:00.000Z',
+      ), {
+        operations: ['bars'],
+        policy: {
+          timeoutMs: 50,
+          cacheTtlMs: 1_000,
+          maxAgeMs: 2 * 24 * 60 * 60 * 1_000,
+          rateLimit: { limit: 10, windowMs: 60_000 },
+          circuitBreaker: { failureThreshold: 2, cooldownMs: 30_000 },
+        },
+      }),
+    ], { now: () => baseTime });
+
+    const result = await registry.resolve({
+      operation: 'bars',
+      symbol: 'AAPL',
+      market: 'us_stock',
+      params: { end: '2020-01-03T00:00:00.000Z' },
+    });
+
+    expect(result.provenance.providerId).toBe('historical-bars');
+  });
+
   it('skips rate-limited and open-circuit providers on later requests', async () => {
     let now = baseTime;
     let rateCalls = 0;
