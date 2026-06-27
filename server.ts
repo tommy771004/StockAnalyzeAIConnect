@@ -33,6 +33,8 @@ import { analyzeSentiment } from './server/utils/sentiment.js';
 import { agentRouter }    from './server/api/agent.js';
 import { ecpayRouter }    from './server/api/ecpay.js';
 import { researchRouter } from './server/api/research.js';
+import { strategiesRouter } from './server/api/strategies.js';
+import { configureStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
 import {
   startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
   getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
@@ -546,6 +548,40 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+
+configureStrategyRuntimeService(async ({ symbol, period1, period2 }) => {
+  const history = await NativeYahooApi.chart(symbol, {
+    interval: '1d',
+    period1: period1 ?? Date.now() - 365 * 24 * 60 * 60 * 1_000,
+    period2,
+  });
+  const bars = history.quotes
+    .map((quote: HistoricalData) => ({
+      timestamp: quote.date instanceof Date
+        ? quote.date.toISOString()
+        : String(quote.date),
+      open: Number(quote.open),
+      high: Number(quote.high),
+      low: Number(quote.low),
+      close: Number(quote.close),
+      volume: Number(quote.volume),
+    }))
+    .filter((bar) => (
+      Number.isFinite(bar.open)
+      && Number.isFinite(bar.high)
+      && Number.isFinite(bar.low)
+      && Number.isFinite(bar.close)
+      && Number.isFinite(bar.volume)
+      && bar.open > 0
+      && bar.high >= Math.max(bar.open, bar.close)
+      && bar.low <= Math.min(bar.open, bar.close)
+      && bar.volume >= 0
+    ));
+  if (bars.length < 2) {
+    throw new Error(`Insufficient normalized OHLCV data for ${symbol}`);
+  }
+  return bars;
+});
 
 const rtMeta = getAutotradingRealtimeMeta();
 console.log(
@@ -2275,6 +2311,7 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
 });
 
 app.use('/api/agent', authMiddleware, agentRouter);
+app.use('/api', authMiddleware, strategiesRouter);
 
 // ECPay payment routes — notify endpoint is called by ECPay server (no auth),
 // checkout endpoint requires auth to associate order with user.

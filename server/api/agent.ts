@@ -25,6 +25,7 @@ import { analyzeSentiment }  from '../utils/sentiment.js';
 import { getBestFreeModel }  from '../utils/modelSelector.js';
 import { getPersonaPrompt, getPersonaList } from '../utils/personas.js';
 import { getKeyMacroSnapshot, formatMacroForPrompt } from '../utils/fredApi.js';
+import { queueAgentBacktest } from '../services/agentBacktestTool.js';
 
 export const agentRouter = Router();
 
@@ -394,12 +395,12 @@ const AGENT_TOOLS = [
         type: 'object',
         properties: {
           ticker:          { type: 'string', description: '股票代號' },
-          strategy:        { type: 'string', description: '策略名稱 (ma_cross, rsi, bb)' },
+          strategyVersionId: { type: 'string', description: '已驗證、不可變的策略版本 ID' },
           initialCapital:  { type: 'number', description: '初始資金 (USD)' },
           startDate:       { type: 'string', description: 'YYYY-MM-DD' },
           endDate:         { type: 'string', description: 'YYYY-MM-DD' },
         },
-        required: ['ticker', 'strategy'],
+        required: ['ticker', 'strategyVersionId'],
       },
     },
   },
@@ -459,8 +460,7 @@ async function executeToolCall(
       return { positions, recentTrades: tradeList.slice(0, 10) };
     }
     case 'execute_backtest': {
-      // Placeholder — real impl would call server-side backtestEngine
-      return { ok: true, message: '回測已排入佇列，結果將透過 SSE 回傳', args };
+      return queueAgentBacktest(userId, args);
     }
     case 'get_economic_data': {
       try {

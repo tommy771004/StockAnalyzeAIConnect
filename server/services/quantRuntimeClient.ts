@@ -9,20 +9,11 @@ import {
   type StrategyValidationResult,
 } from '../types/strategyRuntime.js';
 import { requestScience } from '../utils/scienceService.js';
+import { sha256Hex } from '../utils/hash.js';
 
 const VALIDATION_TIMEOUT_MS = 30_000;
 const DEFAULT_BACKTEST_TIMEOUT_MS = 120_000;
 const MAX_BACKTEST_TIMEOUT_MS = 300_000;
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 async function assertSourceHash(source: string, claimedHash: string): Promise<void> {
   const calculatedHash = await sha256Hex(source);
