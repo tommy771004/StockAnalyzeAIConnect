@@ -65,9 +65,15 @@ or strategy changes.
 
 ## Browser chat and tools
 
-When browser chat includes a symbol, Hermes resolves a registered attributable market
-tool first. The former no-op dynamic import of `server.ts` is removed. Tool schemas shown
-to the model and server-side tool execution now come from the same registry.
+When browser chat includes a symbol, Hermes resolves quote/chart, symbol-news, and SEC
+fundamental tools concurrently. Each tool owns its provider lookup and may degrade
+independently. The chat service combines every successful evidence item in deterministic
+tool order and rebases tool-local IDs into one collision-free `[E1]`, `[E2]`, ... bundle.
+If one provider fails, the remaining attributable sources can still support an answer;
+if all sources fail, the gateway receives explicit `dataUnavailable` context.
+
+The former no-op dynamic import of `server.ts` is removed. Tool schemas shown to the model
+and server-side tool execution now come from the same registry.
 
 The registry currently covers quote/chart context, symbol news, SEC fundamentals, FRED
 macro series, data-source health, portfolio state, strategy drafts/validation, real

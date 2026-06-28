@@ -1,6 +1,6 @@
 import type { EvidenceItem } from './contracts.js';
 import type { EvidenceModelGateway } from './modelGateway.js';
-import type { AgentToolRegistry } from './toolRegistry.js';
+import type { AgentToolContext, AgentToolRegistry } from './toolRegistry.js';
 
 interface GroundedChatInput {
   userId: string;
@@ -15,6 +15,50 @@ interface GroundedChatDependencies {
   gateway: Pick<EvidenceModelGateway, 'answer'>;
 }
 
+const SYMBOL_RESEARCH_TOOLS = [
+  ['show_stock_chart', (symbol: string) => ({ ticker: symbol })],
+  ['show_news_sentiment', (symbol: string) => ({ ticker: symbol, limit: 8 })],
+  ['get_fundamentals', (symbol: string) => ({ ticker: symbol })],
+] as const;
+
+async function collectSymbolEvidence(
+  userId: string,
+  symbol: string,
+  tools: Pick<AgentToolRegistry, 'execute'>,
+): Promise<{ evidence: EvidenceItem[]; dataUnavailable?: string }> {
+  const context: AgentToolContext = {
+    userId,
+    scopes: ['R'],
+    paperOnly: true,
+    allowedMarkets: [],
+    allowedInstruments: [],
+  };
+  const results = await Promise.allSettled(
+    SYMBOL_RESEARCH_TOOLS.map(([toolName, input]) => (
+      tools.execute(toolName, input(symbol), context)
+    )),
+  );
+  const evidence: EvidenceItem[] = [];
+  const unavailable = new Set<string>();
+
+  for (const result of results) {
+    if (result.status === 'rejected') continue;
+    for (const item of result.value.evidence) {
+      evidence.push({ ...item, id: `E${evidence.length + 1}` });
+    }
+    if (result.value.dataUnavailable?.message) {
+      unavailable.add(result.value.dataUnavailable.message);
+    }
+  }
+
+  return {
+    evidence,
+    dataUnavailable: evidence.length > 0
+      ? undefined
+      : [...unavailable][0] ?? 'Market evidence could not be resolved.',
+  };
+}
+
 export async function answerGroundedChat(
   input: GroundedChatInput,
   dependencies: GroundedChatDependencies,
@@ -23,23 +67,13 @@ export async function answerGroundedChat(
   let dataUnavailable: string | undefined;
 
   if (input.symbol?.trim()) {
-    try {
-      const toolResult = await dependencies.tools.execute(
-        'show_stock_chart',
-        { ticker: input.symbol.trim().toUpperCase() },
-        {
-          userId: input.userId,
-          scopes: ['R'],
-          paperOnly: true,
-          allowedMarkets: [],
-          allowedInstruments: [],
-        },
-      );
-      evidence = toolResult.evidence;
-      dataUnavailable = toolResult.dataUnavailable?.message;
-    } catch {
-      dataUnavailable = 'Market evidence could not be resolved.';
-    }
+    const bundle = await collectSymbolEvidence(
+      input.userId,
+      input.symbol.trim().toUpperCase(),
+      dependencies.tools,
+    );
+    evidence = bundle.evidence;
+    dataUnavailable = bundle.dataUnavailable;
   }
 
   return dependencies.gateway.answer({

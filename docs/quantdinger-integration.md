@@ -27,7 +27,7 @@ Upstream license statements:
 | Signal on current data | Validated indicator versions execute through `/strategy/signal` on normalized 15m OHLCV before the paper risk pipeline | `server/python/science_skills_service.py`, `server/services/quantRuntimeClient.ts` |
 | Idea → version → validate → backtest | User-owned immutable versions, source/data hashes, queued jobs, diagnostics, and result inspection | `server/api/strategies.ts`, `src/db/migrations/0002_strategy_runtime.sql` |
 | Provider registry | Attributable providers with operation/market capabilities, timeout, rate limit, circuit breaker, cache, freshness, and health | `server/data/*`, `server/api/dataSources.ts` |
-| AI research and agent tools | Evidence-first tool registry, structured citations, prompt versions, memory/evidence separation | `server/ai/*`, `docs/ai-evidence.md` |
+| AI research and agent tools | Evidence-first tool registry, concurrent quote/news/fundamental research, collision-free structured citations, prompt versions, memory/evidence separation | `server/ai/*`, `docs/ai-evidence.md` |
 | Agent Gateway / MCP-style control | Hashed scoped tokens, allowlists, expiry, rate limit, idempotency, append-only audit, paper-only `T` tools | `server/api/agentV1.ts`, `server/services/agentPolicy.ts` |
 | Multi-tenant trading sessions | One isolated state, RiskManager, paper broker, scheduler, locks, positions, logs, and event channel per user | `server/services/TradingSessionRegistry.ts`, `server/services/AutonomousTradingSession.ts` |
 | Paper before live | Real adapter requests are downgraded/rejected; Agent tokens are invariantly paper-only | `server/api/autotradingSessions.ts`, `server/ai/defaultTools.ts` |
