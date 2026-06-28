@@ -163,14 +163,18 @@ const SensitiveStringPatterns = [
   /\b(?:token|api_?key|apikey|secret)\s*=\s*\S+/gi,
 ];
 
+export function redactSensitiveText(value: string): string {
+  return SensitiveStringPatterns.reduce(
+    (text, pattern) => text.replace(pattern, '[REDACTED]'),
+    value,
+  );
+}
+
 function redact(value: unknown, key?: string, depth = 0): unknown {
   if (key && SensitiveKey.test(key)) return '[REDACTED]';
   if (depth > 12) return '[TRUNCATED]';
   if (typeof value === 'string') {
-    return SensitiveStringPatterns.reduce(
-      (text, pattern) => text.replace(pattern, '[REDACTED]'),
-      value,
-    );
+    return redactSensitiveText(value);
   }
   if (Array.isArray(value)) {
     return value.slice(0, 500).map((item) => redact(item, undefined, depth + 1));

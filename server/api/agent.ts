@@ -28,6 +28,9 @@ import { getDataRegistry } from '../data/configure.js';
 import { createDefaultAgentTools } from '../ai/defaultTools.js';
 import { createAiStrategyDraft } from '../services/aiStrategyDraftService.js';
 import { getStrategyRuntimeService } from '../services/strategyRuntimeService.js';
+import { PromptRegistry } from '../ai/promptRegistry.js';
+import { EvidenceModelGateway } from '../ai/modelGateway.js';
+import { answerGroundedChat } from '../ai/chatService.js';
 
 export const agentRouter = Router();
 
@@ -47,6 +50,19 @@ const registeredAgentTools = createDefaultAgentTools({
   getBacktestJob: (userId, jobId) => (
     getStrategyRuntimeService().getBacktestJob(userId, jobId)
   ),
+});
+
+const promptRegistry = new PromptRegistry();
+const groundedResearchPrompt = promptRegistry.register({
+  id: 'agent.research.system',
+  version: '1.0.0',
+  template: [
+    '你是 Hermes 投資研究助理。回覆使用繁體中文。',
+    '只能把 EVIDENCE 區塊中的內容當成外部市場事實。',
+    '所有外部事實都必須使用 [E#] 標記並列入 citations。',
+    '資料不存在時明確說明，不得補造行情、新聞、基本面或總經數值。',
+    '清楚標示風險，嚴禁保證獲利。',
+  ].join('\n'),
 });
 
 // ── AI strategy draft generation (execution remains in Python runtime) ───────
@@ -310,25 +326,6 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
   if (!message) { res.status(400).json({ error: '缺少 message' }); return; }
 
   try {
-    // 可選：傳入 symbol 時，嘗試取得最新報價作為 RAG 快照
-    let marketSnap: MarketSnap | null = null;
-    if (symbol) {
-      try {
-        // 動態 import 避免循環依賴（server.ts NativeYahooApi 已在頂層）
-        const { default: serverModule } = await import('../../server.js' as string).catch(() => ({ default: null }));
-        void serverModule; // NativeYahooApi is in server.ts scope, not exposed; skip market fetch via dynamic import
-      } catch { /* 無法取得市場快照，繼續 */ }
-    }
-
-    const systemPrompt = await buildSystemPrompt(userId, marketSnap, persona);
-
-    // 組裝對話歷史
-    const messages: OpenRouterMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...(convHistory as OpenRouterMessage[]).slice(-8), // 保留最近 8 輪
-      { role: 'user', content: message },
-    ];
-
     let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
     if (!openrouterKey && userId) {
       try {
@@ -340,8 +337,30 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
     }
 
     const chatModel = req.body.model || await getBestFreeModel();
-    const rawReply = await callOpenRouter(messages, chatModel, openrouterKey);
-    const { cleanText, skills } = parseExtractedSkills(rawReply);
+    const memoryContext = [
+      await buildSystemPrompt(userId, null, persona),
+      `RECENT_CONVERSATION:\n${JSON.stringify(
+        (convHistory as OpenRouterMessage[]).slice(-8),
+      )}`,
+    ].join('\n\n');
+    const gateway = new EvidenceModelGateway(
+      await groundedResearchPrompt,
+      async ({ messages }) => ({
+        model: chatModel,
+        content: await callOpenRouter(messages, chatModel, openrouterKey),
+      }),
+    );
+    const answer = await answerGroundedChat({
+      userId,
+      message: String(message),
+      symbol: typeof symbol === 'string' ? symbol : undefined,
+      memoryContext,
+      personaContext: getPersonaPrompt(persona) ?? undefined,
+    }, {
+      tools: registeredAgentTools,
+      gateway,
+    });
+    const { cleanText, skills } = parseExtractedSkills(answer.answer);
 
     // 持久化萃取出的技能/偏好
     if (skills.length > 0) {
@@ -360,7 +379,9 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
     res.json({
       reply:           cleanText,
       extractedSkills: skills,
-      model:           chatModel,
+      citations:       answer.citations,
+      promptVersion:   answer.promptVersion,
+      model:           answer.model,
     });
 
   } catch (err: unknown) {
