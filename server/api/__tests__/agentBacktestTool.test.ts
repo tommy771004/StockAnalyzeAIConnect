@@ -37,4 +37,39 @@ describe('AI execute_backtest tool', () => {
       { startBacktest: vi.fn() } as any,
     )).rejects.toThrow('strategyVersionId');
   });
+
+  it('queues cross-sectional jobs through the same immutable runtime service', async () => {
+    const startBacktest = vi.fn(async () => ({
+      id: 'job-cross-1',
+      status: 'queued',
+    }));
+
+    await queueAgentBacktest(
+      'user-1',
+      {
+        strategyVersionId: 'version-1',
+        crossSectional: {
+          symbols: ['aapl', 'msft'],
+          portfolioSize: 2,
+          longRatio: 0.5,
+          rebalanceFrequency: 'weekly',
+        },
+      },
+      { startBacktest } as any,
+    );
+
+    expect(startBacktest).toHaveBeenCalledWith('user-1', {
+      strategyVersionId: 'version-1',
+      symbol: undefined,
+      crossSectional: {
+        symbols: ['AAPL', 'MSFT'],
+        portfolioSize: 2,
+        longRatio: 0.5,
+        rebalanceFrequency: 'weekly',
+      },
+      period1: undefined,
+      period2: undefined,
+      execution: undefined,
+    });
+  });
 });

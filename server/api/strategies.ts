@@ -8,6 +8,7 @@ import {
   type StartBacktestCommand,
 } from '../services/strategyRuntimeService.js';
 import {
+  CrossSectionalConfigSchema,
   ExecutionPolicySchema,
   StrategyRuntimeSchema,
   type StrategyValidationResult,
@@ -35,11 +36,20 @@ const VersionBodySchema = z.object({
 });
 
 const BacktestBodySchema = z.object({
-  symbol: z.string().trim().min(1).max(64),
+  symbol: z.string().trim().min(1).max(64).optional(),
+  crossSectional: CrossSectionalConfigSchema.optional(),
   period1: z.union([z.string(), z.number()]).optional(),
   period2: z.union([z.string(), z.number()]).optional(),
   parameters: z.record(z.string(), z.unknown()).optional(),
   execution: ExecutionPolicySchema.partial().optional(),
+}).superRefine((body, context) => {
+  if (!body.symbol && !body.crossSectional) {
+    context.addIssue({
+      code: 'custom',
+      message: 'symbol or crossSectional configuration is required',
+      path: ['symbol'],
+    });
+  }
 });
 
 function requireUserId(req: AuthRequest, res: Response): string | null {

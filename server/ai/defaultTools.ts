@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { DataEnvelope, DataMarket, DataRequestInput } from '../data/types.js';
+import { CrossSectionalConfigSchema } from '../types/strategyRuntime.js';
 import {
   AgentToolRegistry,
   ToolAccessDeniedError,
@@ -63,11 +64,20 @@ const PortfolioInputSchema = z.object({
 });
 
 const BacktestInputSchema = z.object({
-  ticker: z.string().trim().min(1).max(64).transform((value) => value.toUpperCase()),
+  ticker: z.string().trim().min(1).max(64).transform((value) => value.toUpperCase()).optional(),
+  crossSectional: CrossSectionalConfigSchema.optional(),
   strategyVersionId: z.string().min(1),
   initialCapital: z.number().positive().optional(),
   startDate: z.string().min(1).optional(),
   endDate: z.string().min(1).optional(),
+}).superRefine((input, context) => {
+  if (!input.ticker && !input.crossSectional) {
+    context.addIssue({
+      code: 'custom',
+      message: 'ticker or crossSectional configuration is required',
+      path: ['ticker'],
+    });
+  }
 });
 
 const MacroInputSchema = z.object({
@@ -255,10 +265,23 @@ export function createDefaultAgentTools(
         type: 'object',
         properties: {
           ticker: { type: 'string' },
+          crossSectional: {
+            type: 'object',
+            properties: {
+              symbols: { type: 'array', items: { type: 'string' }, minItems: 2 },
+              portfolioSize: { type: 'number' },
+              longRatio: { type: 'number' },
+              rebalanceFrequency: {
+                type: 'string',
+                enum: ['daily', 'weekly', 'monthly'],
+              },
+            },
+            required: ['symbols', 'portfolioSize', 'longRatio', 'rebalanceFrequency'],
+          },
           strategyVersionId: { type: 'string' },
           paperOnly: { type: 'boolean', const: true },
         },
-        required: ['ticker', 'strategyVersionId'],
+        required: ['strategyVersionId'],
       },
     },
     input: StartPaperStrategyInputSchema,
@@ -704,8 +727,10 @@ export function createDefaultAgentTools(
     },
     input: BacktestInputSchema,
     execute: async (input, context) => {
-      const market = marketFor(input.ticker);
-      assertAllowed(input.ticker, market, context);
+      const symbols = input.crossSectional?.symbols ?? [input.ticker!];
+      for (const symbol of symbols) {
+        assertAllowed(symbol, marketFor(symbol), context);
+      }
       const args = Object.fromEntries(
         Object.entries(input).filter(([, value]) => value !== undefined),
       );

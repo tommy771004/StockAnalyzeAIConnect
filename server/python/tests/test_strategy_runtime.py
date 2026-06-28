@@ -8,6 +8,7 @@ sys.path.insert(0, str(PYTHON_ROOT))
 
 from strategy_runtime.indicator_runtime import run_indicator
 from strategy_runtime.backtest import run_backtest
+from strategy_runtime.cross_sectional import run_cross_sectional_backtest
 from strategy_runtime.validator import validate_source
 
 
@@ -221,6 +222,102 @@ class StrategyRuntimeTests(unittest.TestCase):
         self.assertEqual(len(result["trades"]), 1)
         self.assertEqual(result["trades"][0]["side"], "short")
         self.assertGreater(result["trades"][0]["netPnl"], 0)
+
+    def test_cross_sectional_ranks_at_close_and_rebalances_at_next_open(self):
+        source = (
+            "def run(data, params):\n"
+            "    n = len(data['AAA']['close'])\n"
+            "    return {'scores': {\n"
+            "        'AAA': [3.0] * n,\n"
+            "        'BBB': [2.0] * n,\n"
+            "        'CCC': [1.0] * n,\n"
+            "    }}\n"
+        )
+        universe = {
+            "AAA": [
+                {"timestamp": "2026-01-01", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+                {"timestamp": "2026-01-02", "open": 11, "high": 12, "low": 10, "close": 11, "volume": 1000},
+                {"timestamp": "2026-01-03", "open": 12, "high": 13, "low": 11, "close": 12, "volume": 1000},
+            ],
+            "BBB": [
+                {"timestamp": "2026-01-01", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+                {"timestamp": "2026-01-02", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+                {"timestamp": "2026-01-03", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+            ],
+            "CCC": [
+                {"timestamp": "2026-01-01", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+                {"timestamp": "2026-01-02", "open": 9, "high": 10, "low": 8, "close": 9, "volume": 1000},
+                {"timestamp": "2026-01-03", "open": 8, "high": 9, "low": 7, "close": 8, "volume": 1000},
+            ],
+        }
+
+        result = run_cross_sectional_backtest(
+            source=source,
+            universe_bars=universe,
+            params={},
+            policy={
+                "initialCapital": 10_000,
+                "feeRate": 0,
+                "slippageBps": 0,
+                "exitOwner": "strategy",
+            },
+            config={
+                "symbols": ["AAA", "BBB", "CCC"],
+                "portfolioSize": 2,
+                "longRatio": 0.5,
+                "rebalanceFrequency": "weekly",
+            },
+        )
+
+        self.assertEqual(
+            {(trade["symbol"], trade["side"]) for trade in result["trades"]},
+            {("AAA", "long"), ("CCC", "short")},
+        )
+        self.assertTrue(all(trade["entryTimestamp"] == "2026-01-02" for trade in result["trades"]))
+        self.assertTrue(all(trade["exitTimestamp"] == "2026-01-03" for trade in result["trades"]))
+        self.assertGreater(result["metrics"]["totalReturnPct"], 0)
+
+    def test_cross_sectional_stop_prevents_same_bar_reentry(self):
+        source = (
+            "def run(data, params):\n"
+            "    n = len(data['AAA']['close'])\n"
+            "    return {'scores': {'AAA': [2] * n, 'BBB': [1] * n}}\n"
+        )
+        universe = {
+            "AAA": [
+                {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+                {"timestamp": "2", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+                {"timestamp": "3", "open": 100, "high": 100, "low": 90, "close": 92, "volume": 1000},
+            ],
+            "BBB": [
+                {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+                {"timestamp": "2", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+                {"timestamp": "3", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            ],
+        }
+
+        result = run_cross_sectional_backtest(
+            source=source,
+            universe_bars=universe,
+            params={},
+            policy={
+                "initialCapital": 10_000,
+                "feeRate": 0,
+                "slippageBps": 0,
+                "stopLossPct": 0.05,
+                "exitOwner": "engine",
+            },
+            config={
+                "symbols": ["AAA", "BBB"],
+                "portfolioSize": 2,
+                "longRatio": 0.5,
+                "rebalanceFrequency": "daily",
+            },
+        )
+
+        aaa_trades = [trade for trade in result["trades"] if trade["symbol"] == "AAA"]
+        self.assertEqual(len(aaa_trades), 1)
+        self.assertEqual(aaa_trades[0]["exitReason"], "stop_loss")
 
 
 if __name__ == "__main__":

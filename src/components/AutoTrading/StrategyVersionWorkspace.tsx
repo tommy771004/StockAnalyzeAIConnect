@@ -12,6 +12,10 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
   const [runtime, setRuntime] = React.useState<'indicator' | 'script'>('indicator');
   const [source, setSource] = React.useState('');
   const [symbol, setSymbol] = React.useState(defaultSymbol);
+  const [crossSectional, setCrossSectional] = React.useState(false);
+  const [portfolioSize, setPortfolioSize] = React.useState(2);
+  const [longRatio, setLongRatio] = React.useState(0.5);
+  const [rebalanceFrequency, setRebalanceFrequency] = React.useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [job, setJob] = React.useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = React.useState('');
 
@@ -53,7 +57,26 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
 
   const launchBacktest = async () => {
     if (!selectedId || !symbol.trim()) return;
-    const queued = await api.startStrategyBacktest(selectedId, symbol.trim().toUpperCase());
+    const symbols = [...new Set(
+      symbol.split(',').map((value) => value.trim().toUpperCase()).filter(Boolean),
+    )];
+    if (crossSectional && symbols.length < 2) {
+      setMessage(t('strategyWorkspace.crossNeedsSymbols', 'Cross-sectional backtests require at least two symbols.'));
+      return;
+    }
+    const queued = await api.startStrategyBacktest(
+      selectedId,
+      crossSectional
+        ? {
+            crossSectional: {
+              symbols,
+              portfolioSize: Math.min(portfolioSize, symbols.length),
+              longRatio,
+              rebalanceFrequency,
+            },
+          }
+        : { symbol: symbols[0] },
+    );
     setJob(queued as unknown as Record<string, unknown>);
   };
 
@@ -65,7 +88,12 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
   const selected = versions.find((version) => version.id === selectedId);
 
   const startPaper = async () => {
-    if (!selected || selected.validationStatus !== 'valid' || !symbol.trim()) return;
+    if (
+      crossSectional
+      || !selected
+      || selected.validationStatus !== 'valid'
+      || !symbol.trim()
+    ) return;
     const result = await api.startAutotrading({
       mode: 'simulated',
       symbols: [symbol.trim().toUpperCase()],
@@ -96,7 +124,13 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
         </select>
         <select
           value={selectedId}
-          onChange={(event) => setSelectedId(event.target.value)}
+          onChange={(event) => {
+            const nextId = event.target.value;
+            setSelectedId(nextId);
+            if (versions.find((version) => version.id === nextId)?.runtime === 'script') {
+              setCrossSectional(false);
+            }
+          }}
           className="min-w-56 bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs"
         >
           <option value="">{t('strategyWorkspace.selectVersion', 'Select version')}</option>
@@ -137,11 +171,58 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => void validate()} disabled={!selectedId} className="px-3 py-1 border border-(--color-term-border) text-xs disabled:opacity-40">
           {t('strategyWorkspace.validate', 'VALIDATE')}
         </button>
-        <input value={symbol} onChange={(event) => setSymbol(event.target.value)} className="bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs" />
+        <input
+          value={symbol}
+          onChange={(event) => setSymbol(event.target.value)}
+          placeholder={crossSectional ? 'AAPL, MSFT, NVDA' : defaultSymbol}
+          className="min-w-48 bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs"
+        />
+        <label className="flex items-center gap-1 text-[10px] text-(--color-term-muted)">
+          <input
+            type="checkbox"
+            checked={crossSectional}
+            disabled={selected?.runtime === 'script'}
+            onChange={(event) => setCrossSectional(event.target.checked)}
+          />
+          {t('strategyWorkspace.crossSectional', 'CROSS-SECTIONAL')}
+        </label>
+        {crossSectional && (
+          <>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={portfolioSize}
+              onChange={(event) => setPortfolioSize(Math.max(1, Number(event.target.value) || 1))}
+              aria-label={t('strategyWorkspace.portfolioSize', 'Portfolio size')}
+              className="w-20 bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs"
+            />
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.1}
+              value={longRatio}
+              onChange={(event) => setLongRatio(Math.min(1, Math.max(0, Number(event.target.value) || 0)))}
+              aria-label={t('strategyWorkspace.longRatio', 'Long ratio')}
+              className="w-20 bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs"
+            />
+            <select
+              value={rebalanceFrequency}
+              onChange={(event) => setRebalanceFrequency(event.target.value as typeof rebalanceFrequency)}
+              aria-label={t('strategyWorkspace.rebalanceFrequency', 'Rebalance frequency')}
+              className="bg-(--color-term-panel) border border-(--color-term-border) px-2 py-1 text-xs"
+            >
+              <option value="daily">{t('strategyWorkspace.daily', 'daily')}</option>
+              <option value="weekly">{t('strategyWorkspace.weekly', 'weekly')}</option>
+              <option value="monthly">{t('strategyWorkspace.monthly', 'monthly')}</option>
+            </select>
+          </>
+        )}
         <button onClick={() => void launchBacktest()} disabled={!selectedId} className="px-3 py-1 border border-(--color-term-border) text-xs disabled:opacity-40">
           {t('strategyWorkspace.backtest', 'QUEUE BACKTEST')}
         </button>
@@ -150,8 +231,11 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
         </button>
         <button
           onClick={() => void startPaper()}
-          disabled={selected?.validationStatus !== 'valid'}
+          disabled={crossSectional || selected?.validationStatus !== 'valid'}
           className="px-3 py-1 border border-emerald-500/50 text-emerald-300 text-xs disabled:opacity-40"
+          title={crossSectional
+            ? t('strategyWorkspace.crossBacktestOnly', 'Cross-sectional strategies are backtest-only.')
+            : undefined}
         >
           {t('strategyWorkspace.startPaper', 'START VALIDATED PAPER')}
         </button>

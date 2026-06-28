@@ -530,13 +530,28 @@ export const validateStrategyVersion = (versionId: string) =>
     { method: 'POST' },
   );
 
-export const startStrategyBacktest = (versionId: string, symbol: string) =>
+export interface StrategyBacktestRequest {
+  symbol?: string;
+  crossSectional?: {
+    symbols: string[];
+    portfolioSize: number;
+    longRatio: number;
+    rebalanceFrequency: 'daily' | 'weekly' | 'monthly';
+  };
+}
+
+export const startStrategyBacktest = (
+  versionId: string,
+  request: string | StrategyBacktestRequest,
+) =>
   fetchJ<{ id: string; status: string }>(
     `/api/strategy-versions/${encodeURIComponent(versionId)}/backtests`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol }),
+      body: JSON.stringify(
+        typeof request === 'string' ? { symbol: request } : request,
+      ),
     },
   );
 

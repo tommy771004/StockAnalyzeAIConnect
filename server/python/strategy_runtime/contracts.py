@@ -64,11 +64,43 @@ class ExecutionPolicy(BaseModel):
     exitOwner: Literal["engine", "strategy"] = "engine"
 
 
+class CrossSectionalConfig(BaseModel):
+    symbols: list[str] = Field(min_length=2, max_length=50)
+    portfolioSize: int = Field(ge=1, le=50)
+    longRatio: float = Field(ge=0, le=1)
+    rebalanceFrequency: Literal["daily", "weekly", "monthly"]
+
+    @model_validator(mode="after")
+    def validate_universe(self):
+        self.symbols = [symbol.strip().upper() for symbol in self.symbols]
+        if len(set(self.symbols)) != len(self.symbols):
+            raise ValueError("Cross-sectional symbols must be unique")
+        if self.portfolioSize > len(self.symbols):
+            raise ValueError("portfolioSize must not exceed the universe size")
+        return self
+
+
 class StrategyBacktestPayload(StrategySource):
     runId: str = Field(min_length=1)
     symbol: str = Field(min_length=1)
     bars: list[Bar] = Field(min_length=2, max_length=100_000)
     execution: ExecutionPolicy = Field(default_factory=ExecutionPolicy)
+    crossSectional: CrossSectionalConfig | None = None
+    universeBars: dict[str, list[Bar]] | None = None
+
+    @model_validator(mode="after")
+    def validate_cross_sectional(self):
+        if self.crossSectional is None:
+            if self.universeBars is not None:
+                raise ValueError("universeBars requires crossSectional configuration")
+            return self
+        if self.runtime != "indicator":
+            raise ValueError("Cross-sectional backtests require indicator runtime")
+        if self.universeBars is None:
+            raise ValueError("Cross-sectional backtests require universeBars")
+        if set(self.universeBars) != set(self.crossSectional.symbols):
+            raise ValueError("universeBars must match crossSectional symbols")
+        return self
 
 
 class StrategySignalPayload(StrategySource):

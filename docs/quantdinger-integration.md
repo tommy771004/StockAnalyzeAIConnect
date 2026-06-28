@@ -24,6 +24,7 @@ Upstream license statements:
 | QuantDinger concept | Hermes implementation | Key files |
 | --- | --- | --- |
 | Indicator and Script strategy models | Restricted immutable Python runtimes with validation and deterministic backtests | `server/python/strategy_runtime/*`, `server/services/strategyRuntimeService.ts` |
+| Cross-sectional ranking strategies | Multi-symbol IndicatorStrategy scoring, aligned-universe validation, top/bottom equal-weight portfolios, and daily/weekly/monthly next-open rebalancing | `server/python/strategy_runtime/cross_sectional.py`, `server/types/strategyRuntime.ts` |
 | Signal on current data | Validated indicator versions execute through `/strategy/signal` on normalized 15m OHLCV before the paper risk pipeline | `server/python/science_skills_service.py`, `server/services/quantRuntimeClient.ts` |
 | Idea → version → validate → backtest | User-owned immutable versions, source/data hashes, queued jobs, diagnostics, and result inspection | `server/api/strategies.ts`, `src/db/migrations/0002_strategy_runtime.sql` |
 | Provider registry | Attributable providers with operation/market capabilities, timeout, rate limit, circuit breaker, cache, freshness, and health | `server/data/*`, `server/api/dataSources.ts` |

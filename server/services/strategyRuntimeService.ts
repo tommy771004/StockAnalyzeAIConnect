@@ -6,10 +6,12 @@ import {
   type StrategyRuntimeRepository,
 } from '../repositories/strategyRuntimeRepo.js';
 import {
+  CrossSectionalConfigSchema,
   ExecutionPolicySchema,
   StrategyBacktestRequestSchema,
   StrategySignalRequestSchema,
   StrategyRuntimeSchema,
+  type CrossSectionalConfig,
   type ExecutionPolicy,
   type StrategyBacktestRequest,
   type StrategyBacktestResult,
@@ -60,11 +62,21 @@ export interface CreateVersionCommand {
 
 export interface StartBacktestCommand {
   strategyVersionId: string;
-  symbol: string;
+  symbol?: string;
+  crossSectional?: CrossSectionalConfig;
   period1?: string | number;
   period2?: string | number;
   parameters?: Record<string, unknown>;
   execution?: Partial<ExecutionPolicy>;
+}
+
+interface PreparedBacktestRequest {
+  symbol: string;
+  bars: StrategyBar[];
+  parameters: Record<string, unknown>;
+  execution: ExecutionPolicy;
+  crossSectional?: CrossSectionalConfig;
+  universeBars?: Record<string, StrategyBar[]>;
 }
 
 export interface StrategyRuntimeServiceDependencies {
@@ -88,6 +100,32 @@ function defaultSchedule(task: () => Promise<void>): void {
 function errorText(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Backtest worker failed';
   return message.slice(0, 2_000);
+}
+
+function alignUniverseBars(
+  loaded: ReadonlyArray<readonly [string, StrategyBar[]]>,
+): Record<string, StrategyBar[]> {
+  const first = loaded[0];
+  if (!first) throw new Error('Cross-sectional universe is empty');
+  let common = new Set(first[1].map((bar) => bar.timestamp));
+  const indexed = loaded.map(([symbol, bars]) => {
+    const byTimestamp = new Map(bars.map((bar) => [bar.timestamp, bar]));
+    if (byTimestamp.size !== bars.length) {
+      throw new Error(`Duplicate cross-sectional timestamp for ${symbol}`);
+    }
+    common = new Set([...common].filter((timestamp) => byTimestamp.has(timestamp)));
+    return [symbol, byTimestamp] as const;
+  });
+  const timestamps = first[1]
+    .map((bar) => bar.timestamp)
+    .filter((timestamp) => common.has(timestamp));
+  if (timestamps.length < 2) {
+    throw new Error('Cross-sectional universe has fewer than two aligned bars');
+  }
+  return Object.fromEntries(indexed.map(([symbol, bars]) => [
+    symbol,
+    timestamps.map((timestamp) => bars.get(timestamp)!),
+  ]));
 }
 
 export class StrategyRuntimeService {
@@ -164,12 +202,32 @@ export class StrategyRuntimeService {
     if (version.validationStatus !== 'valid') {
       throw new Error('Strategy version must be validated before backtesting');
     }
-    const bars = await this.loadBars({
-      symbol: command.symbol,
-      period1: command.period1,
-      period2: command.period2,
-    });
-    const dataHash = await stableJsonHash(bars);
+    const crossSectional = command.crossSectional
+      ? CrossSectionalConfigSchema.parse(command.crossSectional)
+      : undefined;
+    if (crossSectional && version.runtime !== 'indicator') {
+      throw new Error('Cross-sectional backtests require indicator runtime');
+    }
+    const singleSymbol = command.symbol?.trim().toUpperCase();
+    if (!crossSectional && !singleSymbol) {
+      throw new Error('Backtest symbol is required');
+    }
+    const symbols = crossSectional?.symbols ?? [singleSymbol!];
+    const loaded = await Promise.all(symbols.map(async (symbol) => [
+      symbol,
+      await this.loadBars({
+        symbol,
+        period1: command.period1,
+        period2: command.period2,
+      }),
+    ] as const));
+    const universeBars = crossSectional
+      ? alignUniverseBars(loaded)
+      : Object.fromEntries(loaded);
+    const bars = universeBars[symbols[0]!]!;
+    const dataHash = await stableJsonHash(
+      crossSectional ? universeBars : bars,
+    );
     const parameters = {
       ...asRecord(version.defaultParameters),
       ...(command.parameters ?? {}),
@@ -180,15 +238,16 @@ export class StrategyRuntimeService {
     });
     const persistedRequest = {
       strategyVersionId: version.id,
-      symbol: command.symbol,
+      symbol: crossSectional ? crossSectional.symbols.join(',') : singleSymbol!,
       bars,
       parameters,
       execution,
+      ...(crossSectional ? { crossSectional, universeBars } : {}),
     };
     const createInput: CreateBacktestJobInput = {
       userId,
       strategyVersionId: version.id,
-      symbol: command.symbol,
+      symbol: persistedRequest.symbol,
       request: persistedRequest,
       sourceHash: version.sourceHash,
       dataHash,
@@ -198,9 +257,7 @@ export class StrategyRuntimeService {
       userId,
       queued,
       version,
-      bars,
-      parameters,
-      execution,
+      persistedRequest,
     ));
     return queued;
   }
@@ -250,9 +307,7 @@ export class StrategyRuntimeService {
     userId: string,
     job: BacktestJob,
     version: StrategyVersion,
-    bars: StrategyBar[],
-    parameters: Record<string, unknown>,
-    execution: ExecutionPolicy,
+    prepared: PreparedBacktestRequest,
   ): Promise<void> {
     try {
       const running = await this.repo.markBacktestRunning(userId, job.id);
@@ -263,10 +318,7 @@ export class StrategyRuntimeService {
         runtime: StrategyRuntimeSchema.parse(version.runtime),
         source: version.source,
         sourceHash: version.sourceHash,
-        parameters,
-        symbol: job.symbol,
-        bars,
-        execution,
+        ...prepared,
       });
       const result = await this.backtest(request);
       await this.repo.completeBacktestJob(

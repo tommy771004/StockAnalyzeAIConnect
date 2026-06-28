@@ -203,4 +203,91 @@ describe('StrategyRuntimeService', () => {
       'runtime unavailable',
     );
   });
+
+  it('loads, hashes, persists, and executes one cross-sectional universe', async () => {
+    let scheduled: (() => Promise<void>) | undefined;
+    const repo = fakeRepo({
+      createBacktestJob: vi.fn(async (input) => job({
+        symbol: input.symbol,
+        request: input.request,
+        dataHash: input.dataHash,
+      })),
+    });
+    const loadBars = vi.fn(async (input: { symbol: string }) => (
+      input.symbol === 'AAPL'
+        ? [{
+            timestamp: '2025-12-31',
+            open: 99,
+            high: 100,
+            low: 98,
+            close: 99,
+            volume: 1_000,
+          }, ...bars]
+        : bars
+    ));
+    const backtest = vi.fn(async (request) => ({
+      runId: request.runId,
+      strategyVersionId: request.strategyVersionId,
+      sourceHash: request.sourceHash,
+      engineVersion: 'hermes-quant-1',
+      equityCurve: [{ timestamp: '2026-01-01', equity: 10_000, drawdownPct: 0 }],
+      trades: [],
+      metrics: { totalReturnPct: 0 },
+      assumptions: { strategyMode: 'cross_sectional' },
+      warnings: [],
+    }));
+    const service = new StrategyRuntimeService({
+      repo,
+      loadBars,
+      validate: vi.fn(),
+      backtest,
+      schedule: (task) => {
+        scheduled = task;
+      },
+    });
+
+    const queued = await service.startBacktest('user-1', {
+      strategyVersionId: 'version-1',
+      crossSectional: {
+        symbols: ['aapl', 'msft', 'nvda'],
+        portfolioSize: 2,
+        longRatio: 0.5,
+        rebalanceFrequency: 'weekly',
+      },
+      execution: { initialCapital: 10_000 },
+    });
+
+    expect(loadBars.mock.calls.map(([input]) => input.symbol)).toEqual([
+      'AAPL',
+      'MSFT',
+      'NVDA',
+    ]);
+    expect(queued.symbol).toBe('AAPL,MSFT,NVDA');
+    expect(repo.createBacktestJob).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'AAPL,MSFT,NVDA',
+      dataHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      request: expect.objectContaining({
+        crossSectional: expect.objectContaining({
+          symbols: ['AAPL', 'MSFT', 'NVDA'],
+        }),
+        universeBars: {
+          AAPL: bars,
+          MSFT: bars,
+          NVDA: bars,
+        },
+      }),
+    }));
+
+    await scheduled?.();
+
+    expect(backtest).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'AAPL,MSFT,NVDA',
+      crossSectional: expect.objectContaining({ portfolioSize: 2 }),
+      universeBars: {
+        AAPL: bars,
+        MSFT: bars,
+        NVDA: bars,
+      },
+    }));
+  });
 });

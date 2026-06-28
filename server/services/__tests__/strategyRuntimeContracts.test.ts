@@ -77,4 +77,45 @@ describe('strategy runtime contracts', () => {
 
     expect(parsed.success).toBe(false);
   });
+
+  it('accepts an explicit cross-sectional universe for indicator backtests', () => {
+    const bars = [
+      {
+        timestamp: '2026-01-01T00:00:00.000Z',
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 100,
+      },
+      {
+        timestamp: '2026-01-02T00:00:00.000Z',
+        open: 101,
+        high: 102,
+        low: 100,
+        close: 101,
+        volume: 100,
+      },
+    ];
+    const parsed = StrategyBacktestRequestSchema.safeParse({
+      runId: 'run-cross-1',
+      strategyVersionId: 'version-cross-1',
+      runtime: 'indicator',
+      source: 'def run(data, params): return {"scores": {}}',
+      sourceHash: 'd'.repeat(64),
+      parameters: {},
+      symbol: 'AAPL,MSFT',
+      bars,
+      universeBars: { AAPL: bars, MSFT: bars },
+      crossSectional: {
+        symbols: ['AAPL', 'MSFT'],
+        portfolioSize: 2,
+        longRatio: 0.5,
+        rebalanceFrequency: 'daily',
+      },
+      execution: {},
+    });
+
+    expect(parsed.success).toBe(true);
+  });
 });

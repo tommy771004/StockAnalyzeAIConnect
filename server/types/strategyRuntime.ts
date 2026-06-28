@@ -52,6 +52,28 @@ export const ExecutionPolicySchema = z.object({
 
 export type ExecutionPolicy = z.infer<typeof ExecutionPolicySchema>;
 
+export const CrossSectionalConfigSchema = z.object({
+  symbols: z.array(
+    z.string().trim().min(1).max(64).transform((symbol) => symbol.toUpperCase()),
+  ).min(2).max(50).refine(
+    (symbols) => new Set(symbols).size === symbols.length,
+    { message: 'Cross-sectional symbols must be unique' },
+  ),
+  portfolioSize: z.number().int().min(1).max(50),
+  longRatio: z.number().min(0).max(1),
+  rebalanceFrequency: z.enum(['daily', 'weekly', 'monthly']),
+}).superRefine((config, context) => {
+  if (config.portfolioSize > config.symbols.length) {
+    context.addIssue({
+      code: 'custom',
+      message: 'portfolioSize must not exceed the universe size',
+      path: ['portfolioSize'],
+    });
+  }
+});
+
+export type CrossSectionalConfig = z.infer<typeof CrossSectionalConfigSchema>;
+
 const StrategySourceSchema = z.object({
   strategyVersionId: z.string().min(1),
   runtime: StrategyRuntimeSchema,
@@ -67,6 +89,46 @@ export const StrategyBacktestRequestSchema = StrategySourceSchema.extend({
   symbol: z.string().min(1),
   bars: z.array(BarSchema).min(2).max(100_000),
   execution: ExecutionPolicySchema,
+  crossSectional: CrossSectionalConfigSchema.optional(),
+  universeBars: z.record(
+    z.string().min(1),
+    z.array(BarSchema).min(2).max(100_000),
+  ).optional(),
+}).superRefine((request, context) => {
+  if (!request.crossSectional) {
+    if (request.universeBars) {
+      context.addIssue({
+        code: 'custom',
+        message: 'universeBars requires crossSectional configuration',
+        path: ['universeBars'],
+      });
+    }
+    return;
+  }
+  if (request.runtime !== 'indicator') {
+    context.addIssue({
+      code: 'custom',
+      message: 'Cross-sectional backtests require indicator runtime',
+      path: ['runtime'],
+    });
+  }
+  if (!request.universeBars) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Cross-sectional backtests require universeBars',
+      path: ['universeBars'],
+    });
+    return;
+  }
+  const expected = [...request.crossSectional.symbols].sort();
+  const actual = Object.keys(request.universeBars).sort();
+  if (expected.join('\0') !== actual.join('\0')) {
+    context.addIssue({
+      code: 'custom',
+      message: 'universeBars must match crossSectional symbols',
+      path: ['universeBars'],
+    });
+  }
 });
 
 export const StrategySignalRequestSchema = StrategySourceSchema.extend({
@@ -111,6 +173,7 @@ export const StrategyEquityPointSchema = z.object({
 });
 
 export const StrategyTradeSchema = z.object({
+  symbol: z.string().min(1).optional(),
   side: z.enum(['long', 'short']),
   entryTimestamp: z.string().min(1),
   exitTimestamp: z.string().min(1),

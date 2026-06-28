@@ -52,6 +52,33 @@ def run(data, params):
 Every signal array must have exactly the same length as the supplied OHLCV data. A
 strategy must return exactly one signal form.
 
+## Cross-sectional indicator strategies
+
+Cross-sectional mode reuses the same immutable `indicator` runtime. Instead of one OHLCV
+frame, `data` is keyed by symbol, and the strategy returns one aligned numeric score
+array per configured symbol:
+
+```python
+def run(data, params):
+    scores = {}
+    lookback = int(params.get("lookback", 20))
+    for symbol, frame in data.items():
+        close = frame["close"]
+        values = [0.0] * len(close)
+        for index in range(lookback, len(close)):
+            values[index] = close[index] / close[index - lookback] - 1
+        scores[symbol] = values
+    return {"scores": scores}
+```
+
+The control plane aligns provider data to the common timestamp intersection before
+hashing it. The Python runtime then requires identical aligned timestamps and one score
+per bar for every symbol. At each configured daily, weekly, or monthly rebalance
+boundary, Hermes ranks the latest finite scores at bar close. Orders execute at the next
+bar open. The top-ranked slice is held long, the bottom-ranked slice short, and each
+target receives equal weight. Fees, directional slippage, engine exits, drawdown,
+immutable hashes, and job persistence use the same contracts as single-symbol backtests.
+
 ## Script strategies
 
 ```python
@@ -172,8 +199,31 @@ The submit route returns HTTP `202` with a queued job. Poll:
 GET /api/backtest-jobs/{jobId}
 ```
 
+Cross-sectional submission:
+
+```http
+POST /api/strategy-versions/{versionId}/backtests
+Content-Type: application/json
+
+{
+  "crossSectional": {
+    "symbols": ["AAPL", "MSFT", "NVDA", "GOOGL"],
+    "portfolioSize": 4,
+    "longRatio": 0.5,
+    "rebalanceFrequency": "weekly"
+  },
+  "execution": {
+    "initialCapital": 1000000,
+    "feeRate": 0.001,
+    "slippageBps": 5
+  }
+}
+```
+
 The AI `execute_backtest` tool calls this same service and requires
-`strategyVersionId`; it no longer returns a placeholder result.
+`strategyVersionId`; it accepts either `ticker` or the same `crossSectional` object and
+no longer returns a placeholder result. Every universe symbol is checked against the
+Agent token's market and instrument allowlists before data loading.
 
 ## Paper signal execution
 
@@ -190,6 +240,8 @@ order. The signal then enters the same stop/risk/order pipeline as built-in sign
 
 Stateful `script` versions remain backtest-only until their context can be durably
 snapshotted and restored across paper ticks; paper start rejects them explicitly.
+Cross-sectional ranking versions are also backtest-only until portfolio-level rebalance
+state can be restored atomically across ticks.
 
 ## Running the Python service
 

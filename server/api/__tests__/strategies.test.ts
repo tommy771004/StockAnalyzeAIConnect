@@ -108,4 +108,46 @@ describe('strategy runtime API', () => {
       }),
     );
   });
+
+  it('accepts a cross-sectional universe without a single-symbol shortcut', async () => {
+    const startBacktest = vi.fn(async () => ({
+      id: 'job-cross-1',
+      status: 'queued',
+      userId: 'user-1',
+    }));
+    const baseUrl = await testServer({
+      createVersion: vi.fn(),
+      listVersions: vi.fn(),
+      validateVersion: vi.fn(),
+      startBacktest,
+      getBacktestJob: vi.fn(),
+    });
+
+    const response = await fetch(`${baseUrl}/api/strategy-versions/version-1/backtests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        crossSectional: {
+          symbols: ['aapl', 'msft', 'nvda'],
+          portfolioSize: 2,
+          longRatio: 0.5,
+          rebalanceFrequency: 'weekly',
+        },
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    expect(startBacktest).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        strategyVersionId: 'version-1',
+        crossSectional: {
+          symbols: ['AAPL', 'MSFT', 'NVDA'],
+          portfolioSize: 2,
+          longRatio: 0.5,
+          rebalanceFrequency: 'weekly',
+        },
+      }),
+    );
+  });
 });

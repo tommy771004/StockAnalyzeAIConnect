@@ -84,6 +84,56 @@ class StrategyApiTests(unittest.TestCase):
         self.assertEqual(response["data"]["strategyVersionId"], "version-1")
         self.assertEqual(response["data"]["sourceHash"], source_hash)
 
+    def test_backtest_endpoint_executes_cross_sectional_universe(self):
+        source = (
+            "def run(data, params):\n"
+            "    n = len(data['AAA']['close'])\n"
+            "    return {'scores': {'AAA': [2] * n, 'BBB': [1] * n}}\n"
+        )
+        source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        aaa = [
+            {"timestamp": "1", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+            {"timestamp": "2", "open": 11, "high": 12, "low": 10, "close": 11, "volume": 1000},
+            {"timestamp": "3", "open": 12, "high": 13, "low": 11, "close": 12, "volume": 1000},
+        ]
+        bbb = [
+            {"timestamp": "1", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1000},
+            {"timestamp": "2", "open": 9, "high": 10, "low": 8, "close": 9, "volume": 1000},
+            {"timestamp": "3", "open": 8, "high": 9, "low": 7, "close": 8, "volume": 1000},
+        ]
+
+        response = strategy_backtest(StrategyBacktestPayload(
+            runId="run-cross-1",
+            strategyVersionId="version-cross-1",
+            runtime="indicator",
+            source=source,
+            sourceHash=source_hash,
+            parameters={},
+            symbol="AAA,BBB",
+            bars=aaa,
+            universeBars={"AAA": aaa, "BBB": bbb},
+            crossSectional={
+                "symbols": ["AAA", "BBB"],
+                "portfolioSize": 2,
+                "longRatio": 0.5,
+                "rebalanceFrequency": "daily",
+            },
+            execution={
+                "initialCapital": 10_000,
+                "feeRate": 0,
+                "slippageBps": 0,
+                "exitOwner": "strategy",
+            },
+        ))
+
+        self.assertEqual(response["status"], "success")
+        self.assertEqual(response["data"]["runId"], "run-cross-1")
+        self.assertEqual(response["data"]["assumptions"]["strategyMode"], "cross_sectional")
+        self.assertEqual(
+            {trade["symbol"] for trade in response["data"]["trades"]},
+            {"AAA", "BBB"},
+        )
+
     def test_signal_endpoint_executes_the_immutable_indicator_version(self):
         source = (
             "def run(data, params):\n"

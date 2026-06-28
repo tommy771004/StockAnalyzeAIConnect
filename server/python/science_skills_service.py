@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from quantum_signal import compute_quantum_signal
 from strategy_runtime.backtest import run_backtest
+from strategy_runtime.cross_sectional import run_cross_sectional_backtest
 from strategy_runtime.contracts import (
     ENGINE_VERSION,
     StrategyBacktestPayload,
@@ -93,12 +94,25 @@ def strategy_backtest(payload: StrategyBacktestPayload):
             errors=[item.message for item in validation.diagnostics],
         )
     try:
-        result = run_backtest(
-            runtime=payload.runtime,
-            source=payload.source,
-            bars=[bar.model_dump() for bar in payload.bars],
-            params=payload.parameters,
-            policy=payload.execution.model_dump(),
+        result = (
+            run_cross_sectional_backtest(
+                source=payload.source,
+                universe_bars={
+                    symbol: [bar.model_dump() for bar in bars]
+                    for symbol, bars in (payload.universeBars or {}).items()
+                },
+                params=payload.parameters,
+                policy=payload.execution.model_dump(),
+                config=payload.crossSectional.model_dump(),
+            )
+            if payload.crossSectional is not None
+            else run_backtest(
+                runtime=payload.runtime,
+                source=payload.source,
+                bars=[bar.model_dump() for bar in payload.bars],
+                params=payload.parameters,
+                policy=payload.execution.model_dump(),
+            )
         )
         return ok({
             "runId": payload.runId,

@@ -95,6 +95,30 @@ describe('default agent tools', () => {
     expect(result.evidence[0]?.source.providerId).toBe('hermes-strategy-runtime');
   });
 
+  it('enforces every cross-sectional symbol against agent allowlists', async () => {
+    const queueBacktest = vi.fn(async () => ({ jobId: 'job-8', status: 'queued' }));
+    const tools = createDefaultAgentTools({
+      resolveData: vi.fn() as never,
+      getPortfolio: async () => [],
+      getTrades: async () => [],
+      queueBacktest,
+    });
+
+    await expect(tools.execute('execute_backtest', {
+      strategyVersionId: 'version-1',
+      crossSectional: {
+        symbols: ['AAPL', 'MSFT'],
+        portfolioSize: 2,
+        longRatio: 0.5,
+        rebalanceFrequency: 'weekly',
+      },
+    }, {
+      ...context(['B']),
+      allowedInstruments: ['AAPL'],
+    })).rejects.toThrow('MSFT is outside the instrument allowlist');
+    expect(queueBacktest).not.toHaveBeenCalled();
+  });
+
   it('resolves fundamentals and preserves provider evidence', async () => {
     const resolveData = vi.fn(async () => ({
       request: {},

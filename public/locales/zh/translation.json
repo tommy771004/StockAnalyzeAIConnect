@@ -1144,7 +1144,16 @@
     "backtest": "排程回測",
     "refresh": "更新結果",
     "startPaper": "啟動已驗證模擬策略",
-    "paperStarted": "模擬策略已啟動"
+    "paperStarted": "模擬策略已啟動",
+    "crossSectional": "跨品種策略",
+    "crossNeedsSymbols": "跨品種回測至少需要兩個標的。",
+    "crossBacktestOnly": "跨品種策略目前僅支援回測。",
+    "portfolioSize": "持倉數量",
+    "longRatio": "多頭比例",
+    "rebalanceFrequency": "調倉頻率",
+    "daily": "每日",
+    "weekly": "每週",
+    "monthly": "每月"
   },
   "providerProvenance": {
     "title": "資料來源與追溯",

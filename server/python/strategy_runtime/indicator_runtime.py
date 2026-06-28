@@ -96,3 +96,59 @@ def run_indicator(
             raise ValueError(f"{key} length must match bars")
         normalized[key] = [bool(value) for value in values]
     return normalized
+
+
+def run_cross_sectional_indicator(
+    source: str,
+    universe_data: dict[str, dict[str, list[Any]]],
+    params: dict[str, Any],
+) -> dict[str, list[float]]:
+    if len(universe_data) < 2:
+        raise ValueError("Cross-sectional strategies require at least two symbols")
+
+    expected_length: int | None = None
+    expected_timestamps: list[Any] | None = None
+    copied_data: dict[str, dict[str, list[Any]]] = {}
+    for symbol in sorted(universe_data):
+        data = universe_data[symbol]
+        length = _validate_data(data)
+        timestamps = list(data["timestamp"])
+        if expected_length is None:
+            expected_length = length
+            expected_timestamps = timestamps
+        elif length != expected_length or timestamps != expected_timestamps:
+            raise ValueError("Cross-sectional bars must share aligned timestamps")
+        copied_data[symbol] = {
+            key: list(values)
+            for key, values in data.items()
+        }
+
+    validation = validate_source("indicator", source)
+    if not validation.valid:
+        messages = "; ".join(item.message for item in validation.diagnostics)
+        raise ValueError(f"Strategy validation failed: {messages}")
+
+    namespace: dict[str, Any] = {
+        "__builtins__": SAFE_BUILTINS,
+        "math": math,
+        "statistics": statistics,
+    }
+    exec(compile(source, "<cross-sectional-strategy>", "exec"), namespace, namespace)
+    output = namespace["run"](copied_data, dict(params))
+    if not isinstance(output, dict) or not isinstance(output.get("scores"), dict):
+        raise ValueError("Cross-sectional strategy must return {'scores': {symbol: values}}")
+
+    raw_scores = output["scores"]
+    if set(raw_scores) != set(copied_data):
+        raise ValueError("Cross-sectional scores must contain every configured symbol exactly once")
+
+    normalized: dict[str, list[float]] = {}
+    for symbol in sorted(copied_data):
+        values = list(raw_scores[symbol])
+        if len(values) != expected_length:
+            raise ValueError(f"{symbol} score length must match bars")
+        scores = [float(value) for value in values]
+        if not all(math.isfinite(value) for value in scores):
+            raise ValueError(f"{symbol} scores must be finite")
+        normalized[symbol] = scores
+    return normalized

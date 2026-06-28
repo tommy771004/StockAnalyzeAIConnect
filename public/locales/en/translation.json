@@ -1273,7 +1273,16 @@
     "backtest": "Queue backtest",
     "refresh": "Refresh result",
     "startPaper": "Start validated paper",
-    "paperStarted": "Paper session started"
+    "paperStarted": "Paper session started",
+    "crossSectional": "Cross-sectional",
+    "crossNeedsSymbols": "Cross-sectional backtests require at least two symbols.",
+    "crossBacktestOnly": "Cross-sectional strategies are backtest-only.",
+    "portfolioSize": "Portfolio size",
+    "longRatio": "Long ratio",
+    "rebalanceFrequency": "Rebalance frequency",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
   },
   "providerProvenance": {
     "title": "Data Provider Provenance",

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CrossSectionalConfigSchema } from '../types/strategyRuntime.js';
 import {
   getStrategyRuntimeService,
   type StartBacktestCommand,
@@ -13,10 +14,19 @@ interface AgentBacktestService {
 
 const AgentBacktestArgsSchema = z.object({
   strategyVersionId: z.string().min(1),
-  ticker: z.string().trim().min(1).max(64),
+  ticker: z.string().trim().min(1).max(64).optional(),
+  crossSectional: CrossSectionalConfigSchema.optional(),
   initialCapital: z.number().positive().optional(),
   startDate: z.string().min(1).optional(),
   endDate: z.string().min(1).optional(),
+}).superRefine((input, context) => {
+  if (!input.ticker && !input.crossSectional) {
+    context.addIssue({
+      code: 'custom',
+      message: 'ticker or crossSectional configuration is required',
+      path: ['ticker'],
+    });
+  }
 });
 
 export async function queueAgentBacktest(
@@ -28,6 +38,7 @@ export async function queueAgentBacktest(
   const command: StartBacktestCommand = {
     strategyVersionId: parsed.strategyVersionId,
     symbol: parsed.ticker,
+    crossSectional: parsed.crossSectional,
     period1: parsed.startDate,
     period2: parsed.endDate,
     execution: parsed.initialCapital
