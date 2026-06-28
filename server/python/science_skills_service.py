@@ -12,8 +12,9 @@ from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
 
 from quantum_signal import compute_quantum_signal
-from strategy_runtime.backtest import run_backtest
+from strategy_runtime.backtest import _choose_intent, run_backtest
 from strategy_runtime.cross_sectional import run_cross_sectional_backtest
+from strategy_runtime.script_runtime import ScriptRunner
 from strategy_runtime.contracts import (
     ENGINE_VERSION,
     StrategyBacktestPayload,
@@ -127,8 +128,6 @@ def strategy_backtest(payload: StrategyBacktestPayload):
 
 @app.post("/strategy/signal")
 def strategy_signal(payload: StrategySignalPayload):
-    if payload.runtime != "indicator":
-        return err("paper signal execution currently supports indicator runtime only")
     validation = validate_source(payload.runtime, payload.source)
     if validation.source_hash != payload.sourceHash:
         return err("source hash mismatch")
@@ -139,20 +138,70 @@ def strategy_signal(payload: StrategySignalPayload):
         )
     try:
         bars = [bar.model_dump() for bar in payload.bars]
-        data = {
-            key: [bar[key] for bar in bars]
-            for key in ("timestamp", "open", "high", "low", "close", "volume")
-        }
-        signals = run_indicator(payload.source, data, payload.parameters)
         last = len(bars) - 1
-        if "buy" in signals:
-            action = "SELL" if signals["sell"][last] else "BUY" if signals["buy"][last] else "HOLD"
+        runtime_state: dict[str, Any] | None = None
+        last_processed: str | None = None
+        allocation_pct: float | None = None
+        runtime_reset = False
+        if payload.runtime == "indicator":
+            data = {
+                key: [bar[key] for bar in bars]
+                for key in ("timestamp", "open", "high", "low", "close", "volume")
+            }
+            signals = run_indicator(payload.source, data, payload.parameters)
+            if "buy" in signals:
+                action = "SELL" if signals["sell"][last] else "BUY" if signals["buy"][last] else "HOLD"
+            else:
+                action = (
+                    "SELL" if signals["close_long"][last]
+                    else "BUY" if signals["open_long"][last]
+                    else "HOLD"
+                )
         else:
-            action = (
-                "SELL" if signals["close_long"][last]
-                else "BUY" if signals["open_long"][last]
-                else "HOLD"
+            runner = ScriptRunner(
+                payload.source,
+                payload.parameters,
+                state=payload.runtimeState if payload.lastProcessedTimestamp else None,
             )
+            start_index = 0
+            if payload.lastProcessedTimestamp is not None:
+                matching = [
+                    index
+                    for index, bar in enumerate(bars)
+                    if bar["timestamp"] == payload.lastProcessedTimestamp
+                ]
+                if not matching:
+                    runner = ScriptRunner(payload.source, payload.parameters)
+                    runtime_reset = True
+                else:
+                    start_index = matching[-1] + 1
+            latest_intents = []
+            for bar in bars[start_index:]:
+                latest_intents = runner.on_bar(
+                    bar,
+                    cash=payload.cash,
+                    equity=payload.equity,
+                    position_side=payload.positionSide,
+                    quantity=payload.quantity,
+                )
+                last_processed = bar["timestamp"]
+            intent = _choose_intent(latest_intents, [])
+            if intent is None:
+                action = "HOLD"
+            elif intent.action == "buy":
+                action = "BUY"
+                allocation_pct = intent.pct
+            elif intent.action == "sell":
+                action = "SELL"
+                allocation_pct = intent.pct
+            elif payload.positionSide == "short":
+                action = "BUY"
+            elif payload.positionSide == "long":
+                action = "SELL"
+            else:
+                action = "HOLD"
+            runtime_state = runner.export_state()
+            last_processed = last_processed or payload.lastProcessedTimestamp
         return ok({
             "strategyVersionId": payload.strategyVersionId,
             "sourceHash": payload.sourceHash,
@@ -162,6 +211,10 @@ def strategy_signal(payload: StrategySignalPayload):
             "confidence": 100 if action != "HOLD" else 0,
             "price": bars[last]["close"],
             "marketTimestamp": bars[last]["timestamp"],
+            **({"runtimeState": runtime_state} if runtime_state is not None else {}),
+            **({"lastProcessedTimestamp": last_processed} if last_processed is not None else {}),
+            **({"allocationPct": allocation_pct} if allocation_pct is not None else {}),
+            **({"runtimeReset": True} if runtime_reset else {}),
         })
     except Exception as exc:  # noqa: BLE001
         return err("strategy signal failed", errors=[str(exc)])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import math
 import statistics
 from typing import Any, Literal
@@ -97,7 +98,12 @@ class RuntimeContext:
 
 
 class ScriptRunner:
-    def __init__(self, source: str, params: dict[str, Any]):
+    def __init__(
+        self,
+        source: str,
+        params: dict[str, Any],
+        state: dict[str, Any] | None = None,
+    ):
         validation = validate_source("script", source)
         if not validation.valid:
             messages = "; ".join(item.message for item in validation.diagnostics)
@@ -113,6 +119,32 @@ class ScriptRunner:
         self.context = RuntimeContext(params)
         namespace["on_init"](self.context)
         self.context._drain_intents()
+        if state is not None:
+            self.context.state = self._normalize_state(state)
+
+    @staticmethod
+    def _normalize_state(state: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(state, dict):
+            raise ValueError("Script runtime state must be an object")
+        try:
+            encoded = json.dumps(
+                state,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Script runtime state must be JSON-serializable") from exc
+        if len(encoded.encode("utf-8")) > 100_000:
+            raise ValueError("Script runtime state exceeds 100000 bytes")
+        decoded = json.loads(encoded)
+        if not isinstance(decoded, dict):
+            raise ValueError("Script runtime state must be an object")
+        return decoded
+
+    def export_state(self) -> dict[str, Any]:
+        return self._normalize_state(self.context.state)
 
     def on_bar(
         self,

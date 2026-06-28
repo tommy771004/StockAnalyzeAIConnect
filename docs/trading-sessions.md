@@ -18,7 +18,8 @@ No API route selects a process-global trading user.
 ## Recovery
 
 `autotrading_configs` persists full config plus broker, risk, position, peak, price,
-equity, log, sentiment, and cooldown state. Startup restores every row whose status is:
+equity, log, sentiment, cooldown, and per-version/per-symbol ScriptStrategy runtime
+cursor state. Startup restores every row whose status is:
 
 ```sql
 status IN ('running', 'cooldown')
@@ -31,7 +32,10 @@ whose `config.userId` differs from its owner is rejected.
 An empty broker-position response never erases protected local average-cost state. This
 preserves proactive stops during transient provider failures.
 
-Migration: `src/db/migrations/0004_trading_session_snapshots.sql`.
+Migrations:
+
+- `src/db/migrations/0004_trading_session_snapshots.sql`
+- `src/db/migrations/0005_script_strategy_runtime_state.sql`
 
 ## Execution order
 

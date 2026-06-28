@@ -19,6 +19,7 @@ import {
   type StrategyValidationRequest,
   type StrategyValidationResult,
   type StrategySignalResult,
+  type StrategySignalRuntimeContext,
 } from '../types/strategyRuntime.js';
 import { sha256Hex, stableJsonHash } from '../utils/hash.js';
 import {
@@ -274,8 +275,11 @@ export class StrategyRuntimeService {
     if (version.validationStatus !== 'valid') {
       throw new Error('Strategy version must be validated before paper execution');
     }
-    if (version.runtime !== 'indicator') {
-      throw new Error('Paper execution currently supports indicator strategy versions only');
+    if (version.runtime === 'script') {
+      const tradeDirection = asRecord(version.executionPolicy).tradeDirection ?? 'long';
+      if (tradeDirection !== 'long') {
+        throw new Error('Paper ScriptStrategy currently supports long-only execution');
+      }
     }
     return version;
   }
@@ -284,6 +288,7 @@ export class StrategyRuntimeService {
     userId: string,
     versionId: string,
     symbol: string,
+    runtimeContext: StrategySignalRuntimeContext = {},
   ): Promise<StrategySignalResult> {
     const version = await this.assertPaperExecutableVersion(userId, versionId);
     const bars = await this.loadBars({
@@ -299,6 +304,12 @@ export class StrategyRuntimeService {
       parameters: asRecord(version.defaultParameters),
       symbol,
       bars,
+      runtimeState: runtimeContext.runtimeState,
+      lastProcessedTimestamp: runtimeContext.lastProcessedTimestamp,
+      cash: runtimeContext.cash,
+      equity: runtimeContext.equity,
+      positionSide: runtimeContext.positionSide,
+      quantity: runtimeContext.quantity,
     });
     return runStrategySignal(request);
   }

@@ -106,3 +106,20 @@ class StrategyBacktestPayload(StrategySource):
 class StrategySignalPayload(StrategySource):
     symbol: str = Field(min_length=1)
     bars: list[Bar] = Field(min_length=2, max_length=10_000)
+    runtimeState: dict[str, Any] = Field(default_factory=dict)
+    lastProcessedTimestamp: str | None = None
+    cash: float = Field(default=0, ge=0)
+    equity: float = Field(default=0, ge=0)
+    positionSide: Literal["long", "short"] | None = None
+    quantity: float = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_runtime_cursor(self):
+        if self.runtime == "script":
+            has_state = bool(self.runtimeState)
+            has_cursor = self.lastProcessedTimestamp is not None
+            if has_state and not has_cursor:
+                raise ValueError(
+                    "Script runtimeState requires lastProcessedTimestamp"
+                )
+        return self

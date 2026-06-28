@@ -396,6 +396,7 @@ export const autotradingConfigs = pgTable('autotrading_configs', {
   riskState:       jsonb('risk_state'),
   peakPriceTrack:  jsonb('peak_price_track'),
   recentPriceSeries: jsonb('recent_price_series'),
+  strategyRuntimeState: jsonb('strategy_runtime_state'),
   sessionLogs:     jsonb('session_logs'),
   cooldownUntil:   timestamp('cooldown_until'),
   lastSentimentScore: bigint('last_sentiment_score', { mode: 'number' }),

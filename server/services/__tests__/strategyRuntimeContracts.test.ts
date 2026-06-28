@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   StrategyBacktestRequestSchema,
+  StrategySignalRequestSchema,
   StrategyValidationRequestSchema,
 } from '../../types/strategyRuntime.js';
 
@@ -114,6 +115,43 @@ describe('strategy runtime contracts', () => {
         rebalanceFrequency: 'daily',
       },
       execution: {},
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a durable ScriptStrategy signal cursor and account snapshot', () => {
+    const parsed = StrategySignalRequestSchema.safeParse({
+      strategyVersionId: 'version-script-1',
+      runtime: 'script',
+      source: 'def on_init(ctx): pass\ndef on_bar(ctx, bar): pass',
+      sourceHash: 'e'.repeat(64),
+      parameters: {},
+      symbol: 'AAPL',
+      bars: [
+        {
+          timestamp: '2026-01-01T00:00:00.000Z',
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100,
+          volume: 100,
+        },
+        {
+          timestamp: '2026-01-02T00:00:00.000Z',
+          open: 101,
+          high: 102,
+          low: 100,
+          close: 101,
+          volume: 100,
+        },
+      ],
+      runtimeState: { seen: 1 },
+      lastProcessedTimestamp: '2026-01-01T00:00:00.000Z',
+      cash: 9_000,
+      equity: 10_000,
+      positionSide: 'long',
+      quantity: 10,
     });
 
     expect(parsed.success).toBe(true);

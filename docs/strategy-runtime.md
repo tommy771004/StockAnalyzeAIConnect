@@ -227,8 +227,9 @@ Agent token's market and instrument allowlists before data loading.
 
 ## Paper signal execution
 
-Validated immutable `indicator` versions can run in an isolated paper session. Each tick
-loads normalized 15-minute OHLCV through the provider registry and calls:
+Validated immutable `indicator` and long-only `script` versions can run in an isolated
+paper session. Each tick loads normalized 15-minute OHLCV through the provider registry
+and calls:
 
 ```http
 POST /strategy/signal
@@ -238,8 +239,15 @@ The response must preserve strategy version ID, source hash, symbol, engine vers
 market timestamp. Hermes rejects mismatched identity or stale data before creating an
 order. The signal then enters the same stop/risk/order pipeline as built-in signals.
 
-Stateful `script` versions remain backtest-only until their context can be durably
-snapshotted and restored across paper ticks; paper start rejects them explicitly.
+For `script`, the restricted JSON `ctx.state` and last processed bar timestamp are stored
+per `(user, immutable version, symbol)` inside the trading-session snapshot. A repeated
+bar returns `HOLD`, so retries and restarts cannot duplicate an order. Missed bars warm
+the state without replaying historical orders; only the newest unseen bar may emit an
+intent. If a long-paused cursor falls outside the loaded window, the runtime explicitly
+resets and emits an operator warning. `ctx.buy(pct)` is bounded by the existing per-trade
+allocation limit. Short-capable script policies remain rejected because the simulated
+broker does not support naked short inventory.
+
 Cross-sectional ranking versions are also backtest-only until portfolio-level rebalance
 state can be restored atomically across ticks.
 
@@ -264,12 +272,17 @@ npm run lint
 npm run build
 ```
 
-The database migration is `src/db/migrations/0002_strategy_runtime.sql`. Apply it to the
-target Postgres database before using version or job routes.
+Database migrations:
+
+- `src/db/migrations/0002_strategy_runtime.sql` — immutable versions and backtest jobs.
+- `src/db/migrations/0005_script_strategy_runtime_state.sql` — durable ScriptStrategy
+  paper cursors.
+
+Apply them to the target Postgres database before using these routes.
 
 ## Safety status
 
-This phase enables deterministic backtesting and isolated indicator-version paper
-execution. It does not enable real-money strategy execution or replace the simulated
-broker. Broker adapters remain subject to independent sandbox verification and operator
-acknowledgment.
+This phase enables deterministic backtesting plus isolated indicator and long-only script
+paper execution. It does not enable real-money strategy execution or replace the
+simulated broker. Broker adapters remain subject to independent sandbox verification and
+operator acknowledgment.

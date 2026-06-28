@@ -13,6 +13,10 @@ import {
 
 type PositionTrack = { avgCost: number; qty: number };
 type LogInput = Omit<AgentLog, 'id' | 'timestamp'> & Partial<Pick<AgentLog, 'id' | 'timestamp'>>;
+export interface PersistedStrategyRuntimeState {
+  runtimeState: Record<string, unknown>;
+  lastProcessedTimestamp: string;
+}
 
 export interface TradingSessionSnapshot {
   userId: string;
@@ -25,6 +29,7 @@ export interface TradingSessionSnapshot {
   recentPriceSeries: Array<[string, number[]]>;
   posTrack: Array<[string, PositionTrack]>;
   peakPriceTrack: Array<[string, number]>;
+  strategyRuntimeStates: Array<[string, PersistedStrategyRuntimeState]>;
   lossStreakCount: number;
   risk: RiskManagerSnapshot;
   paperBroker: SimulatedBrokerSnapshot;
@@ -61,6 +66,7 @@ function validateSnapshot(snapshot: TradingSessionSnapshot): void {
     'recentPriceSeries',
     'posTrack',
     'peakPriceTrack',
+    'strategyRuntimeStates',
   ] as const) {
     if (!Array.isArray(snapshot[field])) {
       throw new Error(`Invalid trading session snapshot field: ${field}`);
@@ -88,6 +94,26 @@ function validateSnapshot(snapshot: TradingSessionSnapshot): void {
       throw new Error('Invalid trading session snapshot field: peakPriceTrack');
     }
   }
+  if (snapshot.strategyRuntimeStates.length > 500) {
+    throw new Error('Invalid trading session snapshot field: strategyRuntimeStates');
+  }
+  for (const [key, cursor] of snapshot.strategyRuntimeStates) {
+    if (
+      !key
+      || !cursor?.lastProcessedTimestamp
+      || !cursor.runtimeState
+      || typeof cursor.runtimeState !== 'object'
+      || Array.isArray(cursor.runtimeState)
+    ) {
+      throw new Error('Invalid trading session snapshot field: strategyRuntimeStates');
+    }
+    try {
+      const encoded = JSON.stringify(cursor.runtimeState);
+      if (encoded.length > 100_000) throw new Error('state too large');
+    } catch {
+      throw new Error('Invalid trading session snapshot field: strategyRuntimeStates');
+    }
+  }
   if (
     snapshot.cooldownUntil
     && !Number.isFinite(new Date(snapshot.cooldownUntil).getTime())
@@ -108,6 +134,7 @@ export class TradingSessionState {
   readonly recentPriceSeries = new Map<string, number[]>();
   readonly posTrack = new Map<string, PositionTrack>();
   readonly peakPriceTrack = new Map<string, number>();
+  readonly strategyRuntimeStates = new Map<string, PersistedStrategyRuntimeState>();
   lossStreakCount = 0;
   cooldownUntil: string | null = null;
   syncInProgress = false;
@@ -180,6 +207,10 @@ export class TradingSessionState {
         ([symbol, position]) => [symbol, { ...position }],
       ),
       peakPriceTrack: Array.from(this.peakPriceTrack),
+      strategyRuntimeStates: Array.from(
+        this.strategyRuntimeStates,
+        ([key, cursor]) => [key, structuredClone(cursor)],
+      ),
       lossStreakCount: this.lossStreakCount,
       risk: this.riskManager.exportState(),
       paperBroker: this.paperBroker.exportState(),
@@ -208,6 +239,9 @@ export class TradingSessionState {
     }
     for (const [symbol, price] of snapshot.peakPriceTrack) {
       state.peakPriceTrack.set(symbol, price);
+    }
+    for (const [key, cursor] of snapshot.strategyRuntimeStates) {
+      state.strategyRuntimeStates.set(key, structuredClone(cursor));
     }
     state.lossStreakCount = snapshot.lossStreakCount;
     state.cooldownUntil = snapshot.cooldownUntil ?? null;

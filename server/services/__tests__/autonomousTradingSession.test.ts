@@ -66,6 +66,62 @@ describe('AutonomousTradingSession lifecycle', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('persists and reuses ScriptStrategy runtime cursors across ticks', async () => {
+    const evaluateStrategyVersion = vi.fn(async (input) => ({
+      strategyVersionId: input.versionId,
+      sourceHash: 'a'.repeat(64),
+      engineVersion: 'hermes-quant-1',
+      symbol: input.symbol,
+      action: 'HOLD' as const,
+      confidence: 0,
+      price: 100,
+      marketTimestamp: '2026-01-02T00:00:00.000Z',
+      runtimeState: { seen: (input.runtimeContext.runtimeState?.seen as number ?? 0) + 1 },
+      lastProcessedTimestamp: '2026-01-02T00:00:00.000Z',
+    }));
+    const { state, session, persist } = createSession('user-a', {
+      analyze: undefined,
+      evaluateStrategyVersion,
+    });
+    state.strategyRuntimeStates.set('old-version:AAPL', {
+      runtimeState: { stale: true },
+      lastProcessedTimestamp: '2025-01-01T00:00:00.000Z',
+    });
+    await session.start({
+      symbols: ['AAPL'],
+      strategyVersionId: 'version-script-1',
+    }, { runImmediately: false });
+    expect(state.strategyRuntimeStates.has('old-version:AAPL')).toBe(false);
+    persist.mockClear();
+
+    await session.runTick();
+    await session.runTick();
+
+    expect(evaluateStrategyVersion).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        runtimeContext: expect.objectContaining({
+          runtimeState: undefined,
+          lastProcessedTimestamp: undefined,
+        }),
+      }),
+    );
+    expect(evaluateStrategyVersion).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        runtimeContext: expect.objectContaining({
+          runtimeState: { seen: 1 },
+          lastProcessedTimestamp: '2026-01-02T00:00:00.000Z',
+        }),
+      }),
+    );
+    expect(state.strategyRuntimeStates.get('version-script-1:AAPL')).toEqual({
+      runtimeState: { seen: 2 },
+      lastProcessedTimestamp: '2026-01-02T00:00:00.000Z',
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+  });
+
   it('resumes after a scoped cooldown without changing another session', async () => {
     vi.useFakeTimers();
     const a = createSession('user-a');

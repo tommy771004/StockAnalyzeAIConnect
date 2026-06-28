@@ -134,6 +134,24 @@ export const StrategyBacktestRequestSchema = StrategySourceSchema.extend({
 export const StrategySignalRequestSchema = StrategySourceSchema.extend({
   symbol: z.string().min(1),
   bars: z.array(BarSchema).min(2).max(10_000),
+  runtimeState: z.record(z.string(), z.unknown()).default({}),
+  lastProcessedTimestamp: z.string().min(1).optional(),
+  cash: z.number().finite().nonnegative().default(0),
+  equity: z.number().finite().nonnegative().default(0),
+  positionSide: z.enum(['long', 'short']).nullable().default(null),
+  quantity: z.number().finite().nonnegative().default(0),
+}).superRefine((request, context) => {
+  if (
+    request.runtime === 'script'
+    && Object.keys(request.runtimeState).length > 0
+    && !request.lastProcessedTimestamp
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Script runtimeState requires lastProcessedTimestamp',
+      path: ['lastProcessedTimestamp'],
+    });
+  }
 });
 
 export const StrategySignalResultSchema = z.object({
@@ -145,12 +163,24 @@ export const StrategySignalResultSchema = z.object({
   confidence: z.number().min(0).max(100),
   price: z.number().finite().positive(),
   marketTimestamp: z.string().min(1),
+  runtimeState: z.record(z.string(), z.unknown()).optional(),
+  lastProcessedTimestamp: z.string().min(1).optional(),
+  allocationPct: z.number().positive().max(1).optional(),
+  runtimeReset: z.boolean().optional(),
 });
 
 export type StrategyValidationRequest = z.input<typeof StrategyValidationRequestSchema>;
 export type StrategyBacktestRequest = z.input<typeof StrategyBacktestRequestSchema>;
 export type StrategySignalRequest = z.input<typeof StrategySignalRequestSchema>;
 export type StrategySignalResult = z.infer<typeof StrategySignalResultSchema>;
+export interface StrategySignalRuntimeContext {
+  runtimeState?: Record<string, unknown>;
+  lastProcessedTimestamp?: string;
+  cash?: number;
+  equity?: number;
+  positionSide?: 'long' | 'short' | null;
+  quantity?: number;
+}
 
 export const StrategyDiagnosticSchema = z.object({
   code: z.string().min(1),

@@ -9,6 +9,7 @@ sys.path.insert(0, str(PYTHON_ROOT))
 from strategy_runtime.indicator_runtime import run_indicator
 from strategy_runtime.backtest import run_backtest
 from strategy_runtime.cross_sectional import run_cross_sectional_backtest
+from strategy_runtime.script_runtime import ScriptRunner
 from strategy_runtime.validator import validate_source
 
 
@@ -148,6 +149,36 @@ class StrategyRuntimeTests(unittest.TestCase):
         self.assertEqual(trade["exitPrice"], 103)
         self.assertGreater(trade["fees"], 0)
         self.assertLess(trade["netPnl"], trade["grossPnl"])
+
+    def test_script_runner_restores_json_state_across_processes(self):
+        source = (
+            "def on_init(ctx):\n"
+            "    ctx.state['seen'] = 0\n"
+            "def on_bar(ctx, bar):\n"
+            "    ctx.state['seen'] += 1\n"
+            "    if ctx.state['seen'] == 2:\n"
+            "        ctx.buy(0.25)\n"
+        )
+        first = ScriptRunner(source, {})
+        self.assertEqual(first.on_bar(
+            {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            cash=10_000,
+            equity=10_000,
+            position_side=None,
+            quantity=0,
+        ), [])
+
+        restored = ScriptRunner(source, {}, state=first.export_state())
+        intents = restored.on_bar(
+            {"timestamp": "2", "open": 101, "high": 102, "low": 100, "close": 101, "volume": 1000},
+            cash=10_000,
+            equity=10_000,
+            position_side=None,
+            quantity=0,
+        )
+
+        self.assertEqual(restored.export_state(), {"seen": 2})
+        self.assertEqual([(intent.action, intent.pct) for intent in intents], [("buy", 0.25)])
 
     def test_engine_stop_loss_precedes_queued_strategy_exit(self):
         source = (

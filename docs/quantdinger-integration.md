@@ -26,6 +26,7 @@ Upstream license statements:
 | Indicator and Script strategy models | Restricted immutable Python runtimes with validation and deterministic backtests | `server/python/strategy_runtime/*`, `server/services/strategyRuntimeService.ts` |
 | Cross-sectional ranking strategies | Multi-symbol IndicatorStrategy scoring, aligned-universe validation, top/bottom equal-weight portfolios, and daily/weekly/monthly next-open rebalancing | `server/python/strategy_runtime/cross_sectional.py`, `server/types/strategyRuntime.ts` |
 | Signal on current data | Validated indicator versions execute through `/strategy/signal` on normalized 15m OHLCV before the paper risk pipeline | `server/python/science_skills_service.py`, `server/services/quantRuntimeClient.ts` |
+| Stateful ScriptStrategy paper execution | JSON runtime state and bar cursors persist per user/version/symbol; duplicate bars HOLD, long gaps reset visibly, and long-only intents enter the same risk/order pipeline | `server/python/strategy_runtime/script_runtime.py`, `server/services/tradingSessionState.ts` |
 | Idea → version → validate → backtest | User-owned immutable versions, source/data hashes, queued jobs, diagnostics, and result inspection | `server/api/strategies.ts`, `src/db/migrations/0002_strategy_runtime.sql` |
 | Provider registry | Attributable providers with operation/market capabilities, timeout, rate limit, circuit breaker, cache, freshness, and health | `server/data/*`, `server/api/dataSources.ts` |
 | AI research and agent tools | Evidence-first tool registry, concurrent quote/news/fundamental research, collision-free structured citations, prompt versions, memory/evidence separation | `server/ai/*`, `docs/ai-evidence.md` |
@@ -42,9 +43,9 @@ Upstream license statements:
 - Real KGI, Sinopac, and Yuanta adapters remain disabled until independent signed
   sandbox verification. Upstream live-broker capability is not treated as authorization
   to enable local placeholders.
-- Paper execution currently accepts immutable `indicator` versions. Stateful `script`
-  versions remain supported for deterministic backtests but are rejected before paper
-  start until durable runtime context can be restored safely across ticks.
+- Paper execution accepts immutable indicator and long-only ScriptStrategy versions.
+  Short-capable scripts remain rejected because the simulated adapter has no naked-short
+  inventory model.
 
 ## Data and AI sources
 

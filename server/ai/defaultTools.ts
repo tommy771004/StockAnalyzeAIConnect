@@ -265,23 +265,10 @@ export function createDefaultAgentTools(
         type: 'object',
         properties: {
           ticker: { type: 'string' },
-          crossSectional: {
-            type: 'object',
-            properties: {
-              symbols: { type: 'array', items: { type: 'string' }, minItems: 2 },
-              portfolioSize: { type: 'number' },
-              longRatio: { type: 'number' },
-              rebalanceFrequency: {
-                type: 'string',
-                enum: ['daily', 'weekly', 'monthly'],
-              },
-            },
-            required: ['symbols', 'portfolioSize', 'longRatio', 'rebalanceFrequency'],
-          },
           strategyVersionId: { type: 'string' },
           paperOnly: { type: 'boolean', const: true },
         },
-        required: ['strategyVersionId'],
+        required: ['ticker', 'strategyVersionId'],
       },
     },
     input: StartPaperStrategyInputSchema,
@@ -717,12 +704,25 @@ export function createDefaultAgentTools(
         type: 'object',
         properties: {
           ticker: { type: 'string' },
+          crossSectional: {
+            type: 'object',
+            properties: {
+              symbols: { type: 'array', items: { type: 'string' }, minItems: 2 },
+              portfolioSize: { type: 'number' },
+              longRatio: { type: 'number' },
+              rebalanceFrequency: {
+                type: 'string',
+                enum: ['daily', 'weekly', 'monthly'],
+              },
+            },
+            required: ['symbols', 'portfolioSize', 'longRatio', 'rebalanceFrequency'],
+          },
           strategyVersionId: { type: 'string' },
           initialCapital: { type: 'number' },
           startDate: { type: 'string' },
           endDate: { type: 'string' },
         },
-        required: ['ticker', 'strategyVersionId'],
+        required: ['strategyVersionId'],
       },
     },
     input: BacktestInputSchema,

@@ -160,6 +160,80 @@ class StrategyApiTests(unittest.TestCase):
         self.assertEqual(response["data"]["sourceHash"], source_hash)
         self.assertEqual(response["data"]["price"], 101)
 
+    def test_script_signal_restores_state_and_deduplicates_the_last_bar(self):
+        source = (
+            "def on_init(ctx):\n"
+            "    ctx.state['seen'] = 0\n"
+            "def on_bar(ctx, bar):\n"
+            "    ctx.state['seen'] += 1\n"
+            "    if ctx.state['seen'] == 2:\n"
+            "        ctx.buy(0.25)\n"
+        )
+        source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        bars = [
+            {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+            {"timestamp": "2", "open": 101, "high": 102, "low": 100, "close": 101, "volume": 1000},
+        ]
+        first = strategy_signal(StrategySignalPayload(
+            strategyVersionId="version-script-1",
+            runtime="script",
+            source=source,
+            sourceHash=source_hash,
+            parameters={},
+            symbol="AAPL",
+            bars=bars,
+            cash=10_000,
+            equity=10_000,
+            positionSide=None,
+            quantity=0,
+        ))
+
+        self.assertEqual(first["status"], "success")
+        self.assertEqual(first["data"]["action"], "BUY")
+        self.assertEqual(first["data"]["allocationPct"], 0.25)
+        self.assertEqual(first["data"]["runtimeState"], {"seen": 2})
+        self.assertEqual(first["data"]["lastProcessedTimestamp"], "2")
+
+        duplicate = strategy_signal(StrategySignalPayload(
+            strategyVersionId="version-script-1",
+            runtime="script",
+            source=source,
+            sourceHash=source_hash,
+            parameters={},
+            symbol="AAPL",
+            bars=bars,
+            runtimeState=first["data"]["runtimeState"],
+            lastProcessedTimestamp=first["data"]["lastProcessedTimestamp"],
+            cash=10_000,
+            equity=10_000,
+            positionSide=None,
+            quantity=0,
+        ))
+
+        self.assertEqual(duplicate["status"], "success")
+        self.assertEqual(duplicate["data"]["action"], "HOLD")
+        self.assertEqual(duplicate["data"]["runtimeState"], {"seen": 2})
+
+        reset = strategy_signal(StrategySignalPayload(
+            strategyVersionId="version-script-1",
+            runtime="script",
+            source=source,
+            sourceHash=source_hash,
+            parameters={},
+            symbol="AAPL",
+            bars=bars,
+            runtimeState={"seen": 99},
+            lastProcessedTimestamp="outside-window",
+            cash=10_000,
+            equity=10_000,
+            positionSide=None,
+            quantity=0,
+        ))
+
+        self.assertEqual(reset["status"], "success")
+        self.assertTrue(reset["data"]["runtimeReset"])
+        self.assertEqual(reset["data"]["runtimeState"], {"seen": 2})
+
 
 if __name__ == "__main__":
     unittest.main()

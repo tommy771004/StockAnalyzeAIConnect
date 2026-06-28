@@ -13,6 +13,10 @@ import {
   TradingSessionState,
   type TradingSessionSnapshot,
 } from './tradingSessionState.js';
+import type {
+  StrategySignalResult,
+  StrategySignalRuntimeContext,
+} from '../types/strategyRuntime.js';
 
 export interface SessionAnalysisSignal {
   action: 'BUY' | 'SELL' | 'HOLD';
@@ -27,6 +31,7 @@ export interface SessionAnalysisSignal {
   marketTimestamp?: string;
   dataProvenance?: ExecutionDataProvenance;
   maxDataAgeMs?: number;
+  allocationPct?: number;
 }
 
 export interface AutonomousTradingSessionDependencies {
@@ -38,6 +43,12 @@ export interface AutonomousTradingSessionDependencies {
   persist?: (snapshot: TradingSessionSnapshot) => Promise<void>;
   publish?: (event: { type: string; data: unknown }) => void;
   isMarketOpen?: (config: AgentConfig) => boolean;
+  evaluateStrategyVersion?: (input: {
+    userId: string;
+    versionId: string;
+    symbol: string;
+    runtimeContext: StrategySignalRuntimeContext;
+  }) => Promise<StrategySignalResult>;
 }
 
 type StartOptions = { runImmediately?: boolean };
@@ -66,6 +77,9 @@ export class AutonomousTradingSession {
   private readonly persist: NonNullable<AutonomousTradingSessionDependencies['persist']>;
   private readonly publish: NonNullable<AutonomousTradingSessionDependencies['publish']>;
   private readonly isMarketOpen: NonNullable<AutonomousTradingSessionDependencies['isMarketOpen']>;
+  private readonly evaluateStrategyVersion: NonNullable<
+    AutonomousTradingSessionDependencies['evaluateStrategyVersion']
+  >;
   private readonly executor: OrderExecutor;
   private persistChain: Promise<void> = Promise.resolve();
 
@@ -78,6 +92,15 @@ export class AutonomousTradingSession {
     this.publish = dependencies.publish ?? (() => undefined);
     this.isMarketOpen = dependencies.isMarketOpen
       ?? ((config) => anyMarketOpen(config.symbols, config.tradingHours));
+    this.evaluateStrategyVersion = dependencies.evaluateStrategyVersion ?? (async (input) => {
+      const { getStrategyRuntimeService } = await import('./strategyRuntimeService.js');
+      return getStrategyRuntimeService().evaluateVersionSignal(
+        input.userId,
+        input.versionId,
+        input.symbol,
+        input.runtimeContext,
+      );
+    });
     this.executor = new OrderExecutor(
       state.paperBroker,
       state.paperBroker,
@@ -93,6 +116,7 @@ export class AutonomousTradingSession {
   ): Promise<{ ok: true; mode: 'simulated' }> {
     this.clearTimer();
     this.state.config = mergeConfig(this.state.config, config);
+    this.pruneStrategyRuntimeStates();
     if (this.state.config.mode === 'real') {
       this.state.config.mode = 'simulated';
       this.emitLog({
@@ -377,7 +401,12 @@ export class AutonomousTradingSession {
     const totalAssets = brokerState.balance + portfolioValue;
     const qty = signal.action === 'SELL'
       ? (this.state.posTrack.get(symbol)?.qty ?? 0)
-      : this.calculateBuyQuantity(symbol, price, brokerState.balance);
+      : this.calculateBuyQuantity(
+          symbol,
+          price,
+          brokerState.balance,
+          signal.allocationPct,
+        );
     if (qty <= 0) return;
 
     const positions = Array.from(this.state.posTrack, ([heldSymbol, position]) => ({
@@ -421,12 +450,18 @@ export class AutonomousTradingSession {
     this.applyFill(symbol, signal.action, result.filledQty, result.filledPrice);
   }
 
-  private calculateBuyQuantity(symbol: string, price: number, available: number): number {
+  private calculateBuyQuantity(
+    symbol: string,
+    price: number,
+    available: number,
+    allocationPct?: number,
+  ): number {
     const configured = this.state.config.params.maxAllocationPerTrade ?? 0.1;
     const maxAmount = configured <= 1
       ? this.state.config.budgetLimitTWD * configured
       : configured;
-    const amount = Math.min(available * 0.1, maxAmount);
+    const requestedFraction = allocationPct ?? 0.1;
+    const amount = Math.min(available * requestedFraction, maxAmount);
     if (/\.(TW|TWO)$/i.test(symbol)) {
       return Math.floor(amount / (price * 1_000)) * 1_000;
     }
@@ -504,12 +539,42 @@ export class AutonomousTradingSession {
     symbol: string;
   }): Promise<SessionAnalysisSignal> {
     if (input.config.strategyVersionId) {
-      const { getStrategyRuntimeService } = await import('./strategyRuntimeService.js');
-      const signal = await getStrategyRuntimeService().evaluateVersionSignal(
-        input.userId,
+      const runtimeKey = this.strategyRuntimeKey(
         input.config.strategyVersionId,
         input.symbol,
       );
+      const cursor = this.state.strategyRuntimeStates.get(runtimeKey);
+      const brokerState = this.state.paperBroker.exportState();
+      const portfolioValue = Array.from(this.state.posTrack.values())
+        .reduce((sum, position) => sum + position.qty * position.avgCost, 0);
+      const position = this.state.posTrack.get(input.symbol);
+      const signal = await this.evaluateStrategyVersion({
+        userId: input.userId,
+        versionId: input.config.strategyVersionId,
+        symbol: input.symbol,
+        runtimeContext: {
+          runtimeState: cursor?.runtimeState,
+          lastProcessedTimestamp: cursor?.lastProcessedTimestamp,
+          cash: brokerState.balance,
+          equity: brokerState.balance + portfolioValue,
+          positionSide: position?.qty ? 'long' : null,
+          quantity: position?.qty ?? 0,
+        },
+      });
+      if (signal.runtimeState && signal.lastProcessedTimestamp) {
+        this.state.strategyRuntimeStates.set(runtimeKey, {
+          runtimeState: structuredClone(signal.runtimeState),
+          lastProcessedTimestamp: signal.lastProcessedTimestamp,
+        });
+      }
+      if (signal.runtimeReset) {
+        this.emitLog({
+          level: 'WARNING',
+          source: 'STRATEGY_RUNTIME',
+          symbol: input.symbol,
+          message: 'ScriptStrategy cursor 已超出行情視窗；已重新 warm-up 並建立新狀態。',
+        });
+      }
       return {
         action: signal.action,
         confidence: signal.confidence,
@@ -517,6 +582,7 @@ export class AutonomousTradingSession {
         decisionId: `${signal.strategyVersionId}-${input.symbol}-${signal.marketTimestamp}`,
         evidenceIds: [`strategy:${signal.sourceHash}`, `market:${input.symbol}:${signal.marketTimestamp}`],
         marketTimestamp: signal.marketTimestamp,
+        allocationPct: signal.allocationPct,
         dataProvenance: {
           providerId: `hermes-strategy-runtime:${signal.engineVersion}`,
           retrievedAt: new Date().toISOString(),
@@ -561,6 +627,22 @@ export class AutonomousTradingSession {
         message,
       }),
     });
+  }
+
+  private strategyRuntimeKey(versionId: string, symbol: string): string {
+    return `${versionId}:${symbol.toUpperCase()}`;
+  }
+
+  private pruneStrategyRuntimeStates(): void {
+    const versionId = this.state.config.strategyVersionId;
+    const allowed = new Set(
+      versionId
+        ? this.state.config.symbols.map((symbol) => this.strategyRuntimeKey(versionId, symbol))
+        : [],
+    );
+    for (const key of this.state.strategyRuntimeStates.keys()) {
+      if (!allowed.has(key)) this.state.strategyRuntimeStates.delete(key);
+    }
   }
 
   private emitLog(log: Omit<AgentLog, 'id' | 'timestamp'>): void {

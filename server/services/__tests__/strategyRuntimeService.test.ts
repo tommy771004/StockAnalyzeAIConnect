@@ -290,4 +290,33 @@ describe('StrategyRuntimeService', () => {
       },
     }));
   });
+
+  it('allows long-only ScriptStrategy paper execution and rejects short-capable policy', async () => {
+    const service = new StrategyRuntimeService({
+      repo: fakeRepo({
+        getVersionForUser: vi.fn(async (_userId, versionId) => (
+          versionId === 'long-script'
+            ? version({
+                id: versionId,
+                runtime: 'script',
+                executionPolicy: { tradeDirection: 'long' },
+              })
+            : version({
+                id: versionId,
+                runtime: 'script',
+                executionPolicy: { tradeDirection: 'both' },
+              })
+        )),
+      }),
+      loadBars: vi.fn(async () => bars),
+      validate: vi.fn(),
+      backtest: vi.fn(),
+      schedule: vi.fn(),
+    });
+
+    await expect(service.assertPaperExecutableVersion('user-1', 'long-script'))
+      .resolves.toMatchObject({ runtime: 'script' });
+    await expect(service.assertPaperExecutableVersion('user-1', 'both-script'))
+      .rejects.toThrow('long-only');
+  });
 });

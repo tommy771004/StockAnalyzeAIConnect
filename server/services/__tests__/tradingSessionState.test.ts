@@ -12,6 +12,10 @@ describe('TradingSessionState isolation', () => {
     userA.config.symbols = ['AAPL'];
     userA.posTrack.set('AAPL', { qty: 10, avgCost: 100 });
     userA.peakPriceTrack.set('AAPL', 110);
+    userA.strategyRuntimeStates.set('version-1:AAPL', {
+      runtimeState: { seen: 1 },
+      lastProcessedTimestamp: '2026-01-01T00:00:00.000Z',
+    });
     userA.lossStreakCount = 2;
     userA.riskManager.activateKillSwitch();
     userA.appendLog({
@@ -32,6 +36,7 @@ describe('TradingSessionState isolation', () => {
     expect(userB.config.symbols).not.toContain('AAPL');
     expect(userB.posTrack.size).toBe(0);
     expect(userB.peakPriceTrack.size).toBe(0);
+    expect(userB.strategyRuntimeStates.size).toBe(0);
     expect(userB.lossStreakCount).toBe(0);
     expect(userB.riskManager.isKillSwitchActive()).toBe(false);
     expect(userB.logs()).toEqual([]);
@@ -49,6 +54,10 @@ describe('TradingSessionState snapshots', () => {
     original.status = 'cooldown';
     original.posTrack.set('AAPL', { qty: 10, avgCost: 100 });
     original.peakPriceTrack.set('AAPL', 112);
+    original.strategyRuntimeStates.set('version-1:AAPL', {
+      runtimeState: { seen: 12, nested: { armed: true } },
+      lastProcessedTimestamp: '2026-01-02T00:00:00.000Z',
+    });
     original.lossStreakCount = 3;
     original.equityHistory.push({
       timestamp: '2026-01-02T00:00:00.000Z',
@@ -73,6 +82,10 @@ describe('TradingSessionState snapshots', () => {
     expect(restored.status).toBe('cooldown');
     expect(restored.posTrack.get('AAPL')).toEqual({ qty: 10, avgCost: 100 });
     expect(restored.peakPriceTrack.get('AAPL')).toBe(112);
+    expect(restored.strategyRuntimeStates.get('version-1:AAPL')).toEqual({
+      runtimeState: { seen: 12, nested: { armed: true } },
+      lastProcessedTimestamp: '2026-01-02T00:00:00.000Z',
+    });
     expect(restored.lossStreakCount).toBe(3);
     expect(restored.riskManager.getStats().dailyLoss).toBe(100_000);
     expect(restored.riskManager.isKillSwitchActive()).toBe(true);

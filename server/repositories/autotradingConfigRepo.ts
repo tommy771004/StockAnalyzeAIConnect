@@ -61,6 +61,8 @@ function snapshotFromRow(row: AutotradingConfig): TradingSessionSnapshot {
     posTrack,
     peakPriceTrack:
       (row.peakPriceTrack as TradingSessionSnapshot['peakPriceTrack'] | null) ?? [],
+    strategyRuntimeStates:
+      (row.strategyRuntimeState as TradingSessionSnapshot['strategyRuntimeStates'] | null) ?? [],
     lossStreakCount: row.lossStreakCount,
     risk,
     paperBroker:
@@ -151,6 +153,7 @@ export const autotradingConfigRepo = {
       riskState: snapshot.risk,
       peakPriceTrack: snapshot.peakPriceTrack,
       recentPriceSeries: snapshot.recentPriceSeries,
+      strategyRuntimeState: snapshot.strategyRuntimeStates,
       sessionLogs: snapshot.logs,
       cooldownUntil: snapshot.cooldownUntil ? new Date(snapshot.cooldownUntil) : null,
       lastSentimentScore: snapshot.lastSentimentScore,

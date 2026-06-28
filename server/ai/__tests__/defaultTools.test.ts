@@ -22,6 +22,28 @@ function context(scopes: Array<'R' | 'W' | 'B' | 'T'> = ['R', 'B']) {
 }
 
 describe('default agent tools', () => {
+  it('describes cross-sectional input only on backtests, never paper start', () => {
+    const tools = createDefaultAgentTools({
+      resolveData: vi.fn() as never,
+      getPortfolio: async () => [],
+      getTrades: async () => [],
+      queueBacktest: async () => ({ jobId: 'job-1', status: 'queued' }),
+    });
+    const paperSchema = tools.describe('start_paper_strategy').inputSchema as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+    const backtestSchema = tools.describe('execute_backtest').inputSchema as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+
+    expect(paperSchema.properties).not.toHaveProperty('crossSectional');
+    expect(paperSchema.required).toEqual(['ticker', 'strategyVersionId']);
+    expect(backtestSchema.properties).toHaveProperty('crossSectional');
+    expect(backtestSchema.required).toEqual(['strategyVersionId']);
+  });
+
   it('propagates provider provenance into stock-chart evidence', async () => {
     const resolveData = vi.fn(async () => ({
       request: {},
