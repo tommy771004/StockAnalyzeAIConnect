@@ -1271,7 +1271,9 @@
     "validate": "Validate",
     "valid": "Valid",
     "backtest": "Queue backtest",
-    "refresh": "Refresh result"
+    "refresh": "Refresh result",
+    "startPaper": "Start validated paper",
+    "paperStarted": "Paper session started"
   },
   "providerProvenance": {
     "title": "Data Provider Provenance",

@@ -46,7 +46,7 @@ import {
   agentV1Router,
 } from './server/api/agentV1.js';
 import { agentAuthMiddleware } from './server/middleware/agentAuth.js';
-import { configureStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
+import { configureStrategyRuntimeService, getStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
 import { createRegistryBarLoader } from './server/services/registryBarLoader.js';
 import {
   configureDataRegistry,
@@ -658,7 +658,12 @@ function isMarketOpen(symbol: string): boolean {
 app.use(
   '/api/autotrading',
   authMiddleware,
-  createAutotradingSessionsRouter({ registry: tradingSessionRegistry }),
+  createAutotradingSessionsRouter({
+    registry: tradingSessionRegistry,
+    assertPaperExecutableVersion: (userId, versionId) => (
+      getStrategyRuntimeService().assertPaperExecutableVersion(userId, versionId)
+    ),
+  }),
 );
 
 app.get('/api/autotrading/realtime/meta', authMiddleware, (req: AuthRequest, res) => {

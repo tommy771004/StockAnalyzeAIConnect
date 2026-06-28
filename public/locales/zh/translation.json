@@ -1142,7 +1142,9 @@
     "validate": "驗證",
     "valid": "驗證通過",
     "backtest": "排程回測",
-    "refresh": "更新結果"
+    "refresh": "更新結果",
+    "startPaper": "啟動已驗證模擬策略",
+    "paperStarted": "模擬策略已啟動"
   },
   "providerProvenance": {
     "title": "資料來源與追溯",

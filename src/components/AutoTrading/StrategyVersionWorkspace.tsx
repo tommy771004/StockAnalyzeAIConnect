@@ -64,6 +64,16 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
 
   const selected = versions.find((version) => version.id === selectedId);
 
+  const startPaper = async () => {
+    if (!selected || selected.validationStatus !== 'valid' || !symbol.trim()) return;
+    const result = await api.startAutotrading({
+      mode: 'simulated',
+      symbols: [symbol.trim().toUpperCase()],
+      strategyVersionId: selected.id,
+    });
+    setMessage(`${t('strategyWorkspace.paperStarted', 'Paper session started')} · ${result.status}`);
+  };
+
   return (
     <section className="space-y-3" aria-label={t('strategyWorkspace.title', 'Strategy Versions')}>
       <div className="flex flex-wrap items-center gap-2">
@@ -137,6 +147,13 @@ export function StrategyVersionWorkspace({ defaultSymbol = '2330.TW' }: { defaul
         </button>
         <button onClick={() => void refreshJob()} disabled={!job} className="px-3 py-1 border border-(--color-term-border) text-xs disabled:opacity-40">
           {t('strategyWorkspace.refresh', 'REFRESH RESULT')}
+        </button>
+        <button
+          onClick={() => void startPaper()}
+          disabled={selected?.validationStatus !== 'valid'}
+          className="px-3 py-1 border border-emerald-500/50 text-emerald-300 text-xs disabled:opacity-40"
+        >
+          {t('strategyWorkspace.startPaper', 'START VALIDATED PAPER')}
         </button>
       </div>
       {message && <p className="text-xs text-amber-300">{message}</p>}

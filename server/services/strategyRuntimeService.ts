@@ -231,7 +231,7 @@ export class StrategyRuntimeService {
     const version = await this.assertPaperExecutableVersion(userId, versionId);
     const bars = await this.loadBars({
       symbol,
-      period1: Math.floor(Date.now() / 1_000) - 120 * 86_400,
+      period1: Math.floor(Date.now() / 1_000) - 30 * 86_400,
       interval: '15m',
     });
     const request = StrategySignalRequestSchema.parse({

@@ -7,6 +7,7 @@ import { AgentConfigPatchSchema } from '../utils/configSchema.js';
 
 export interface AutotradingSessionsRouterDependencies {
   registry: TradingSessionRegistry;
+  assertPaperExecutableVersion?: (userId: string, versionId: string) => Promise<unknown>;
 }
 
 function requireUserId(request: AuthRequest): string {
@@ -30,6 +31,26 @@ export function createAutotradingSessionsRouter(
 ) {
   const router = Router();
   const { registry } = dependencies;
+
+  const assertVersion = async (userId: string, versionId?: string) => {
+    if (!versionId) return;
+    if (!dependencies.assertPaperExecutableVersion) {
+      throw new Error('Strategy runtime service is unavailable');
+    }
+    await dependencies.assertPaperExecutableVersion(userId, versionId);
+  };
+
+  const versionError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : 'Strategy version validation failed';
+    const normalizedMessage = message.toLowerCase();
+    return {
+      status: normalizedMessage.includes('not found') ? 404
+        : normalizedMessage.includes('unavailable') ? 503
+          : normalizedMessage.includes('strategy version') || normalizedMessage.includes('paper execution') ? 400
+            : 500,
+      message,
+    };
+  };
 
   router.get('/status', (request: AuthRequest, response) => {
     const session = registry.ensure(requireUserId(request));
@@ -57,13 +78,19 @@ export function createAutotradingSessionsRouter(
           error: parsed.error.issues.map((issue) => issue.message).join('; '),
         });
       }
-      const session = await registry.start(requireUserId(request), parsed.data);
+      const userId = requireUserId(request);
+      await assertVersion(userId, parsed.data.strategyVersionId);
+      const session = await registry.start(userId, parsed.data);
       return response.json({
         ok: true,
         status: session.state.status,
         config: session.state.config,
       });
     } catch (error) {
+      const mapped = versionError(error);
+      if (mapped.status !== 500) {
+        return response.status(mapped.status).json({ ok: false, error: mapped.message });
+      }
       return next(error);
     }
   });
@@ -96,9 +123,15 @@ export function createAutotradingSessionsRouter(
           error: parsed.error.issues.map((issue) => issue.message).join('; '),
         });
       }
-      const session = await registry.update(requireUserId(request), parsed.data);
+      const userId = requireUserId(request);
+      await assertVersion(userId, parsed.data.strategyVersionId);
+      const session = await registry.update(userId, parsed.data);
       return response.json({ ok: true, config: session.state.config });
     } catch (error) {
+      const mapped = versionError(error);
+      if (mapped.status !== 500) {
+        return response.status(mapped.status).json({ ok: false, error: mapped.message });
+      }
       return next(error);
     }
   });

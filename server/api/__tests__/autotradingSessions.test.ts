@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createAutotradingSessionsRouter } from '../autotradingSessions.js';
 import { TradingSessionRegistry } from '../../services/TradingSessionRegistry.js';
@@ -141,5 +141,68 @@ describe('user-scoped auto-trading routes', () => {
 
     expect(response.status).toBe(409);
     expect(JSON.stringify(await response.json())).toContain('沙盒');
+  });
+
+  it('proves strategy-version ownership and validation before browser paper start', async () => {
+    const registry = createRegistry();
+    const assertPaperExecutableVersion = vi.fn(async () => {
+      throw new Error('Strategy version not found');
+    });
+    const app = express();
+    app.use(express.json());
+    app.use((request, _response, next) => {
+      (request as any).userId = 'user-a';
+      next();
+    });
+    app.use('/api/autotrading', createAutotradingSessionsRouter({
+      registry,
+      assertPaperExecutableVersion,
+    }));
+    const baseUrl = await listen(app);
+
+    const response = await fetch(`${baseUrl}/api/autotrading/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbols: ['AAPL'],
+        strategyVersionId: 'version-owned-by-someone-else',
+      }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(assertPaperExecutableVersion).toHaveBeenCalledWith(
+      'user-a',
+      'version-owned-by-someone-else',
+    );
+    expect(registry.get('user-a')).toBeUndefined();
+  });
+
+  it('returns a client error when the selected version cannot run in paper mode', async () => {
+    const registry = createRegistry();
+    const app = express();
+    app.use(express.json());
+    app.use((request, _response, next) => {
+      (request as any).userId = 'user-a';
+      next();
+    });
+    app.use('/api/autotrading', createAutotradingSessionsRouter({
+      registry,
+      assertPaperExecutableVersion: async () => {
+        throw new Error('Paper execution currently supports indicator strategy versions only');
+      },
+    }));
+    const baseUrl = await listen(app);
+
+    const response = await fetch(`${baseUrl}/api/autotrading/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbols: ['AAPL'],
+        strategyVersionId: 'script-version',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(registry.get('user-a')).toBeUndefined();
   });
 });
