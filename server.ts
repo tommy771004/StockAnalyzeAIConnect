@@ -40,6 +40,12 @@ import { ecpayRouter }    from './server/api/ecpay.js';
 import { researchRouter } from './server/api/research.js';
 import { strategiesRouter } from './server/api/strategies.js';
 import { dataSourcesRouter } from './server/api/dataSources.js';
+import {
+  agentAdminRouter,
+  agentAuditAdminRouter,
+  agentV1Router,
+} from './server/api/agentV1.js';
+import { agentAuthMiddleware } from './server/middleware/agentAuth.js';
 import { configureStrategyRuntimeService } from './server/services/strategyRuntimeService.js';
 import { createRegistryBarLoader } from './server/services/registryBarLoader.js';
 import {
@@ -2301,6 +2307,9 @@ app.post('/api/screener', authMiddleware, screenerLimiter, async (req: AuthReque
   res.json({ results, scanned: workingSymbols.length });
 });
 
+app.use('/api/agent/v1/tokens', authMiddleware, agentAdminRouter);
+app.use('/api/agent/v1/audit', authMiddleware, agentAuditAdminRouter);
+app.use('/api/agent/v1', agentAuthMiddleware, agentV1Router);
 app.use('/api/agent', authMiddleware, agentRouter);
 app.use('/api', authMiddleware, strategiesRouter);
 app.use('/api', authMiddleware, dataSourcesRouter);

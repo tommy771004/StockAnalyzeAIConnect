@@ -312,3 +312,15 @@ export async function appendAgentAuditEvent(
     createdAt: new Date(event.createdAt),
   });
 }
+
+export async function listAgentAuditEvents(
+  userId: string,
+  limit = 100,
+) {
+  return requireDb()
+    .select()
+    .from(agentAuditEvents)
+    .where(eq(agentAuditEvents.userId, userId))
+    .orderBy(desc(agentAuditEvents.createdAt))
+    .limit(Math.max(1, Math.min(500, limit)));
+}
