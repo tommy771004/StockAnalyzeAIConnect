@@ -41,6 +41,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   strategies:     many(strategies),
   strategyVersions: many(strategyVersions),
   backtestJobs: many(backtestJobs),
+  agentTokens: many(agentTokens),
+  agentIdempotencyRecords: many(agentIdempotency),
+  agentAuditEvents: many(agentAuditEvents),
   agentMemories:  many(agentMemories),
   portfolioHistory: many(portfolioHistory),
   paymentOrders:  many(paymentOrders),
@@ -255,6 +258,85 @@ export const backtestJobsRelations = relations(backtestJobs, ({ one }) => ({
   }),
 }));
 
+// ─── scoped external agent tokens ─────────────────────────────────────────────
+export const agentTokens = pgTable('agent_tokens', {
+  id:                  uuid('id').defaultRandom().primaryKey(),
+  userId:              uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name:                text('name').notNull(),
+  prefix:              text('prefix').notNull(),
+  tokenHash:           text('token_hash').notNull(),
+  scopes:              text('scopes').array().notNull(),
+  expiresAt:           timestamp('expires_at').notNull(),
+  allowedMarkets:      text('allowed_markets').array().notNull().default([]),
+  allowedInstruments:  text('allowed_instruments').array().notNull().default([]),
+  paperOnly:           boolean('paper_only').notNull().default(true),
+  rateLimitPerMinute:  integer('rate_limit_per_minute').notNull().default(60),
+  revokedAt:           timestamp('revoked_at'),
+  lastUsedAt:          timestamp('last_used_at'),
+  createdAt:           timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('agent_tokens_prefix_uidx').on(t.prefix),
+  uniqueIndex('agent_tokens_hash_uidx').on(t.tokenHash),
+  index('agent_tokens_user_created_idx').on(t.userId, t.createdAt),
+]);
+
+export const agentTokensRelations = relations(agentTokens, ({ one, many }) => ({
+  user: one(users, { fields: [agentTokens.userId], references: [users.id] }),
+  idempotencyRecords: many(agentIdempotency),
+  auditEvents: many(agentAuditEvents),
+}));
+
+// ─── agent request idempotency ────────────────────────────────────────────────
+export const agentIdempotency = pgTable('agent_idempotency', {
+  id:             uuid('id').defaultRandom().primaryKey(),
+  tokenId:        uuid('token_id').notNull().references(() => agentTokens.id, { onDelete: 'cascade' }),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  key:            text('key').notNull(),
+  route:          text('route').notNull(),
+  requestHash:    text('request_hash').notNull(),
+  status:         text('status').notNull().default('in_progress'),
+  responseStatus: integer('response_status'),
+  responseBody:   jsonb('response_body'),
+  resourceIds:    text('resource_ids').array().notNull().default([]),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+  updatedAt:      timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('agent_idempotency_token_key_uidx').on(t.tokenId, t.key),
+  index('agent_idempotency_user_created_idx').on(t.userId, t.createdAt),
+]);
+
+export const agentIdempotencyRelations = relations(agentIdempotency, ({ one }) => ({
+  token: one(agentTokens, { fields: [agentIdempotency.tokenId], references: [agentTokens.id] }),
+  user: one(users, { fields: [agentIdempotency.userId], references: [users.id] }),
+}));
+
+// ─── append-only agent audit events ───────────────────────────────────────────
+export const agentAuditEvents = pgTable('agent_audit_events', {
+  id:             serial('id').primaryKey(),
+  tokenId:        uuid('token_id').references(() => agentTokens.id, { onDelete: 'set null' }),
+  tokenPrefix:    text('token_prefix'),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  route:          text('route').notNull(),
+  riskClass:      text('risk_class').notNull(),
+  requestHash:    text('request_hash').notNull(),
+  status:         text('status').notNull(),
+  latencyMs:      integer('latency_ms').notNull(),
+  promptVersion:  text('prompt_version'),
+  toolVersion:    text('tool_version'),
+  resourceIds:    text('resource_ids').array().notNull().default([]),
+  metadata:       jsonb('metadata').notNull().default({}),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('agent_audit_user_created_idx').on(t.userId, t.createdAt),
+  index('agent_audit_token_created_idx').on(t.tokenId, t.createdAt),
+  index('agent_audit_route_created_idx').on(t.route, t.createdAt),
+]);
+
+export const agentAuditEventsRelations = relations(agentAuditEvents, ({ one }) => ({
+  token: one(agentTokens, { fields: [agentAuditEvents.tokenId], references: [agentTokens.id] }),
+  user: one(users, { fields: [agentAuditEvents.userId], references: [users.id] }),
+}));
+
 // ─── agent_memory_type enum ───────────────────────────────────────────────────
 export const agentMemoryTypeEnum = pgEnum('agent_memory_type', ['PREFERENCE', 'SKILL', 'CONTEXT']);
 
@@ -387,6 +469,12 @@ export type StrategyVersion = typeof strategyVersions.$inferSelect;
 export type NewStrategyVersion = typeof strategyVersions.$inferInsert;
 export type BacktestJob = typeof backtestJobs.$inferSelect;
 export type NewBacktestJob = typeof backtestJobs.$inferInsert;
+export type AgentToken = typeof agentTokens.$inferSelect;
+export type NewAgentToken = typeof agentTokens.$inferInsert;
+export type AgentIdempotencyRecord = typeof agentIdempotency.$inferSelect;
+export type NewAgentIdempotencyRecord = typeof agentIdempotency.$inferInsert;
+export type AgentAuditEventRow = typeof agentAuditEvents.$inferSelect;
+export type NewAgentAuditEventRow = typeof agentAuditEvents.$inferInsert;
 export type AgentMemory    = typeof agentMemories.$inferSelect;
 export type NewAgentMemory = typeof agentMemories.$inferInsert;
 export type AgentMemoryType = 'PREFERENCE' | 'SKILL' | 'CONTEXT';
