@@ -14,7 +14,6 @@
  */
 
 import { Router } from 'express';
-import * as vm from 'vm';
 import type { AuthRequest } from '../middleware/auth.js';
 import * as agentMemoryRepo from '../repositories/agentMemoryRepo.js';
 import * as watchlistRepo   from '../repositories/watchlistRepo.js';
@@ -24,84 +23,95 @@ import { calcIndicators }    from '../utils/technical.js';
 import { analyzeSentiment }  from '../utils/sentiment.js';
 import { getBestFreeModel }  from '../utils/modelSelector.js';
 import { getPersonaPrompt, getPersonaList } from '../utils/personas.js';
-import { getKeyMacroSnapshot, formatMacroForPrompt } from '../utils/fredApi.js';
 import { queueAgentBacktest } from '../services/agentBacktestTool.js';
+import { getDataRegistry } from '../data/configure.js';
+import { createDefaultAgentTools } from '../ai/defaultTools.js';
+import { createAiStrategyDraft } from '../services/aiStrategyDraftService.js';
+import { getStrategyRuntimeService } from '../services/strategyRuntimeService.js';
 
 export const agentRouter = Router();
 
-// ── 動態策略生成與 VM 執行 ──────────────────────────────────────────────────
+const registeredAgentTools = createDefaultAgentTools({
+  resolveData: (request) => getDataRegistry().resolve(request),
+  getPortfolio: (userId) => import('../repositories/positionsRepo.js')
+    .then((module) => module.getPositionsByUser(userId)),
+  getTrades: (userId) => tradesRepo.getTradesByUser(userId),
+  queueBacktest: (userId, args) => queueAgentBacktest(userId, args),
+});
+
+// ── AI strategy draft generation (execution remains in Python runtime) ───────
 agentRouter.post('/dynamic-strategy', async (req: AuthRequest, res) => {
-  const { prompt, historyData } = req.body;
-  if (!prompt || !historyData) return res.status(400).json({ error: 'Missing prompt or historyData' });
+  const userId = req.userId;
+  const strategyId = Number(req.body?.strategyId);
+  const runtime = req.body?.runtime;
+  const prompt = req.body?.prompt;
+  if (!userId) {
+    res.status(401).json({ error: '未授權' });
+    return;
+  }
+  if (
+    !Number.isInteger(strategyId)
+    || strategyId <= 0
+    || (runtime !== 'indicator' && runtime !== 'script')
+    || typeof prompt !== 'string'
+    || !prompt.trim()
+  ) {
+    res.status(400).json({
+      error: 'strategyId, runtime (indicator|script), and prompt are required',
+    });
+    return;
+  }
 
   try {
-    const systemInstruction = `
-你是一位頂尖的量化交易工程師。
-你需要根據使用者的自然語言要求，寫出一段 JavaScript 函數。
-該函數簽名必須為: \`function generate_signals(df) { ... }\`
-
-參數 df 是一個陣列，每個元素包含：
-{ date: Date, open: number, high: number, low: number, close: number, volume: number }
-
-回傳值必須是一個與 df 長度相同的陣列，裡面的值只能是：
-1 (買入), -1 (賣出), 或 0 (持有/無動作)。
-
-請實作一個向量化的回測邏輯。如果需要技術指標（如 SMA, EMA, RSI），請你自己實作非常簡單的版本，不要依賴外部套件。
-
-[嚴格約束]
-1. 不要有任何 markdown。
-2. 絕對只能輸出純 JavaScript 程式碼。
-3. 程式碼最後不需要呼叫該函數。
-`;
-
-    // 1. Get OpenRouter Key
     let openrouterKey = req.body.openrouterKey || process.env.OPENROUTER_API_KEY;
-    if (!openrouterKey && req.userId) {
+    if (!openrouterKey) {
       try {
-        const storedKey = await settingsRepo.getSetting(req.userId, 'OPENROUTER_API_KEY');
+        const storedKey = await settingsRepo.getSetting(userId, 'OPENROUTER_API_KEY');
         if (typeof storedKey === 'string' && storedKey) openrouterKey = storedKey;
       } catch (e) {
         console.warn('Failed to fetch OPENROUTER_API_KEY from db', e);
       }
     }
 
-    // 2. Ask Hermes to generate Code
-    const codeResponse = await callOpenRouter([
-      { role: 'system', content: systemInstruction },
-      { role: 'user', content: prompt }
-    ], undefined, openrouterKey);
-
-    // 2. Clean up markdown if any
-    let cleanCode = codeResponse.replace(/```(?:javascript|js)?\n/i, '').replace(/```$/m, '').trim();
-
-    // 3. Setup Node.js VM Sandbox
-    const sandbox = {
-      Math: Math,
-      Date: Date,
-      console: { log: () => {} }, // mock console
-    };
-
-    const script = new vm.Script(`
-      ${cleanCode}
-      generate_signals(df);
-    `);
-
-    const context = vm.createContext({ ...sandbox, df: historyData });
-    const signals = script.runInContext(context, { timeout: 3000 }); // 3s timeout to prevent infinite loops
-
-    if (!Array.isArray(signals)) {
-       throw new Error('Generated code did not return an array.');
-    }
-
-    res.json({
-      ok: true,
-      code: cleanCode,
-      signals: signals
+    const version = await createAiStrategyDraft({
+      userId,
+      strategyId,
+      runtime,
+      prompt,
+    }, {
+      generateSource: ({ runtime: targetRuntime, prompt: userPrompt }) => {
+        const contract = targetRuntime === 'indicator'
+          ? 'Define def run(data, params) and return aligned buy/sell or four-way signal arrays.'
+          : 'Define on_init(ctx) and on_bar(ctx, bar); use only ctx order methods and deterministic state.';
+        return callOpenRouter([
+          {
+            role: 'system',
+            content: [
+              'Generate Python strategy source for the Hermes restricted quant runtime.',
+              contract,
+              'No markdown, imports, filesystem, network, process, environment, or dynamic evaluation.',
+              'Return source code only. The draft will be validated separately and must not be executed here.',
+            ].join('\n'),
+          },
+          { role: 'user', content: userPrompt },
+        ], undefined, openrouterKey);
+      },
+      createVersion: (ownerId, parentStrategyId, command) => (
+        getStrategyRuntimeService().createVersion(ownerId, parentStrategyId, command)
+      ),
     });
 
-  } catch (err: any) {
-    console.error('[DynamicStrategy] VM Execution Error:', err);
-    res.status(500).json({ error: 'Strategy Generation or Execution Failed', details: err.message, code: err.codeSnippet || undefined });
+    res.status(201).json({
+      ok: true,
+      version,
+      next: {
+        validate: `/api/strategy-versions/${(version as { id: string }).id}/validate`,
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Strategy draft generation failed';
+    console.error('[DynamicStrategy] Draft generation failed:', message);
+    res.status(500).json({ error: message });
   }
 });
 
@@ -350,135 +360,10 @@ agentRouter.post('/chat', async (req: AuthRequest, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PHASE 4: Function Calling (Tools) Schema
-// Rule: skills/02_Agent_GenUI.md §1 "Function Calling"
-// ─────────────────────────────────────────────────────────────────────────────
-
-const AGENT_TOOLS = [
-  {
-    type: 'function' as const,
-    function: {
-      name: 'show_stock_chart',
-      description: '顯示特定股票的互動式 K 線圖',
-      parameters: {
-        type: 'object',
-        properties: {
-          ticker:    { type: 'string',  description: '股票代號，例如 AAPL, NVDA, TSLA' },
-          timeframe: { type: 'string',  enum: ['1D','1W','1M','3M','1Y'], description: '時間區間' },
-          showMA:    { type: 'boolean', description: '是否疊加移動平均線' },
-        },
-        required: ['ticker'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_portfolio_performance',
-      description: '讀取使用者的投資組合績效，包含持倉明細與損益統計',
-      parameters: {
-        type: 'object',
-        properties: {
-          period: { type: 'string', enum: ['1D','1W','1M','3M','YTD','1Y'], description: '績效計算區間' },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'execute_backtest',
-      description: '對指定股票執行回測並回傳績效指標',
-      parameters: {
-        type: 'object',
-        properties: {
-          ticker:          { type: 'string', description: '股票代號' },
-          strategyVersionId: { type: 'string', description: '已驗證、不可變的策略版本 ID' },
-          initialCapital:  { type: 'number', description: '初始資金 (USD)' },
-          startDate:       { type: 'string', description: 'YYYY-MM-DD' },
-          endDate:         { type: 'string', description: 'YYYY-MM-DD' },
-        },
-        required: ['ticker', 'strategyVersionId'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'show_news_sentiment',
-      description: '顯示特定標的的最新新聞情緒分析卡片',
-      parameters: {
-        type: 'object',
-        properties: {
-          ticker: { type: 'string', description: '股票代號' },
-          limit:  { type: 'number', description: '新聞筆數上限 (default 5)' },
-        },
-        required: ['ticker'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_economic_data',
-      description: '取得美國關鍵總體經濟數據，包含聯準會利率、通膨（CPI/PCE）、就業、殖利率曲線等指標',
-      parameters: {
-        type: 'object',
-        properties: {
-          indicators: {
-            type: 'array',
-            items: { type: 'string' },
-            description: '指定要取得的指標 key，例如 ["FED_FUNDS_RATE", "CPI_ALL"]。留空則取全部關鍵指標',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-] as const;
-
-type AgentToolName = (typeof AGENT_TOOLS)[number]['function']['name'];
-
 interface ToolCallResult {
-  tool_name: AgentToolName;
+  tool_name: string;
   args:      Record<string, unknown>;
   result:    unknown;
-}
-
-// Execute a Tool Call server-side and return the result
-async function executeToolCall(
-  toolName: AgentToolName,
-  args: Record<string, unknown>,
-  userId: string,
-): Promise<unknown> {
-  switch (toolName) {
-    case 'get_portfolio_performance': {
-      const positions = await import('../repositories/positionsRepo.js').then(m => m.getPositionsByUser(userId)).catch(() => []);
-      const tradeList = await tradesRepo.getTradesByUser(userId).catch(() => []);
-      return { positions, recentTrades: tradeList.slice(0, 10) };
-    }
-    case 'execute_backtest': {
-      return queueAgentBacktest(userId, args);
-    }
-    case 'get_economic_data': {
-      try {
-        const snap = await getKeyMacroSnapshot();
-        const formatted = formatMacroForPrompt(snap);
-        return { formatted, raw: snap };
-      } catch (e) {
-        return { error: `FRED API 失敗: ${(e as Error).message}` };
-      }
-    }
-    case 'show_stock_chart':
-    case 'show_news_sentiment': {
-      // These tools produce UI components rendered on the frontend
-      return { rendered_on_client: true, args };
-    }
-    default:
-      return { error: `未知工具: ${toolName as string}` };
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -544,7 +429,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
       body: JSON.stringify({
         model:       streamModel,
         messages,
-        tools:       AGENT_TOOLS,
+        tools:       registeredAgentTools.openRouterTools(),
         tool_choice: 'auto',
         temperature: 0.65,
         max_tokens:  1200,
@@ -582,7 +467,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
       const toolResults: ToolCallResult[] = [];
 
       for (const tc of assistantMsg.tool_calls) {
-        const toolName = tc.function.name as AgentToolName;
+        const toolName = tc.function.name;
         let args: Record<string, unknown> = {};
         try { args = JSON.parse(tc.function.arguments) as Record<string, unknown>; } catch { /* ignore */ }
 
@@ -599,7 +484,13 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
           tool_call_id: tc.id,
         });
 
-        const result = await executeToolCall(toolName, args, userId);
+        const result = await registeredAgentTools.execute(toolName, args, {
+          userId,
+          scopes: ['R', 'B'],
+          paperOnly: true,
+          allowedMarkets: [],
+          allowedInstruments: [],
+        });
         toolResults.push({ tool_name: toolName, args, result });
       }
 
