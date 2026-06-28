@@ -391,6 +391,15 @@ export const autotradingConfigs = pgTable('autotrading_configs', {
   lossStreakCount: bigint('loss_streak_count', { mode: 'number' }).notNull().default(0),
   posTrack:        jsonb('pos_track'),
   equityHistory:   jsonb('equity_history'),
+  configState:     jsonb('config_state'),
+  brokerState:     jsonb('broker_state'),
+  riskState:       jsonb('risk_state'),
+  peakPriceTrack:  jsonb('peak_price_track'),
+  recentPriceSeries: jsonb('recent_price_series'),
+  sessionLogs:     jsonb('session_logs'),
+  cooldownUntil:   timestamp('cooldown_until'),
+  lastSentimentScore: bigint('last_sentiment_score', { mode: 'number' }),
+  lastEquityBroadcast: bigint('last_equity_broadcast', { mode: 'number' }),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 });
 

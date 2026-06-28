@@ -306,6 +306,77 @@ describe('external agent v1 routes', () => {
     }));
   });
 
+  it('requires T scope idempotency and audits paper session ownership', async () => {
+    const execute = vi.fn(async () => ({
+      toolName: 'start_paper_strategy',
+      toolVersion: '1',
+      data: { sessionId: 'user-1', status: 'running', paperOnly: true },
+      evidence: [],
+      warnings: [],
+    }));
+    const beginIdempotency = vi.fn(async () => ({
+      kind: 'started',
+      record: { id: 'idem-paper-1' },
+    }) as never);
+    const completeIdempotency = vi.fn(async () => undefined);
+    const appendAudit = vi.fn(async () => undefined);
+    const app = express();
+    app.use(express.json());
+    app.use((request, _response, next) => {
+      (request as any).agent = principal;
+      next();
+    });
+    app.use('/api/agent/v1', createAgentV1Router({
+      tools: {
+        describe: () => ({
+          name: 'start_paper_strategy',
+          version: '1',
+          description: 'paper',
+          riskClass: 'paper_trade',
+          requiredScopes: ['T'],
+          inputSchema: {},
+        }),
+        execute,
+        openRouterTools: () => [],
+      } as never,
+      beginIdempotency,
+      completeIdempotency,
+      failIdempotency: vi.fn(),
+      appendAudit,
+      getBacktestJob: vi.fn(),
+    }));
+    const baseUrl = await listen(app);
+
+    const response = await fetch(`${baseUrl}/api/agent/v1/paper-sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'paper-start-0001',
+      },
+      body: JSON.stringify({
+        ticker: 'AAPL',
+        strategyVersionId: 'version-1',
+        paperOnly: true,
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(execute).toHaveBeenCalledWith(
+      'start_paper_strategy',
+      expect.objectContaining({ paperOnly: true }),
+      expect.objectContaining({ userId: 'user-1', paperOnly: true }),
+    );
+    expect(completeIdempotency).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'idem-paper-1',
+      resourceIds: ['user-1'],
+    }));
+    expect(appendAudit).toHaveBeenCalledWith(expect.objectContaining({
+      riskClass: 'paper_trade',
+      resourceIds: ['user-1'],
+      metadata: { toolName: 'start_paper_strategy' },
+    }));
+  });
+
   it('streams only the authenticated user terminal backtest state', async () => {
     const getBacktestJob = vi.fn(async (userId, jobId) => (
       userId === 'user-1' && jobId === 'job-1'

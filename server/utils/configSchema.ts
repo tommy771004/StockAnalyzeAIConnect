@@ -31,6 +31,9 @@ export const StrategyParamsSchema = z.object({
     minEdgePct: z.number().min(0.01).max(10),
     weight: z.number().min(0).max(1)
   }).optional(),
+  INST_FLOW: z.object({
+    weight: z.number().min(0).max(1)
+  }).optional(),
   stopLossPct: z.number().min(0.1).max(20),
   takeProfitPct: z.number().min(0.5).max(100),
   trailingStopPct: z.number().min(0.1).max(10),
@@ -45,6 +48,7 @@ export const StrategyParamsSchema = z.object({
 
 export const AgentConfigPatchSchema = z.object({
   userId: z.string().uuid().optional(),
+  strategyVersionId: z.string().min(1).max(200).optional(),
   mode: z.enum(['simulated', 'real']),
   symbols: z.array(z.string()),
   params: StrategyParamsSchema,
@@ -53,7 +57,9 @@ export const AgentConfigPatchSchema = z.object({
   hedgeConfig: z.object({
     enabled: z.boolean(),
     hedgeRatio: z.number(),
-    hedgeSymbol: z.string().optional()
+    hedgeSymbol: z.string().optional(),
+    hedgeBrokerId: z.string().optional(),
+    hedgeType: z.enum(['inverse_etf', 'direct']).optional()
   }),
   circuitBreaker: z.object({
     enabled: z.boolean(),

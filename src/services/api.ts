@@ -494,6 +494,117 @@ export const deleteStrategy = (id: number): Promise<void> =>
 export const activateStrategy = (id: number): Promise<void> =>
   fetchJ<void>(`/api/strategies/${id}/activate`, { method: 'POST' });
 
+export interface StrategyVersionRecord {
+  id: string;
+  strategyId: number;
+  version: number;
+  runtime: 'indicator' | 'script';
+  source: string;
+  sourceHash: string;
+  provenance: 'human' | 'ai' | 'imported';
+  validationStatus: 'pending' | 'valid' | 'invalid';
+  diagnostics: Array<{ code: string; message: string; severity: 'error' | 'warning'; line?: number }>;
+  executionPolicy: Record<string, unknown>;
+  createdAt: string;
+}
+
+export const getStrategyVersions = (strategyId: number) =>
+  fetchJ<StrategyVersionRecord[]>(`/api/strategies/${strategyId}/versions`);
+
+export const createStrategyVersion = (
+  strategyId: number,
+  input: {
+    runtime: 'indicator' | 'script';
+    source: string;
+    provenance?: 'human' | 'ai' | 'imported';
+  },
+) => fetchJ<StrategyVersionRecord>(`/api/strategies/${strategyId}/versions`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+});
+
+export const validateStrategyVersion = (versionId: string) =>
+  fetchJ<{ valid: boolean; diagnostics: StrategyVersionRecord['diagnostics']; engineVersion: string }>(
+    `/api/strategy-versions/${encodeURIComponent(versionId)}/validate`,
+    { method: 'POST' },
+  );
+
+export const startStrategyBacktest = (versionId: string, symbol: string) =>
+  fetchJ<{ id: string; status: string }>(
+    `/api/strategy-versions/${encodeURIComponent(versionId)}/backtests`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    },
+  );
+
+export const getStrategyBacktestJob = (jobId: string) =>
+  fetchJ<Record<string, unknown>>(`/api/backtest-jobs/${encodeURIComponent(jobId)}`);
+
+export const getDataSourceHealth = () =>
+  fetchJ<{
+    providers: Array<{
+      id: string;
+      version: string;
+      operations: string[];
+      markets: string[];
+      breaker: string;
+      rateRemaining: number;
+      lastSuccessAt?: string;
+      lastFailureAt?: string;
+    }>;
+    cache: { entries: number; hits: number; misses: number; evictions: number };
+  }>('/api/data-sources/health');
+
+export interface AgentTokenRecord {
+  id: string;
+  prefix: string;
+  name: string;
+  scopes: string[];
+  expiresAt: string;
+  allowedMarkets: string[];
+  allowedInstruments: string[];
+  paperOnly: true;
+  revokedAt?: string | null;
+}
+
+export const listAgentTokens = () =>
+  fetchJ<AgentTokenRecord[]>('/api/agent/v1/tokens');
+
+export const createAgentToken = (input: {
+  name: string;
+  scopes: string[];
+  expiresAt: string;
+  allowedMarkets: string[];
+  allowedInstruments: string[];
+  rateLimitPerMinute?: number;
+}) => fetchJ<{ token: AgentTokenRecord; plaintext: string }>('/api/agent/v1/tokens', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+});
+
+export const revokeAgentToken = (tokenId: string) =>
+  fetchJ<void>(`/api/agent/v1/tokens/${encodeURIComponent(tokenId)}`, {
+    method: 'DELETE',
+  });
+
+export const listAgentAuditEvents = (limit = 100) =>
+  fetchJ<Array<{
+    id: number;
+    tokenPrefix?: string;
+    route: string;
+    riskClass: string;
+    status: string;
+    latencyMs: number;
+    toolVersion?: string;
+    resourceIds: string[];
+    metadata: Record<string, unknown>;
+    createdAt: string;
+  }>>(`/api/agent/v1/audit?limit=${limit}`);
+
 // ── Performance ─────────────────────────────────────────────────────────────
 export const getPerformance = (period: string = '1m'): Promise<any> =>
   fetchJ<any>(`/api/autotrading/performance?period=${period}`);

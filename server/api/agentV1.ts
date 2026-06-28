@@ -29,6 +29,12 @@ import * as tradesRepo from '../repositories/tradesRepo.js';
 import { queueAgentBacktest } from '../services/agentBacktestTool.js';
 import { getStrategyRuntimeService } from '../services/strategyRuntimeService.js';
 import type { ToolRiskClass } from '../ai/contracts.js';
+import {
+  inspectPaperOrders,
+  inspectPaperSession,
+  startPaperStrategy,
+  stopPaperStrategy,
+} from '../services/paperSessionTools.js';
 
 interface AgentAdminDependencies {
   createToken: typeof createAgentToken;
@@ -133,7 +139,7 @@ function resourceIds(result: unknown): string[] {
     : undefined;
   if (!data || typeof data !== 'object') return [];
   const record = data as Record<string, unknown>;
-  return [record.jobId, record.id]
+  return [record.jobId, record.id, record.sessionId]
     .filter((value): value is string => typeof value === 'string');
 }
 
@@ -325,6 +331,18 @@ export function createAgentV1Router(
   router.post('/backtests', (request: AgentRequest, response) => {
     void executeTool(request, response, 'execute_backtest', request.body ?? {}, 202);
   });
+  router.post('/paper-sessions', (request: AgentRequest, response) => {
+    void executeTool(request, response, 'start_paper_strategy', request.body ?? {}, 201);
+  });
+  router.delete('/paper-sessions/current', (request: AgentRequest, response) => {
+    void executeTool(request, response, 'stop_paper_strategy', {});
+  });
+  router.get('/paper-sessions/current', (request: AgentRequest, response) => {
+    void executeTool(request, response, 'inspect_paper_session', {});
+  });
+  router.get('/paper-sessions/current/orders', (request: AgentRequest, response) => {
+    void executeTool(request, response, 'inspect_paper_orders', {});
+  });
 
   router.get('/backtests/:jobId', async (request: AgentRequest, response) => {
     const startedAt = Date.now();
@@ -487,6 +505,10 @@ const defaultAgentV1Tools = createDefaultAgentTools({
   getBacktestJob: (userId, jobId) => (
     getStrategyRuntimeService().getBacktestJob(userId, jobId)
   ),
+  startPaperStrategy,
+  stopPaperStrategy,
+  inspectPaperSession,
+  inspectPaperOrders,
 });
 
 export const agentV1Router = createAgentV1Router({

@@ -1262,5 +1262,36 @@
     "keyboardSelect": "Select",
     "keyboardConfirm": "Confirm",
     "keyboardClose": "Close"
+  },
+  "strategyWorkspace": {
+    "title": "Immutable Strategy Workspace",
+    "selectVersion": "Select strategy version",
+    "sourcePlaceholder": "Python strategy source",
+    "createVersion": "Create version",
+    "validate": "Validate",
+    "valid": "Valid",
+    "backtest": "Queue backtest",
+    "refresh": "Refresh result"
+  },
+  "providerProvenance": {
+    "title": "Data Provider Provenance",
+    "lastSuccess": "Last success",
+    "rateRemaining": "Rate remaining"
+  },
+  "paperSession": {
+    "title": "Paper Session",
+    "simulated": "Simulated only",
+    "liveDisabled": "Live broker controls remain disabled until signed sandbox verification is complete."
+  },
+  "agentTokens": {
+    "title": "Scoped Agent Tokens",
+    "paperOnly": "Tokens are paper-only, revocable, expiring, rate-limited, and instrument-allowlisted.",
+    "create": "Create",
+    "once": "Copy now — this secret is shown once.",
+    "dismiss": "Dismiss and erase",
+    "revoke": "Revoke"
+  },
+  "agentAudit": {
+    "title": "Agent Audit Trail"
   }
 }

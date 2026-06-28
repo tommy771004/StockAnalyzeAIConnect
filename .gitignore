@@ -33,3 +33,5 @@ graphify_vendor/*
 docs/*
 !docs/ux-audit/
 !docs/ux-audit/**
+!docs/quantdinger-integration.md
+!docs/trading-sessions.md

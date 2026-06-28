@@ -24,6 +24,9 @@ import { DecisionAnalysisPanel } from '../../components/AutoTrading/DecisionAnal
 import { TradeToast } from '../../components/AutoTrading/TradeToast';
 import { DataStatusBadge, type DataMode } from '../ui/DataStatusBadge';
 import { canShowUsBrokerageSymbol } from '../../config/marketFeatures';
+import { StrategyVersionWorkspace } from '../../components/AutoTrading/StrategyVersionWorkspace';
+import { ProviderProvenancePanel } from '../../components/AutoTrading/ProviderProvenancePanel';
+import { PaperSessionPanel } from '../../components/AutoTrading/PaperSessionPanel';
 
 const SIDEBAR_WIDTH_KEY = 'autotrading.sidebarWidthPx';
 const SIDEBAR_MIN_PX = 260;
@@ -287,14 +290,16 @@ export function AutoTradingPage() {
           )}
 
           {mainTab === 'STRATEGY' && (
-            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4">
-              <StrategyTab 
+            <div className="flex-1 border border-(--color-term-border) rounded-sm overflow-y-auto bg-black/40 p-4 space-y-6">
+              <StrategyTab
                 strategies={ws.config?.strategies ?? []}
                 params={ws.config?.params ?? {}}
                 onStrategiesChange={(s) => handleUpdateConfig({ strategies: s })}
                 onParamsChange={(p) => handleUpdateConfig({ params: p })}
                 isRunning={ws.status === 'running'}
               />
+              <StrategyVersionWorkspace defaultSymbol={currentSymbols[0]} />
+              <ProviderProvenancePanel />
             </div>
           )}
 
@@ -355,6 +360,7 @@ export function AutoTradingPage() {
             onKillSwitch={handleKillSwitch}
             onUpdateConfig={handleUpdateConfig}
           />
+          <PaperSessionPanel status={ws.status} config={ws.config} />
         </div>
       </div>
     </div>

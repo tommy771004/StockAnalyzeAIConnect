@@ -8,6 +8,7 @@ import {
 import {
   ExecutionPolicySchema,
   StrategyBacktestRequestSchema,
+  StrategySignalRequestSchema,
   StrategyRuntimeSchema,
   type ExecutionPolicy,
   type StrategyBacktestRequest,
@@ -15,10 +16,12 @@ import {
   type StrategyBar,
   type StrategyValidationRequest,
   type StrategyValidationResult,
+  type StrategySignalResult,
 } from '../types/strategyRuntime.js';
 import { sha256Hex, stableJsonHash } from '../utils/hash.js';
 import {
   runStrategyBacktest,
+  runStrategySignal,
   validateStrategy,
 } from './quantRuntimeClient.js';
 
@@ -39,6 +42,7 @@ export interface LoadStrategyBarsInput {
   symbol: string;
   period1?: string | number;
   period2?: string | number;
+  interval?: string;
 }
 
 export type LoadStrategyBars = (
@@ -203,6 +207,43 @@ export class StrategyRuntimeService {
 
   getBacktestJob(userId: string, jobId: string): Promise<BacktestJob | null> {
     return this.repo.getBacktestJobForUser(userId, jobId);
+  }
+
+  async assertPaperExecutableVersion(
+    userId: string,
+    versionId: string,
+  ): Promise<StrategyVersion> {
+    const version = await this.requireVersion(userId, versionId);
+    if (version.validationStatus !== 'valid') {
+      throw new Error('Strategy version must be validated before paper execution');
+    }
+    if (version.runtime !== 'indicator') {
+      throw new Error('Paper execution currently supports indicator strategy versions only');
+    }
+    return version;
+  }
+
+  async evaluateVersionSignal(
+    userId: string,
+    versionId: string,
+    symbol: string,
+  ): Promise<StrategySignalResult> {
+    const version = await this.assertPaperExecutableVersion(userId, versionId);
+    const bars = await this.loadBars({
+      symbol,
+      period1: Math.floor(Date.now() / 1_000) - 120 * 86_400,
+      interval: '15m',
+    });
+    const request = StrategySignalRequestSchema.parse({
+      strategyVersionId: version.id,
+      runtime: version.runtime,
+      source: version.source,
+      sourceHash: version.sourceHash,
+      parameters: asRecord(version.defaultParameters),
+      symbol,
+      bars,
+    });
+    return runStrategySignal(request);
   }
 
   private async processBacktest(

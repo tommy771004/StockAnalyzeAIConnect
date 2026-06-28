@@ -3,7 +3,7 @@
  * 策略自動優化器：透過參數變異與回測尋找最優配置
  */
 import { runBacktestWithBestEngine, riskAdjustedScore, deflatedRiskAdjustedScore } from './backtestEngine.js';
-import { getAgentConfig } from './autonomousAgent.js';
+import { tradingSessionRegistry } from './tradingSessionRegistryInstance.js';
 
 interface OptimizationProposal {
   originalParams: any;
@@ -63,8 +63,8 @@ function mutateParams(params: any) {
 /**
  * 執行優化掃描
  */
-export async function runOptimizationScan(symbol: string, history: any[]): Promise<OptimizationProposal | null> {
-  const currentConfig = getAgentConfig();
+export async function runOptimizationScan(userId: string, symbol: string, history: any[]): Promise<OptimizationProposal | null> {
+  const currentConfig = tradingSessionRegistry.ensure(userId).state.config;
   const currentParams = currentConfig.params;
   
   // 1. 基準 + 5 組變異子代 — 全部並行執行

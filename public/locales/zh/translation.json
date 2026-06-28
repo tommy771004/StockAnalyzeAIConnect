@@ -1133,5 +1133,36 @@
     "keyboardSelect": "選擇",
     "keyboardConfirm": "確認",
     "keyboardClose": "關閉"
+  },
+  "strategyWorkspace": {
+    "title": "不可變策略版本工作區",
+    "selectVersion": "選擇策略版本",
+    "sourcePlaceholder": "Python 策略原始碼",
+    "createVersion": "建立版本",
+    "validate": "驗證",
+    "valid": "驗證通過",
+    "backtest": "排程回測",
+    "refresh": "更新結果"
+  },
+  "providerProvenance": {
+    "title": "資料來源與追溯",
+    "lastSuccess": "最近成功",
+    "rateRemaining": "剩餘速率額度"
+  },
+  "paperSession": {
+    "title": "模擬交易工作階段",
+    "simulated": "僅模擬",
+    "liveDisabled": "真實券商控制仍停用，直到完成並簽署沙盒驗證。"
+  },
+  "agentTokens": {
+    "title": "限權 Agent Token",
+    "paperOnly": "Token 僅能模擬交易，且可撤銷、有期限、限流並受標的白名單限制。",
+    "create": "建立",
+    "once": "請立即複製，此密鑰只顯示一次。",
+    "dismiss": "關閉並清除",
+    "revoke": "撤銷"
+  },
+  "agentAudit": {
+    "title": "Agent 稽核軌跡"
   }
 }

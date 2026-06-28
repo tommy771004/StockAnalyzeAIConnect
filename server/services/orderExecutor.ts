@@ -44,6 +44,27 @@ export interface OrderLifecycleEvent {
   timestamp: string;
   message?: string;
   retryCount?: number;
+  userId?: string;
+  strategyVersionId?: string;
+  decisionId?: string;
+  evidenceIds?: string[];
+  dataProvenance?: ExecutionDataProvenance;
+}
+
+export interface ExecutionDataProvenance {
+  providerId: string;
+  retrievedAt: string;
+  marketTimestamp?: string;
+  delayed: boolean;
+  cacheStatus?: string;
+}
+
+export interface OrderExecutionContext {
+  userId: string;
+  strategyVersionId: string;
+  decisionId: string;
+  evidenceIds: string[];
+  dataProvenance: ExecutionDataProvenance;
 }
 
 interface ActiveOrder {
@@ -54,7 +75,16 @@ interface ActiveOrder {
   filledQty: number;
   filledPrice: number;
   status: OrderLifecycleStatus;
+  context: OrderExecutionContext;
   partialTimer?: ReturnType<typeof setTimeout>;
+}
+
+export interface OrderExecutorOptions {
+  /**
+   * Legacy copy-trading service is process-scoped. Isolated user sessions keep it
+   * disabled until follower ownership is explicitly user-scoped.
+   */
+  enableCopyTrading?: boolean;
 }
 
 // ── Utility ───────────────────────────────────────────────────────
@@ -75,12 +105,14 @@ function sleep(ms: number): Promise<void> {
 export class OrderExecutor {
   /** 目前活躍中的訂單（尚未 FILLED 或 CANCELLED）*/
   private _activeOrders = new Map<string, ActiveOrder>();
+  private _seenBrokerOrderIds = new Set<string>();
 
   constructor(
     private primaryBroker: IBrokerAdapter,
     private hedgeBroker: IBrokerAdapter,
     private emitLog: (log: any) => void,
     private onLifecycle?: (event: OrderLifecycleEvent) => void,
+    private options: OrderExecutorOptions = { enableCopyTrading: true },
   ) {}
 
   // ── 公開 API ────────────────────────────────────────────────────
@@ -92,8 +124,20 @@ export class OrderExecutor {
   async executeTrade(
     config: AgentConfig,
     trade: { symbol: string; side: 'BUY' | 'SELL'; qty: number; price: number },
+    context?: OrderExecutionContext,
   ): Promise<OrderLifecycleEvent | null> {
     const { symbol, side, qty, price } = trade;
+    const executionContext = context ?? {
+      userId: config.userId ?? 'legacy',
+      strategyVersionId: config.strategyVersionId ?? 'legacy-unversioned',
+      decisionId: `legacy-${Date.now()}-${symbol}`,
+      evidenceIds: [],
+      dataProvenance: {
+        providerId: 'legacy-agent',
+        retrievedAt: new Date().toISOString(),
+        delayed: false,
+      },
+    };
 
     this.emitLog({
       level: 'EXECUTION', source: 'EXEC', symbol,
@@ -133,10 +177,30 @@ export class OrderExecutor {
     if (!result) {
       const msg = lastError instanceof Error ? lastError.message : '下單程序異常';
       this.emitLog({ level: 'ERROR', source: 'EXEC', symbol, message: `下單失敗：${msg}` });
-      const evt = this._buildEvent('REJECTED', symbol, side, qty, 0, 0, msg, retryCount);
+      const evt = this._buildEvent('REJECTED', symbol, side, qty, 0, 0, executionContext, msg, retryCount);
       this.onLifecycle?.(evt);
       return null;
     }
+
+    if (result.orderId && this._seenBrokerOrderIds.has(result.orderId)) {
+      const message = `duplicate broker order id: ${result.orderId}`;
+      this.emitLog({ level: 'ERROR', source: 'EXEC', symbol, message });
+      const evt = this._buildEvent(
+        'REJECTED',
+        symbol,
+        side,
+        qty,
+        0,
+        0,
+        executionContext,
+        message,
+        retryCount,
+      );
+      evt.orderId = result.orderId;
+      this.onLifecycle?.(evt);
+      return null;
+    }
+    if (result.orderId) this._seenBrokerOrderIds.add(result.orderId);
 
     // ── REJECTED ──
     if (result.status === 'REJECTED') {
@@ -144,7 +208,7 @@ export class OrderExecutor {
         level: 'WARNING', source: 'EXEC', symbol,
         message: `❌ 訂單被拒絕：${result.message ?? '券商拒絕'}`,
       });
-      const evt = this._buildEvent('REJECTED', symbol, side, qty, 0, 0, result.message, retryCount);
+      const evt = this._buildEvent('REJECTED', symbol, side, qty, 0, 0, executionContext, result.message, retryCount);
       evt.orderId = result.orderId || evt.orderId;
       this.onLifecycle?.(evt);
       return null;
@@ -156,7 +220,7 @@ export class OrderExecutor {
         level: 'EXECUTION', source: 'EXEC', symbol,
         message: `✅ 訂單成交：${side} ${result.filledQty} 股 @ ${result.filledPrice} [FILLED]${retryCount > 0 ? ` (retry=${retryCount})` : ''}`,
       });
-      const evt = this._buildEvent('FILLED', symbol, side, qty, result.filledQty, result.filledPrice, undefined, retryCount);
+      const evt = this._buildEvent('FILLED', symbol, side, qty, result.filledQty, result.filledPrice, executionContext, undefined, retryCount);
       evt.orderId = result.orderId;
       this.onLifecycle?.(evt);
 
@@ -179,10 +243,11 @@ export class OrderExecutor {
         filledQty: result.filledQty,
         filledPrice: result.filledPrice,
         status: 'PARTIAL',
+        context: executionContext,
       };
       this._activeOrders.set(result.orderId, activeOrder);
 
-      const evt = this._buildEvent('PARTIAL', symbol, side, qty, result.filledQty, result.filledPrice, undefined, retryCount);
+      const evt = this._buildEvent('PARTIAL', symbol, side, qty, result.filledQty, result.filledPrice, executionContext, undefined, retryCount);
       evt.orderId = result.orderId;
       this.onLifecycle?.(evt);
 
@@ -196,7 +261,21 @@ export class OrderExecutor {
     }
 
     // ── 未預期狀態 fallback ──
-    this.emitLog({ level: 'WARNING', source: 'EXEC', symbol, message: `未知訂單狀態：${result.status}` });
+    const message = `unknown broker order status: ${result.status}`;
+    this.emitLog({ level: 'WARNING', source: 'EXEC', symbol, message });
+    const evt = this._buildEvent(
+      'REJECTED',
+      symbol,
+      side,
+      qty,
+      result.filledQty,
+      result.filledPrice,
+      executionContext,
+      message,
+      retryCount,
+    );
+    evt.orderId = result.orderId || evt.orderId;
+    this.onLifecycle?.(evt);
     return null;
   }
 
@@ -221,6 +300,7 @@ export class OrderExecutor {
     const evt = this._buildEvent(
       'CANCELLED', active.symbol, active.side,
       active.requestedQty, active.filledQty, active.filledPrice,
+      active.context,
       '手動取消',
     );
     evt.orderId = orderId;
@@ -261,6 +341,7 @@ export class OrderExecutor {
     const evt = this._buildEvent(
       'CANCELLED', active.symbol, active.side,
       active.requestedQty, active.filledQty, active.filledPrice,
+      active.context,
       `部分成交超時取消 (已成交 ${active.filledQty}/${active.requestedQty})`,
     );
     evt.orderId = active.orderId;
@@ -278,10 +359,12 @@ export class OrderExecutor {
     result: OrderResult,
   ) {
     // 觸發跟單
-    copyTradingService.syncTrade(
-      { symbol: trade.symbol, side: trade.side, qty: result.filledQty, price: result.filledPrice },
-      (msg) => this.emitLog({ level: 'SYSTEM', source: 'COPY', symbol: trade.symbol, message: msg }),
-    ).catch(e => console.error('[CopyTrade Error]', e));
+    if (this.options.enableCopyTrading !== false) {
+      copyTradingService.syncTrade(
+        { symbol: trade.symbol, side: trade.side, qty: result.filledQty, price: result.filledPrice },
+        (msg) => this.emitLog({ level: 'SYSTEM', source: 'COPY', symbol: trade.symbol, message: msg }),
+      ).catch(e => console.error('[CopyTrade Error]', e));
+    }
 
     // 聯動對沖
     if (config.hedgeConfig?.enabled && config.hedgeConfig.hedgeSymbol) {
@@ -329,6 +412,7 @@ export class OrderExecutor {
     requestedQty: number,
     filledQty: number,
     filledPrice: number,
+    context: OrderExecutionContext,
     message?: string,
     retryCount?: number,
   ): OrderLifecycleEvent {
@@ -343,6 +427,9 @@ export class OrderExecutor {
       timestamp: new Date().toISOString(),
       message,
       retryCount,
+      ...context,
+      evidenceIds: [...context.evidenceIds],
+      dataProvenance: { ...context.dataProvenance },
     };
   }
 }

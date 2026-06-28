@@ -27,6 +27,16 @@ interface SimPositionInternal {
   openDate?: string; // YYYY-MM-DD
 }
 
+export interface SimulatedBrokerSnapshot {
+  connected: boolean;
+  balance: number;
+  dailyPnl: number;
+  positions: SimPositionInternal[];
+  orderCounter: number;
+}
+
+const MARKET_TYPES: MarketType[] = ['TW_STOCK', 'TW_OPTIONS', 'TW_FUTURES', 'US_STOCK', 'CRYPTO'];
+
 export class SimulatedAdapter implements IBrokerAdapter {
   readonly brokerId = 'simulated';
   private _connected = false;
@@ -73,8 +83,10 @@ export class SimulatedAdapter implements IBrokerAdapter {
     const orderId = `SIM-${Date.now()}-${this._orderCounter}`;
 
     // 模擬即時成交：LIMIT 以委託價成交、MARKET 以即時報價並套用滑點（對交易者不利的偏移）
-    const isLimit = !!(order.price && order.price > 0);
-    const rawFill = isLimit ? order.price! : await this._getSimulatedMarketPrice(order.symbol);
+    const isLimit = order.orderType === 'LIMIT';
+    const rawFill = order.price && order.price > 0
+      ? order.price
+      : await this._getSimulatedMarketPrice(order.symbol);
     if (!rawFill || rawFill <= 0) {
       return { orderId, status: 'REJECTED', filledQty: 0, filledPrice: 0, timestamp: Date.now(), message: '無法取得報價' };
     }
@@ -194,6 +206,52 @@ export class SimulatedAdapter implements IBrokerAdapter {
     this._balance = amount;
     this._dailyPnl = 0;
     this._positions.clear();
+  }
+
+  exportState(): SimulatedBrokerSnapshot {
+    return {
+      connected: this._connected,
+      balance: this._balance,
+      dailyPnl: this._dailyPnl,
+      positions: Array.from(this._positions.values(), (position) => ({ ...position })),
+      orderCounter: this._orderCounter,
+    };
+  }
+
+  restoreState(snapshot: SimulatedBrokerSnapshot): void {
+    if (!snapshot || typeof snapshot !== 'object') {
+      throw new Error('Invalid simulated broker snapshot');
+    }
+    if (!Number.isFinite(snapshot.balance) || snapshot.balance < 0) {
+      throw new Error('Invalid simulated broker balance');
+    }
+    if (!Number.isFinite(snapshot.dailyPnl)) {
+      throw new Error('Invalid simulated broker dailyPnl');
+    }
+    if (!Number.isInteger(snapshot.orderCounter) || snapshot.orderCounter < 0) {
+      throw new Error('Invalid simulated broker orderCounter');
+    }
+
+    const positions = new Map<string, SimPositionInternal>();
+    for (const position of snapshot.positions ?? []) {
+      if (
+        !position.symbol
+        || !Number.isFinite(position.qty)
+        || position.qty <= 0
+        || !Number.isFinite(position.avgCost)
+        || position.avgCost < 0
+        || !MARKET_TYPES.includes(position.marketType)
+      ) {
+        throw new Error('Invalid simulated broker position');
+      }
+      positions.set(position.symbol, { ...position });
+    }
+
+    this._connected = snapshot.connected === true;
+    this._balance = snapshot.balance;
+    this._dailyPnl = snapshot.dailyPnl;
+    this._positions = positions;
+    this._orderCounter = snapshot.orderCounter;
   }
 }
 

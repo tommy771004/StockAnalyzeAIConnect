@@ -52,19 +52,7 @@ import {
   configureDataRegistry,
   createDefaultDataProviders,
 } from './server/data/configure.js';
-import {
-  startAutonomousAgent, startAgent, stopAgent, emergencyKillSwitch,
-  getAgentStatus, getAgentConfig, getAgentLogs, updateAgentConfig,
-  setWsBroadcast, getLossStreakCount, resetCircuitBreaker, deactivateKillSwitch,
-  setPrimaryBroker, getPrimaryBrokerId,
-} from './server/services/autonomousAgent.js';
 import { DEFAULT_AGENT_CONFIG, DEFAULT_RISK_CONFIG, DEFAULT_TRADING_HOURS } from './server/services/autotradingDefaults.js';
-import { isTradingSession } from './server/services/tradingSession.js';
-import { riskManager } from './server/services/RiskManager.js';
-import { simulatedAdapter } from './server/services/brokers/SimulatedAdapter.js';
-import { sinopacAdapter } from './server/services/brokers/SinopacAdapter.js';
-import { kgiAdapter } from './server/services/brokers/KGIAdapter.js';
-import { yuantaAdapter } from './server/services/brokers/YuantaAdapter.js';
 import { screenerLimiter, alertsWriteLimiter } from './server/middleware/rateLimiter.js';
 import type { ScreenerResultRow } from './src/terminal/types/market.js';
 import { callAISimple } from './server/utils/llmPipeline.js';
@@ -86,9 +74,11 @@ import {
   isAblyEnabled,
   getAutotradingRealtimeMeta,
   createAutotradingToken,
-  publishAutotradingEvent,
 } from './server/services/ablyRealtime.js';
 import { getAutotradingDiagnostics, resetAutotradingDiagnostics } from './server/services/autotradingDiagnostics.js';
+import { createAutotradingSessionsRouter } from './server/api/autotradingSessions.js';
+import { tradingSessionRegistry } from './server/services/tradingSessionRegistryInstance.js';
+import { sessionEventHub } from './server/services/sessionEventHub.js';
 
 
 
@@ -120,7 +110,7 @@ try {
   // Only start these in non-vercel environments
   if (!process.env.VERCEL) {
     // 修正：異步啟動自動交易引擎並恢復配置 (P1)
-    startAutonomousAgent().catch(e => console.error('[AutoAgent] 啟動失敗:', e));
+    tradingSessionRegistry.restoreAll().catch(e => console.error('[AutoAgent] 多租戶恢復失敗:', e));
   }
 } catch (e) {
   console.warn('[DB] Neon not available. Please set DATABASE_URL in .env to enable persistence:', (e as Error).message);
@@ -638,45 +628,53 @@ function isMarketOpen(symbol: string): boolean {
 });
 
 // ─── AutoTrading WebSocket ─────────────────────────────────────────────────
-const autotradingWsClients = new Set<any>();
-
-setWsBroadcast((data: unknown) => {
-  const msg = JSON.stringify(data);
-  autotradingWsClients.forEach(ws => {
-    if (ws.readyState === 1) ws.send(msg);
+(app as any).ws('/ws/autotrading', authMiddleware, (ws: any, req: AuthRequest) => {
+  const userId = req.userId!;
+  const session = tradingSessionRegistry.ensure(userId);
+  const unsubscribe = sessionEventHub.subscribe(userId, (event) => {
+    if (ws.readyState === 1) ws.send(JSON.stringify(event));
   });
-  // Managed realtime bridge (Ably) for environments where raw WS upgrades are limited.
-  void publishAutotradingEvent(data);
-});
 
-(app as any).ws('/ws/autotrading', (ws: any) => {
-  autotradingWsClients.add(ws);
-
-  // 連線後立即推送當前狀態
-  ws.send(JSON.stringify({ type: 'status', data: { status: getAgentStatus(), config: getAgentConfig(), riskStats: riskManager.getStats() } }));
-  const recentLogs = getAgentLogs(50);
+  ws.send(JSON.stringify({
+    type: 'status',
+    data: {
+      status: session.state.status,
+      config: session.state.config,
+      riskStats: {
+        ...session.state.riskManager.getStats(),
+        lossStreakCount: session.state.lossStreakCount,
+      },
+    },
+  }));
+  const recentLogs = session.state.logs(50);
   if (recentLogs.length > 0) ws.send(JSON.stringify({ type: 'log_history', data: recentLogs }));
 
-  ws.on('close', () => autotradingWsClients.delete(ws));
-  ws.on('error', () => autotradingWsClients.delete(ws));
+  ws.on('close', unsubscribe);
+  ws.on('error', unsubscribe);
 });
 
 // ─── AutoTrading REST API ─────────────────────────────────────────────────────
 
-app.get('/api/autotrading/realtime/meta', authMiddleware, (_req, res) => {
-  res.json(getAutotradingRealtimeMeta());
+app.use(
+  '/api/autotrading',
+  authMiddleware,
+  createAutotradingSessionsRouter({ registry: tradingSessionRegistry }),
+);
+
+app.get('/api/autotrading/realtime/meta', authMiddleware, (req: AuthRequest, res) => {
+  res.json(getAutotradingRealtimeMeta(req.userId));
 });
 
 app.get('/api/autotrading/ably/token', authMiddleware, async (req: AuthRequest, res) => {
   if (!isAblyEnabled()) {
-    const meta = getAutotradingRealtimeMeta();
+    const meta = getAutotradingRealtimeMeta(req.userId);
     return res.status(501).json({
       error: meta.ably.reason || 'Ably is not configured on server',
     });
   }
   try {
     const clientId = req.userId ? `user:${req.userId}` : undefined;
-    const token = await createAutotradingToken(clientId);
+    const token = await createAutotradingToken(req.userId!, clientId);
     res.json(token);
   } catch (e) {
     // Surface upstream Ably error (config/permissions). The detail is not
@@ -687,57 +685,25 @@ app.get('/api/autotrading/ably/token', authMiddleware, async (req: AuthRequest, 
   }
 });
 
-app.get('/api/autotrading/status', authMiddleware, (_req, res) => {
-  res.json({
-    status: getAgentStatus(),
-    config: getAgentConfig(),
-    riskStats: {
-      ...riskManager.getStats(),
-      lossStreakCount: getLossStreakCount()
-    },
-  });
-});
-
-app.post('/api/autotrading/status/reset', authMiddleware, (_req, res) => {
-  const result = resetCircuitBreaker();
-  res.json(result);
-});
-
-app.post('/api/autotrading/start', authMiddleware, (req: AuthRequest, res) => {
-  const cfg = req.body ?? {};
-  if (req.userId) cfg.userId = req.userId; // 注入使用者 ID 以利持久化 (P1)
-  const result = startAgent(cfg);
-  res.json(result);
-});
-
-app.post('/api/autotrading/stop', authMiddleware, (_req, res) => {
-  const result = stopAgent();
-  res.json(result);
-});
-
-app.post('/api/autotrading/kill-switch', authMiddleware, (_req, res) => {
-  const result = emergencyKillSwitch();
-  res.json(result);
-});
-
 // Telegram Webhook for quick liquidation
 app.post('/api/webhook/telegram', async (req, res) => {
   try {
     const { callback_query } = req.body;
     if (callback_query && callback_query.data === 'action_kill_switch') {
-      const result = emergencyKillSwitch();
-      console.log('[TelegramWebhook] 收到強平指令:', result);
+      const targetUserId = process.env.TELEGRAM_AUTOTRADING_USER_ID?.trim();
+      if (!targetUserId) {
+        return res.status(409).json({
+          error: 'TELEGRAM_AUTOTRADING_USER_ID 未設定，拒絕模糊的全域強平。',
+        });
+      }
+      await tradingSessionRegistry.kill(targetUserId);
+      console.log('[TelegramWebhook] 收到使用者範圍強平指令:', targetUserId);
     }
-    res.status(200).send('OK');
+    return res.status(200).send('OK');
   } catch (e) {
     console.error('[TelegramWebhook] Error:', e);
     res.status(500).send('Error');
   }
-});
-
-app.post('/api/autotrading/kill-switch/release', authMiddleware, (_req, res) => {
-  const result = deactivateKillSwitch();
-  res.json(result);
 });
 
 app.get('/api/autotrading/defaults', authMiddleware, (_req, res) => {
@@ -758,46 +724,6 @@ app.get('/api/autotrading/diagnostics', authMiddleware, (req: AuthRequest, res) 
 app.post('/api/autotrading/diagnostics/reset', authMiddleware, (_req, res) => {
   const result = resetAutotradingDiagnostics();
   res.json({ ok: true, result });
-});
-
-app.get('/api/autotrading/session', authMiddleware, (req: AuthRequest, res) => {
-  const symbols = String(req.query.symbols ?? '2330.TW').split(',').map(s => s.trim()).filter(Boolean);
-  const cfg = getAgentConfig();
-  const result = symbols.map(s => ({ symbol: s, ...isTradingSession(s, cfg.tradingHours) }));
-  res.json({ ok: true, sessions: result });
-});
-
-app.get('/api/autotrading/config', authMiddleware, (_req, res) => {
-  res.json(getAgentConfig());
-});
-
-app.put('/api/autotrading/config', authMiddleware, (req: AuthRequest, res) => {
-  if (req.userId) req.body.userId = req.userId; // 注入使用者 ID (P1)
-  updateAgentConfig(req.body);
-  res.json({ ok: true, config: getAgentConfig() });
-});
-
-app.get('/api/autotrading/logs', authMiddleware, (req: AuthRequest, res) => {
-  const limit = parseInt(String(req.query.limit ?? '100'));
-  res.json(getAgentLogs(limit));
-});
-
-app.get('/api/autotrading/positions', authMiddleware, async (_req, res) => {
-  try {
-    const positions = await simulatedAdapter.getPositions();
-    res.json(positions);
-  } catch (e) {
-    handleApiError(res, e);
-  }
-});
-
-app.get('/api/autotrading/balance', authMiddleware, async (_req, res) => {
-  try {
-    const balance = await simulatedAdapter.getBalance();
-    res.json(balance);
-  } catch (e) {
-    handleApiError(res, e);
-  }
 });
 
 app.get('/api/autotrading/orders', authMiddleware, async (req: AuthRequest, res) => {
@@ -914,66 +840,6 @@ app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthR
   }
 });
 
-app.get('/api/autotrading/broker/status', authMiddleware, (_req, res) => {
-  const cfg = getAgentConfig();
-  const brokerBridgeUrl =
-    process.env.BROKER_BRIDGE_URL ??
-    process.env.SINOPAC_BRIDGE_URL ??
-    process.env.KGI_BRIDGE_URL ??
-    'http://127.0.0.1:18080';
-  res.json({
-    ok: true,
-    config: {
-      brokerId: getPrimaryBrokerId(),
-      accountId: '',
-      mode: cfg.mode,
-    },
-    bridgeUrl: brokerBridgeUrl,
-  });
-});
-
-app.post('/api/autotrading/broker/connect', authMiddleware, async (req: AuthRequest, res) => {
-  const { brokerId, apiKey, apiSecret, certPath, certPassphrase, accountId, mode, bridgeUrl } = req.body ?? {};
-  const adapters = {
-    simulated: simulatedAdapter,
-    sinopac: sinopacAdapter,
-    kgi: kgiAdapter,
-    yuanta: yuantaAdapter,
-  } as const;
-
-  const adapter = adapters[brokerId as keyof typeof adapters];
-  if (!adapter) {
-    return res.status(400).json({
-      ok: false,
-      message: `Unsupported brokerId: ${brokerId}`,
-    });
-  }
-
-  try {
-    const result = await adapter.connect({
-      brokerId,
-      apiKey,
-      apiSecret,
-      certPath,
-      certPassphrase,
-      accountId,
-      bridgeUrl,
-      mode: (mode === 'real' ? 'real' : 'simulated'),
-    });
-    if (result?.ok) {
-      setPrimaryBroker(brokerId);
-    }
-    return res.json(result);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'broker connect failed';
-    return res.status(500).json({
-      ok: false,
-      message: msg,
-      requiresLocalSetup: brokerId !== 'simulated',
-    });
-  }
-});
-
 app.post('/api/autotrading/backtest', authMiddleware, async (req: AuthRequest, res) => {
   const { symbol, period, config } = req.body;
   try {
@@ -1017,7 +883,8 @@ app.post('/api/autotrading/optimize', authMiddleware, async (req: AuthRequest, r
       close: q.close
     })).filter((q: any) => q.close != null);
 
-    const proposal = await runOptimizationScan(symbol, quotes);
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const proposal = await runOptimizationScan(req.userId, symbol, quotes);
     res.json({ ok: true, proposal });
   } catch (e) {
     handleApiError(res, e);
@@ -1103,7 +970,7 @@ app.post('/api/autotrading/orders/:id/cancel', authMiddleware, async (req: AuthR
 
     if (order.brokerOrderId) {
       try {
-        await simulatedAdapter.cancelOrder(order.brokerOrderId);
+        await tradingSessionRegistry.ensure(req.userId).state.paperBroker.cancelOrder(order.brokerOrderId);
       } catch {
         // ignore adapter cancellation failure and still mark local lifecycle to cancelled
       }

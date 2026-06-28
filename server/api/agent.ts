@@ -31,6 +31,12 @@ import { getStrategyRuntimeService } from '../services/strategyRuntimeService.js
 import { PromptRegistry } from '../ai/promptRegistry.js';
 import { EvidenceModelGateway } from '../ai/modelGateway.js';
 import { answerGroundedChat } from '../ai/chatService.js';
+import {
+  inspectPaperOrders,
+  inspectPaperSession,
+  startPaperStrategy,
+  stopPaperStrategy,
+} from '../services/paperSessionTools.js';
 
 export const agentRouter = Router();
 
@@ -50,6 +56,10 @@ const registeredAgentTools = createDefaultAgentTools({
   getBacktestJob: (userId, jobId) => (
     getStrategyRuntimeService().getBacktestJob(userId, jobId)
   ),
+  startPaperStrategy,
+  stopPaperStrategy,
+  inspectPaperSession,
+  inspectPaperOrders,
 });
 
 const promptRegistry = new PromptRegistry();

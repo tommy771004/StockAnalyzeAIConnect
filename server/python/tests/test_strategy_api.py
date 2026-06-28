@@ -7,8 +7,8 @@ import unittest
 PYTHON_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PYTHON_ROOT))
 
-from science_skills_service import strategy_backtest, strategy_validate
-from strategy_runtime.contracts import StrategyBacktestPayload, StrategySource
+from science_skills_service import strategy_backtest, strategy_signal, strategy_validate
+from strategy_runtime.contracts import StrategyBacktestPayload, StrategySignalPayload, StrategySource
 
 
 class StrategyApiTests(unittest.TestCase):
@@ -83,6 +83,32 @@ class StrategyApiTests(unittest.TestCase):
         self.assertEqual(response["data"]["runId"], "run-1")
         self.assertEqual(response["data"]["strategyVersionId"], "version-1")
         self.assertEqual(response["data"]["sourceHash"], source_hash)
+
+    def test_signal_endpoint_executes_the_immutable_indicator_version(self):
+        source = (
+            "def run(data, params):\n"
+            "    n = len(data['close'])\n"
+            "    return {'buy': [False] * (n - 1) + [True], 'sell': [False] * n}\n"
+        )
+        source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        response = strategy_signal(StrategySignalPayload(
+            strategyVersionId="version-1",
+            runtime="indicator",
+            source=source,
+            sourceHash=source_hash,
+            parameters={},
+            symbol="AAPL",
+            bars=[
+                {"timestamp": "1", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+                {"timestamp": "2", "open": 101, "high": 102, "low": 100, "close": 101, "volume": 1000},
+            ],
+        ))
+
+        self.assertEqual(response["status"], "success")
+        self.assertEqual(response["data"]["action"], "BUY")
+        self.assertEqual(response["data"]["strategyVersionId"], "version-1")
+        self.assertEqual(response["data"]["sourceHash"], source_hash)
+        self.assertEqual(response["data"]["price"], 101)
 
 
 if __name__ == "__main__":

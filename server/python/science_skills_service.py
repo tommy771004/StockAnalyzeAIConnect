@@ -16,8 +16,10 @@ from strategy_runtime.backtest import run_backtest
 from strategy_runtime.contracts import (
     ENGINE_VERSION,
     StrategyBacktestPayload,
+    StrategySignalPayload,
     StrategySource,
 )
+from strategy_runtime.indicator_runtime import run_indicator
 from strategy_runtime.validator import validate_source
 from timesfm_predictor import TimesFMPredictor
 
@@ -107,6 +109,48 @@ def strategy_backtest(payload: StrategyBacktestPayload):
         })
     except Exception as exc:  # noqa: BLE001
         return err("strategy backtest failed", errors=[str(exc)])
+
+
+@app.post("/strategy/signal")
+def strategy_signal(payload: StrategySignalPayload):
+    if payload.runtime != "indicator":
+        return err("paper signal execution currently supports indicator runtime only")
+    validation = validate_source(payload.runtime, payload.source)
+    if validation.source_hash != payload.sourceHash:
+        return err("source hash mismatch")
+    if not validation.valid:
+        return err(
+            "strategy validation failed",
+            errors=[item.message for item in validation.diagnostics],
+        )
+    try:
+        bars = [bar.model_dump() for bar in payload.bars]
+        data = {
+            key: [bar[key] for bar in bars]
+            for key in ("timestamp", "open", "high", "low", "close", "volume")
+        }
+        signals = run_indicator(payload.source, data, payload.parameters)
+        last = len(bars) - 1
+        if "buy" in signals:
+            action = "SELL" if signals["sell"][last] else "BUY" if signals["buy"][last] else "HOLD"
+        else:
+            action = (
+                "SELL" if signals["close_long"][last]
+                else "BUY" if signals["open_long"][last]
+                else "HOLD"
+            )
+        return ok({
+            "strategyVersionId": payload.strategyVersionId,
+            "sourceHash": payload.sourceHash,
+            "engineVersion": ENGINE_VERSION,
+            "symbol": payload.symbol,
+            "action": action,
+            "confidence": 100 if action != "HOLD" else 0,
+            "price": bars[last]["close"],
+            "marketTimestamp": bars[last]["timestamp"],
+        })
+    except Exception as exc:  # noqa: BLE001
+        return err("strategy signal failed", errors=[str(exc)])
 
 
 @app.get("/arxiv/search")

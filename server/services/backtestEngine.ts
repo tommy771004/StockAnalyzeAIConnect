@@ -4,7 +4,7 @@
  */
 import { fuseSignals, isQuantumSignalEnabled } from './signalFusionService.js';
 import type { SignalObservation } from '../types/signal.js';
-import { applySlippage } from './twFees.js';
+import { applySlippage, computeTwStockFees } from './twFees.js';
 import { DEFAULT_SLIPPAGE_BPS, DEFAULT_LIQUIDITY_CAP_PCT } from './autotradingDefaults.js';
 
 interface BacktestResult {
@@ -122,8 +122,11 @@ export async function runAdvancedBacktest(
       if (shouldExit) {
         const exitPrice = applySlippage(currentPrice, 'SELL', slippageBps);
         const tradeValue = shares * exitPrice;
-        const commission = Math.max(20, tradeValue * 0.001425); // 0.1425% fee
-        const tax = tradeValue * 0.003; // 0.3% tax
+        const { commission, tax } = computeTwStockFees(tradeValue, {
+          side: 'SELL',
+          isDayTrade: entryDate === currentDate,
+          isETF: /^00\d+\.(TW|TWO)$/i.test(symbol),
+        });
 
         balance += (tradeValue - commission - tax);
         const pnl = (exitPrice - entryPrice) * shares - commission - tax;
@@ -237,7 +240,9 @@ export async function runAdvancedBacktest(
         // 先計算預估股數
         let estShares = Math.floor(targetInvest / fillPrice);
         // 考慮手續費
-        const estCommission = Math.max(20, estShares * fillPrice * 0.001425);
+        const estCommission = computeTwStockFees(estShares * fillPrice, {
+          side: 'BUY',
+        }).commission;
         if (estShares * fillPrice + estCommission > balance) {
            estShares = Math.floor((balance - 20) / (fillPrice * 1.001425));
         }
@@ -253,7 +258,9 @@ export async function runAdvancedBacktest(
           shares = estShares;
           const tradeValue = shares * fillPrice;
 
-          const commission = Math.max(20, tradeValue * 0.001425);
+          const commission = computeTwStockFees(tradeValue, {
+            side: 'BUY',
+          }).commission;
 
           balance -= (tradeValue + commission);
           // 買入成本需要攤平手續費

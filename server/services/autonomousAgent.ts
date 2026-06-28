@@ -44,7 +44,7 @@ interface TaiwanSkillRules {
   intradayOddLot: { start: string; end: string; minQty: number; maxQty: number };
 }
 
-interface AnalysisSignal {
+export interface AnalysisSignal {
   action: 'BUY' | 'SELL' | 'HOLD';
   confidence: number;
   price?: number;
@@ -52,6 +52,16 @@ interface AnalysisSignal {
   quantumForcedLiquidation?: boolean;
   defensiveMode?: boolean;
   _analysisError?: boolean;
+  decisionId?: string;
+  evidenceIds?: string[];
+  marketTimestamp?: string;
+  dataProvenance?: {
+    providerId: string;
+    retrievedAt: string;
+    marketTimestamp?: string;
+    delayed: boolean;
+    cacheStatus?: string;
+  };
   timesFmMeta?: {
     action: 'BUY' | 'SELL' | 'HOLD';
     confidence: number;
@@ -67,6 +77,14 @@ interface AnalysisSignal {
     gated?: boolean;
     leverageMultiplier?: number;
   };
+}
+
+export interface TradingAnalysisContext {
+  emitLog: (log: Omit<AgentLog, 'id' | 'timestamp'>) => void;
+  publish: (event: { type: string; data: unknown }) => void;
+  pushRecentPrice: (symbol: string, price: number, maxLen?: number) => number[];
+  broadcastSentiment: (score: number) => void;
+  warn: (key: string, message: string) => void;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -401,7 +419,17 @@ function parseInstitutionalFlowBias(flowText: string): number {
 }
 
 // ── 分析邏輯 ──────────────────────────────────────────────────
-async function runAnalysis(config: AgentConfig, symbol: string): Promise<AnalysisSignal> {
+export async function runTradingAnalysis(
+  config: AgentConfig,
+  symbol: string,
+  context: TradingAnalysisContext = {
+    emitLog,
+    publish: (event) => wsBroadcast?.(event),
+    pushRecentPrice,
+    broadcastSentiment,
+    warn: warnWithCooldown,
+  },
+): Promise<AnalysisSignal> {
   const sParams = { ...config.params, ...(config.symbolConfigs?.[symbol] || {}) };
   try {
     const [news, flow, mtf, indicators, overview, quote, modelCandidates] = await Promise.all([
@@ -417,7 +445,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
     const primaryModel = modelCandidates[0]?.status === 'fulfilled' ? modelCandidates[0].value : undefined;
     const secondaryModel = modelCandidates[1]?.status === 'fulfilled' ? modelCandidates[1].value : primaryModel;
     if (modelCandidates.some((m) => m.status === 'rejected')) {
-      warnWithCooldown(`model-selector:${symbol}`, `[Agent] Model selector degraded for ${symbol}; using callLLM auto routing.`);
+      context.warn(`model-selector:${symbol}`, `[Agent] Model selector degraded for ${symbol}; using callLLM auto routing.`);
     }
 
     const rsiValue = Number(indicators?.['RSI'] || 50);
@@ -440,7 +468,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
         sentiment = sentimentText.trim().replace(/[^a-zA-Z]/g, '');
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        warnWithCooldown(`sentiment:${symbol}`, `[Agent] Sentiment analysis fallback for ${symbol}: ${msg}`);
+        context.warn(`sentiment:${symbol}`, `[Agent] Sentiment analysis fallback for ${symbol}: ${msg}`);
       }
     }
 
@@ -470,12 +498,12 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
       dec = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || '{}');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      warnWithCooldown(`orchestrator:${symbol}`, `[Agent] Orchestrator decision fallback for ${symbol}: ${msg}`);
+      context.warn(`orchestrator:${symbol}`, `[Agent] Orchestrator decision fallback for ${symbol}: ${msg}`);
     }
 
     const currentPrice = quote?.price || Number(overview?.close ?? 0) || 0;
     const prevClose = quote?.prevClose || 0;
-    const recentPrices = pushRecentPrice(symbol, currentPrice);
+    const recentPrices = context.pushRecentPrice(symbol, currentPrice);
     const timesFmCfg = {
       horizonTicks: Math.max(3, Math.min(32, Math.floor(Number(sParams.TIMESFM_FORECAST?.horizonTicks ?? 8)))),
       minEdgePct: Math.max(0.01, Number(sParams.TIMESFM_FORECAST?.minEdgePct ?? 0.2)),
@@ -489,7 +517,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
     
     // 信心度過低時，透過已有的新聞服務補充上下文後重新決策
     if (dec.action !== 'HOLD' && (dec.confidence || 0) < 65 && news && news.length > 50) {
-      emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `信心度 (${dec.confidence}) 過低，以新聞摘要補充上下文後重新評估...` });
+      context.emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `信心度 (${dec.confidence}) 過低，以新聞摘要補充上下文後重新評估...` });
       try {
         const { text: newText } = await callLLM({
           systemPrompt: ORCHESTRATOR_PROMPT,
@@ -501,11 +529,11 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
         });
         const newDec = JSON.parse(newText.match(/\{[\s\S]*\}/)?.[0] || '{}');
         if (newDec.confidence && Number(newDec.confidence) > (dec.confidence || 0)) {
-          emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `補充研究完成：信心度 ${dec.confidence} → ${newDec.confidence}，動作: ${newDec.action}` });
+          context.emitLog({ level: 'INFO', source: 'AGENT', symbol, message: `補充研究完成：信心度 ${dec.confidence} → ${newDec.confidence}，動作: ${newDec.action}` });
           dec = newDec;
         }
       } catch (e) {
-        warnWithCooldown(`deep-research:${symbol}`, `[Agent] 補充研究失敗 ${symbol}: ${(e as Error).message}`);
+        context.warn(`deep-research:${symbol}`, `[Agent] 補充研究失敗 ${symbol}: ${(e as Error).message}`);
       }
     }
     
@@ -562,10 +590,10 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
             model: String(tf.data.model ?? 'timesfm'),
           };
         } else if (tf.errors?.length) {
-          warnWithCooldown(`timesfm:${symbol}`, `[Agent] TimesFM fallback for ${symbol}: ${tf.errors[0]}`);
+          context.warn(`timesfm:${symbol}`, `[Agent] TimesFM fallback for ${symbol}: ${tf.errors[0]}`);
         }
       } catch (e) {
-        warnWithCooldown(`timesfm:${symbol}`, `[Agent] TimesFM call failed for ${symbol}: ${(e as Error).message}`);
+        context.warn(`timesfm:${symbol}`, `[Agent] TimesFM call failed for ${symbol}: ${(e as Error).message}`);
       }
     }
 
@@ -676,7 +704,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
         quantumForcedLiquidation = quantumAction === 'SELL' && quantumConfidence >= 70 && regimeFlipProb >= 0.65;
         defensiveMode = regimeFlipProb >= 0.7 || uncertaintyPenalty >= 0.65;
       } else if (quantumRes.errors?.length) {
-        emitLog({ level: 'WARNING', source: 'QUANTUM', symbol, message: `Quantum signal fallback: ${quantumRes.errors[0]}` });
+        context.emitLog({ level: 'WARNING', source: 'QUANTUM', symbol, message: `Quantum signal fallback: ${quantumRes.errors[0]}` });
       }
     }
 
@@ -700,7 +728,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
       quantumMeta.leverageMultiplier = quantumPolicy.leverageMultiplier;
     }
 
-    wsBroadcast?.({
+    context.publish({
       type: 'decision_fusion',
       data: {
         symbol,
@@ -720,7 +748,7 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
 
     // 發送決策熱圖數據到前端（改用融合決策）
     const heatScore = effectiveConfidence * (effectiveAction === 'SELL' ? -1 : effectiveAction === 'BUY' ? 1 : 0);
-    wsBroadcast?.({
+    context.publish({
       type: 'decision_heat',
       data: {
         symbol,
@@ -734,10 +762,11 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
     const sentimentDelta = effectiveAction === 'BUY' ? 50 + heatScore / 2
       : effectiveAction === 'SELL' ? 50 - Math.abs(heatScore) / 2
       : 50;
-    broadcastSentiment(sentimentDelta);
+    context.broadcastSentiment(sentimentDelta);
 
-    return { 
-      action: effectiveAction || 'HOLD', 
+    const decisionTimestamp = new Date().toISOString();
+    return {
+      action: effectiveAction || 'HOLD',
       confidence: effectiveConfidence || 0, 
       price: currentPrice,
       prevClose,
@@ -745,6 +774,16 @@ async function runAnalysis(config: AgentConfig, symbol: string): Promise<Analysi
       defensiveMode,
       timesFmMeta,
       quantumMeta,
+      decisionId: `${config.userId ?? 'anonymous'}-${symbol}-${Date.now()}`,
+      evidenceIds: [`market:${symbol}:${decisionTimestamp}`],
+      marketTimestamp: decisionTimestamp,
+      dataProvenance: {
+        providerId: isTaiwanSymbol(symbol) ? 'twse' : 'tradingview',
+        retrievedAt: decisionTimestamp,
+        marketTimestamp: decisionTimestamp,
+        delayed: false,
+        cacheStatus: 'live_or_provider_cache',
+      },
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -862,7 +901,7 @@ async function agentTick() {
     // Phase 1: 所有標的並行分析（純讀取，互不干擾）
     const analysisResults = await Promise.allSettled(
       agentConfig.symbols.map(symbol =>
-        runAnalysis(agentConfig, symbol).then(signal => ({ symbol, signal }))
+        runTradingAnalysis(agentConfig, symbol).then(signal => ({ symbol, signal }))
       )
     );
 

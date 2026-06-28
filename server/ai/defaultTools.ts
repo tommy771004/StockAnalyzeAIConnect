@@ -33,6 +33,17 @@ interface DefaultAgentToolDependencies {
     userId: string,
     jobId: string,
   ): Promise<unknown | null>;
+  startPaperStrategy?(
+    userId: string,
+    input: {
+      ticker: string;
+      strategyVersionId: string;
+      paperOnly: true;
+    },
+  ): Promise<unknown>;
+  stopPaperStrategy?(userId: string): Promise<unknown>;
+  inspectPaperSession?(userId: string): Promise<unknown>;
+  inspectPaperOrders?(userId: string): Promise<unknown>;
   now?: () => number;
 }
 
@@ -86,6 +97,14 @@ const StrategyVersionInputSchema = z.object({
 const BacktestJobInputSchema = z.object({
   jobId: z.string().min(1).max(200),
 });
+
+const StartPaperStrategyInputSchema = z.object({
+  ticker: z.string().trim().min(1).max(64).transform((value) => value.toUpperCase()),
+  strategyVersionId: z.string().min(1).max(200),
+  paperOnly: z.literal(true).default(true),
+});
+
+const EmptyInputSchema = z.object({}).strict();
 
 function marketFor(symbol: string): DataMarket {
   if (symbol.endsWith('.TW') || symbol.endsWith('.TWO')) return 'tw_stock';
@@ -222,6 +241,159 @@ export function createDefaultAgentTools(
       } catch {
         return unavailable('show_stock_chart', '1', 'NO_PROVIDER_DATA');
       }
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'start_paper_strategy',
+      version: '1',
+      description: '啟動使用者擁有且已驗證的不可變策略版本；僅限隔離模擬交易',
+      riskClass: 'paper_trade',
+      requiredScopes: ['T'],
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ticker: { type: 'string' },
+          strategyVersionId: { type: 'string' },
+          paperOnly: { type: 'boolean', const: true },
+        },
+        required: ['ticker', 'strategyVersionId'],
+      },
+    },
+    input: StartPaperStrategyInputSchema,
+    execute: async (input, context) => {
+      if (!dependencies.startPaperStrategy || !dependencies.validateStrategyVersion) {
+        return unavailable('start_paper_strategy', '1', 'PAPER_SESSION_UNAVAILABLE');
+      }
+      const market = marketFor(input.ticker);
+      assertAllowed(input.ticker, market, context);
+      const validation = await dependencies.validateStrategyVersion(
+        context.userId,
+        input.strategyVersionId,
+      );
+      if (
+        !validation
+        || typeof validation !== 'object'
+        || (validation as { valid?: boolean }).valid !== true
+      ) {
+        throw new ToolAccessDeniedError('Strategy version is not valid for paper execution');
+      }
+      const data = await dependencies.startPaperStrategy(context.userId, {
+        ticker: input.ticker,
+        strategyVersionId: input.strategyVersionId,
+        paperOnly: true,
+      });
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'start_paper_strategy',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Paper session ${context.userId}`,
+          data,
+          'hermes-paper-session',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'stop_paper_strategy',
+      version: '1',
+      description: '停止目前 Agent token 所屬使用者的模擬交易工作階段',
+      riskClass: 'paper_trade',
+      requiredScopes: ['T'],
+      inputSchema: { type: 'object', properties: {} },
+    },
+    input: EmptyInputSchema,
+    execute: async (_input, context) => {
+      if (!dependencies.stopPaperStrategy) {
+        return unavailable('stop_paper_strategy', '1', 'PAPER_SESSION_UNAVAILABLE');
+      }
+      const data = await dependencies.stopPaperStrategy(context.userId);
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'stop_paper_strategy',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Stopped paper session ${context.userId}`,
+          data,
+          'hermes-paper-session',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'inspect_paper_session',
+      version: '1',
+      description: '讀取目前 Agent token 所屬使用者的模擬交易狀態與風控',
+      riskClass: 'read',
+      requiredScopes: ['T'],
+      inputSchema: { type: 'object', properties: {} },
+    },
+    input: EmptyInputSchema,
+    execute: async (_input, context) => {
+      if (!dependencies.inspectPaperSession) {
+        return unavailable('inspect_paper_session', '1', 'PAPER_SESSION_UNAVAILABLE');
+      }
+      const data = await dependencies.inspectPaperSession(context.userId);
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'inspect_paper_session',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Paper session status ${context.userId}`,
+          data,
+          'hermes-paper-session',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'inspect_paper_orders',
+      version: '1',
+      description: '讀取目前 Agent token 所屬使用者的模擬委託與持倉',
+      riskClass: 'read',
+      requiredScopes: ['T'],
+      inputSchema: { type: 'object', properties: {} },
+    },
+    input: EmptyInputSchema,
+    execute: async (_input, context) => {
+      if (!dependencies.inspectPaperOrders) {
+        return unavailable('inspect_paper_orders', '1', 'PAPER_SESSION_UNAVAILABLE');
+      }
+      const data = await dependencies.inspectPaperOrders(context.userId);
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'inspect_paper_orders',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Paper orders ${context.userId}`,
+          data,
+          'hermes-paper-session',
+          timestamp,
+        )],
+        warnings: [],
+      };
     },
   });
 

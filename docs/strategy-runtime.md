@@ -175,6 +175,22 @@ GET /api/backtest-jobs/{jobId}
 The AI `execute_backtest` tool calls this same service and requires
 `strategyVersionId`; it no longer returns a placeholder result.
 
+## Paper signal execution
+
+Validated immutable `indicator` versions can run in an isolated paper session. Each tick
+loads normalized 15-minute OHLCV through the provider registry and calls:
+
+```http
+POST /strategy/signal
+```
+
+The response must preserve strategy version ID, source hash, symbol, engine version, and
+market timestamp. Hermes rejects mismatched identity or stale data before creating an
+order. The signal then enters the same stop/risk/order pipeline as built-in signals.
+
+Stateful `script` versions remain backtest-only until their context can be durably
+snapshotted and restored across paper ticks; paper start rejects them explicitly.
+
 ## Running the Python service
 
 Windows isolated environment:
@@ -201,6 +217,7 @@ target Postgres database before using version or job routes.
 
 ## Safety status
 
-This phase enables deterministic backtesting only. It does not enable real-money
-strategy execution or replace the simulated broker. Broker adapters remain subject to
-independent sandbox verification and operator acknowledgment.
+This phase enables deterministic backtesting and isolated indicator-version paper
+execution. It does not enable real-money strategy execution or replace the simulated
+broker. Broker adapters remain subject to independent sandbox verification and operator
+acknowledgment.

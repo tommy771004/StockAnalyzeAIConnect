@@ -26,13 +26,13 @@ export function createRegistryBarLoader(
   registry: DataResolver,
   now: () => number = Date.now,
 ): LoadStrategyBars {
-  return async ({ symbol, period1, period2 }) => {
+  return async ({ symbol, period1, period2, interval }) => {
     const envelope = await registry.resolve({
       operation: 'bars',
       symbol,
       market: marketFor(symbol),
       params: {
-        interval: '1d',
+        interval: interval ?? '1d',
         start: asIsoTime(period1 ?? now() - 365 * 24 * 60 * 60 * 1_000),
         end: asIsoTime(period2 ?? now()),
         limit: 10_000,

@@ -11,7 +11,7 @@ const provenance = {
   cache: 'miss' as const,
 };
 
-function context(scopes: Array<'R' | 'W' | 'B'> = ['R', 'B']) {
+function context(scopes: Array<'R' | 'W' | 'B' | 'T'> = ['R', 'B']) {
   return {
     userId: 'user-1',
     scopes,
@@ -184,5 +184,65 @@ describe('default agent tools', () => {
     expect(draft.evidence[0]?.source.providerId).toBe('hermes-strategy-registry');
     expect(validation.data).toMatchObject({ valid: true });
     expect(job.data).toMatchObject({ id: 'job-2', status: 'completed' });
+  });
+
+  it('starts, inspects, and stops only allowlisted paper sessions with T scope', async () => {
+    const validateStrategyVersion = vi.fn(async () => ({ valid: true, diagnostics: [] }));
+    const startPaperStrategy = vi.fn(async () => ({
+      sessionId: 'user-1',
+      status: 'running',
+      paperOnly: true,
+    }));
+    const inspectPaperSession = vi.fn(async () => ({
+      sessionId: 'user-1',
+      status: 'running',
+      paperOnly: true,
+    }));
+    const inspectPaperOrders = vi.fn(async () => [{ orderId: 'SIM-1' }]);
+    const stopPaperStrategy = vi.fn(async () => ({
+      sessionId: 'user-1',
+      status: 'stopped',
+      paperOnly: true,
+    }));
+    const tools = createDefaultAgentTools({
+      resolveData: vi.fn() as never,
+      getPortfolio: async () => [],
+      getTrades: async () => [],
+      queueBacktest: async () => ({ jobId: 'job-1', status: 'queued' }),
+      validateStrategyVersion,
+      startPaperStrategy,
+      inspectPaperSession,
+      inspectPaperOrders,
+      stopPaperStrategy,
+      now: () => Date.parse('2026-01-02T00:00:01.000Z'),
+    });
+
+    await expect(tools.execute('start_paper_strategy', {
+      ticker: 'MSFT',
+      strategyVersionId: 'version-1',
+    }, context(['T']))).rejects.toThrow('allowlist');
+    await expect(tools.execute('start_paper_strategy', {
+      ticker: 'AAPL',
+      strategyVersionId: 'version-1',
+    }, context(['R']))).rejects.toThrow('requires scopes');
+
+    const started = await tools.execute('start_paper_strategy', {
+      ticker: 'AAPL',
+      strategyVersionId: 'version-1',
+    }, context(['T']));
+    const inspected = await tools.execute('inspect_paper_session', {}, context(['T']));
+    const orders = await tools.execute('inspect_paper_orders', {}, context(['T']));
+    const stopped = await tools.execute('stop_paper_strategy', {}, context(['T']));
+
+    expect(validateStrategyVersion).toHaveBeenCalledWith('user-1', 'version-1');
+    expect(startPaperStrategy).toHaveBeenCalledWith('user-1', {
+      ticker: 'AAPL',
+      strategyVersionId: 'version-1',
+      paperOnly: true,
+    });
+    expect(started.data).toMatchObject({ status: 'running', paperOnly: true });
+    expect(inspected.data).toMatchObject({ status: 'running' });
+    expect(orders.data).toEqual([{ orderId: 'SIM-1' }]);
+    expect(stopped.data).toMatchObject({ status: 'stopped' });
   });
 });

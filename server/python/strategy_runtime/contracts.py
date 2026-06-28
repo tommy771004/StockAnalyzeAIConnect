@@ -69,3 +69,8 @@ class StrategyBacktestPayload(StrategySource):
     symbol: str = Field(min_length=1)
     bars: list[Bar] = Field(min_length=2, max_length=100_000)
     execution: ExecutionPolicy = Field(default_factory=ExecutionPolicy)
+
+
+class StrategySignalPayload(StrategySource):
+    symbol: str = Field(min_length=1)
+    bars: list[Bar] = Field(min_length=2, max_length=10_000)

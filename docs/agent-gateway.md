@@ -55,10 +55,20 @@ POST /api/agent/v1/strategy-versions/:versionId/validate
 POST /api/agent/v1/backtests
 GET  /api/agent/v1/backtests/:jobId
 GET  /api/agent/v1/backtests/:jobId/events
+POST /api/agent/v1/paper-sessions
+GET  /api/agent/v1/paper-sessions/current
+GET  /api/agent/v1/paper-sessions/current/orders
+DELETE /api/agent/v1/paper-sessions/current
 ```
 
 Tool discovery is filtered by the token's scopes. Tool execution revalidates scope,
 paper-only policy, input schema, output schema, allowlists, and evidence.
+
+`start_paper_strategy` validates user ownership and the immutable strategy version before
+starting the user's isolated session. Paper execution currently supports validated
+`indicator` versions. The same restricted Python runtime evaluates current normalized
+15-minute OHLCV, and the resulting signal still passes through proactive stops,
+freshness checks, portfolio risk, and the simulated broker.
 
 ## Idempotency
 
@@ -103,3 +113,4 @@ not audit fields. Audit rows are append-only in the repository surface.
 - Strategy validation and execution occur in the restricted Python runtime.
 - Generated strategy code is never executed in the Express process.
 - Real broker placeholders remain unavailable to the gateway.
+- Paper session IDs and run/resource IDs are recorded in idempotency and audit rows.

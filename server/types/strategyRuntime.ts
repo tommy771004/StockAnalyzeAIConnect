@@ -69,8 +69,26 @@ export const StrategyBacktestRequestSchema = StrategySourceSchema.extend({
   execution: ExecutionPolicySchema,
 });
 
+export const StrategySignalRequestSchema = StrategySourceSchema.extend({
+  symbol: z.string().min(1),
+  bars: z.array(BarSchema).min(2).max(10_000),
+});
+
+export const StrategySignalResultSchema = z.object({
+  strategyVersionId: z.string().min(1),
+  sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+  engineVersion: z.string().min(1),
+  symbol: z.string().min(1),
+  action: z.enum(['BUY', 'SELL', 'HOLD']),
+  confidence: z.number().min(0).max(100),
+  price: z.number().finite().positive(),
+  marketTimestamp: z.string().min(1),
+});
+
 export type StrategyValidationRequest = z.input<typeof StrategyValidationRequestSchema>;
 export type StrategyBacktestRequest = z.input<typeof StrategyBacktestRequestSchema>;
+export type StrategySignalRequest = z.input<typeof StrategySignalRequestSchema>;
+export type StrategySignalResult = z.infer<typeof StrategySignalResultSchema>;
 
 export const StrategyDiagnosticSchema = z.object({
   code: z.string().min(1),

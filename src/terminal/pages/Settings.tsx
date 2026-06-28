@@ -4,6 +4,8 @@ import { Panel } from '../ui/Panel';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { Loader2, Save, User, Shield, CreditCard, Key, Edit2, Check, X } from 'lucide-react';
+import { AgentTokenPanel } from '../../components/Settings/AgentTokenPanel';
+import { AgentAuditPanel } from '../../components/Settings/AgentAuditPanel';
 
 // Fix #6: typed user/settings state — no more useState<any>
 interface UserProfile {
@@ -226,6 +228,14 @@ export function SettingsPage() {
             </div>
           </div>
         </Panel>
+        <div className="md:col-span-2 space-y-6">
+          <Panel title={t('agentTokens.title', 'Scoped Agent Tokens')} icon={<Shield className="h-4 w-4" />} collapsible>
+            <div className="p-4"><AgentTokenPanel /></div>
+          </Panel>
+          <Panel title={t('agentAudit.title', 'Agent Audit Trail')} icon={<Shield className="h-4 w-4" />} collapsible>
+            <div className="p-4"><AgentAuditPanel /></div>
+          </Panel>
+        </div>
       </div>
     </div>
   );

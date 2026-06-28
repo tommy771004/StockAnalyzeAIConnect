@@ -1,10 +1,14 @@
 import {
   StrategyBacktestRequestSchema,
   StrategyBacktestResultSchema,
+  StrategySignalRequestSchema,
+  StrategySignalResultSchema,
   StrategyValidationRequestSchema,
   StrategyValidationResultSchema,
   type StrategyBacktestRequest,
   type StrategyBacktestResult,
+  type StrategySignalRequest,
+  type StrategySignalResult,
   type StrategyValidationRequest,
   type StrategyValidationResult,
 } from '../types/strategyRuntime.js';
@@ -85,6 +89,34 @@ export async function runStrategyBacktest(
     || result.sourceHash !== request.sourceHash
   ) {
     throw new Error('Strategy backtest returned mismatched immutable identity');
+  }
+  return result;
+}
+
+export async function runStrategySignal(
+  input: StrategySignalRequest,
+): Promise<StrategySignalResult> {
+  const request = StrategySignalRequestSchema.parse(input);
+  await assertSourceHash(request.source, request.sourceHash);
+  const response = await requestScience<unknown>(
+    '/strategy/signal',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+    { retries: 0, timeoutMs: VALIDATION_TIMEOUT_MS },
+  );
+  if (response.status !== 'success' || response.data === null) {
+    throw new Error(errorMessage(response, 'Strategy signal failed'));
+  }
+  const result = StrategySignalResultSchema.parse(response.data);
+  if (
+    result.strategyVersionId !== request.strategyVersionId
+    || result.sourceHash !== request.sourceHash
+    || result.symbol !== request.symbol
+  ) {
+    throw new Error('Strategy signal returned mismatched immutable identity');
   }
   return result;
 }

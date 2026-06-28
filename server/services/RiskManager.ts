@@ -72,7 +72,25 @@ export interface MonteCarloRiskSnapshot {
   lastUpdated: string;
 }
 
-class RiskManager {
+export interface RiskManagerSnapshot {
+  config: RiskConfig;
+  modelRisk: ModelRiskConfig;
+  currentDailyLoss: number;
+  currentDailyTrade: number;
+  killSwitchActive: boolean;
+  totalUsed: number;
+  consecutiveDrawdownDays: number;
+  monteCarlo: MonteCarloRiskSnapshot;
+}
+
+function requireNonNegativeFinite(value: number, field: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid RiskManager snapshot field: ${field}`);
+  }
+  return value;
+}
+
+export class RiskManager {
   private config: RiskConfig = { ...DEFAULT_RISK_CONFIG };
   private modelRisk: ModelRiskConfig = { ...DEFAULT_MODEL_RISK_CONFIG };
   private currentDailyLoss = 0;
@@ -143,6 +161,58 @@ class RiskManager {
   restoreDailyState(state: { dailyLoss?: number; killSwitchActive?: boolean }) {
     if (state.dailyLoss !== undefined) this.currentDailyLoss = state.dailyLoss;
     if (state.killSwitchActive) this.killSwitchActive = true;
+  }
+
+  exportState(): RiskManagerSnapshot {
+    return {
+      config: { ...this.config },
+      modelRisk: { ...this.modelRisk },
+      currentDailyLoss: this.currentDailyLoss,
+      currentDailyTrade: this.currentDailyTrade,
+      killSwitchActive: this.killSwitchActive,
+      totalUsed: this.totalUsed,
+      consecutiveDrawdownDays: this.consecutiveDrawdownDays,
+      monteCarlo: { ...this.monteCarlo },
+    };
+  }
+
+  restoreState(snapshot: RiskManagerSnapshot): void {
+    if (!snapshot || typeof snapshot !== 'object') {
+      throw new Error('Invalid RiskManager snapshot');
+    }
+
+    this.config = { ...DEFAULT_RISK_CONFIG, ...snapshot.config };
+    this.modelRisk = { ...DEFAULT_MODEL_RISK_CONFIG, ...snapshot.modelRisk };
+    this.currentDailyLoss = requireNonNegativeFinite(snapshot.currentDailyLoss, 'currentDailyLoss');
+    this.currentDailyTrade = requireNonNegativeFinite(snapshot.currentDailyTrade, 'currentDailyTrade');
+    this.killSwitchActive = snapshot.killSwitchActive === true;
+    this.totalUsed = requireNonNegativeFinite(snapshot.totalUsed, 'totalUsed');
+    this.consecutiveDrawdownDays = Math.floor(
+      requireNonNegativeFinite(snapshot.consecutiveDrawdownDays, 'consecutiveDrawdownDays'),
+    );
+    this.monteCarlo = {
+      ...snapshot.monteCarlo,
+      paths: Math.floor(requireNonNegativeFinite(snapshot.monteCarlo.paths, 'monteCarlo.paths')),
+      horizonSteps: Math.floor(
+        requireNonNegativeFinite(snapshot.monteCarlo.horizonSteps, 'monteCarlo.horizonSteps'),
+      ),
+      ruinProbability: requireNonNegativeFinite(
+        snapshot.monteCarlo.ruinProbability,
+        'monteCarlo.ruinProbability',
+      ),
+      valueAtRisk95Pct: requireNonNegativeFinite(
+        snapshot.monteCarlo.valueAtRisk95Pct,
+        'monteCarlo.valueAtRisk95Pct',
+      ),
+      expectedMaxDrawdownPct: requireNonNegativeFinite(
+        snapshot.monteCarlo.expectedMaxDrawdownPct,
+        'monteCarlo.expectedMaxDrawdownPct',
+      ),
+      ruinThresholdTWD: requireNonNegativeFinite(
+        snapshot.monteCarlo.ruinThresholdTWD,
+        'monteCarlo.ruinThresholdTWD',
+      ),
+    };
   }
 
   recordPnl(pnl: number) {

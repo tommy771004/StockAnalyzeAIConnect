@@ -66,6 +66,7 @@ export interface RiskStats {
 
 export interface AgentConfig {
   userId?: string;
+  strategyVersionId?: string;
   mode: 'simulated' | 'real';
   strategies: StrategyType[];
   params: StrategyParams;

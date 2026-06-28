@@ -11,7 +11,7 @@ import { recordAutotradingDiagnostic } from './autotradingDiagnostics.js';
 
 const ABLY_REST_BASE = 'https://rest.ably.io';
 const ABLY_AUTH_URL = '/api/autotrading/ably/token';
-const ABLY_CHANNEL = (process.env.ABLY_AUTOTRADING_CHANNEL ?? 'autotrading:global').trim();
+const ABLY_CHANNEL_PREFIX = (process.env.ABLY_AUTOTRADING_CHANNEL ?? 'autotrading').trim();
 const ABLY_API_KEY = (process.env.ABLY_API_KEY ?? '').trim();
 const ABLY_TOKEN_TTL_MS = Math.max(60_000, Number(process.env.ABLY_TOKEN_TTL_MS ?? 60 * 60 * 1000));
 const ABLY_PUBLISH_TIMEOUT_MS = Math.max(2000, Number(process.env.ABLY_PUBLISH_TIMEOUT_MS ?? 8000));
@@ -34,13 +34,17 @@ export function isAblyEnabled(): boolean {
   return !!ABLY_API_KEY && !!KEY_NAME && ABLY_API_KEY.includes(':');
 }
 
-export function getAutotradingRealtimeMeta() {
+function channelForUser(userId: string): string {
+  return `${ABLY_CHANNEL_PREFIX}:user:${userId}`;
+}
+
+export function getAutotradingRealtimeMeta(userId?: string) {
   const reason = getAblyDisabledReason();
   return {
     provider: isAblyEnabled() ? 'ably' : 'ws',
     ably: {
       enabled: isAblyEnabled(),
-      channel: ABLY_CHANNEL,
+      channel: userId ? channelForUser(userId) : `${ABLY_CHANNEL_PREFIX}:user:{userId}`,
       authUrl: ABLY_AUTH_URL,
       reason: reason || undefined,
       keyName: KEY_NAME || undefined,
@@ -49,13 +53,13 @@ export function getAutotradingRealtimeMeta() {
   };
 }
 
-export async function createAutotradingToken(clientId?: string) {
+export async function createAutotradingToken(userId: string, clientId?: string) {
   if (!isAblyEnabled()) {
     throw new Error('ABLY_API_KEY is not configured');
   }
 
   const capability = JSON.stringify({
-    [ABLY_CHANNEL]: ['subscribe'],
+    [channelForUser(userId)]: ['subscribe'],
   });
 
   // Ably REST requestToken 需要 timestamp 做新鮮度檢查 (錯誤碼 40001)
@@ -102,16 +106,18 @@ function logAblyPublishError(message: string) {
 
 // Batch queue: events are collected here and flushed together in a single Ably REST call,
 // avoiding concurrent HTTP requests that cause "operation aborted due to timeout" errors.
-let _pendingMessages: Array<{ name: string; data: unknown }> = [];
-let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+const _pendingMessages = new Map<string, Array<{ name: string; data: unknown }>>();
+const _flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const BATCH_FLUSH_MS = 300;
 
-async function flushPendingMessages(): Promise<void> {
-  _flushTimer = null;
-  if (_pendingMessages.length === 0) return;
-  const batch = _pendingMessages.splice(0); // drain atomically before any await
+async function flushPendingMessages(channel: string): Promise<void> {
+  _flushTimers.delete(channel);
+  const pending = _pendingMessages.get(channel);
+  if (!pending?.length) return;
+  const batch = pending.splice(0);
+  if (pending.length === 0) _pendingMessages.delete(channel);
 
-  const endpoint = `${ABLY_REST_BASE}/channels/${encodeURIComponent(ABLY_CHANNEL)}/messages`;
+  const endpoint = `${ABLY_REST_BASE}/channels/${encodeURIComponent(channel)}/messages`;
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -140,7 +146,7 @@ async function flushPendingMessages(): Promise<void> {
 
 // Synchronous enqueue — never blocks the agent tick.
 // Events are batched and sent in a single HTTP call BATCH_FLUSH_MS after the first enqueue.
-export function publishAutotradingEvent(data: unknown): void {
+export function publishAutotradingEvent(userId: string, data: unknown): void {
   if (!isAblyEnabled()) return;
 
   const type = (data && typeof data === 'object' && 'type' in (data as Record<string, unknown>))
@@ -149,9 +155,15 @@ export function publishAutotradingEvent(data: unknown): void {
 
   if (SKIP_ABLY_TYPES.has(type)) return;
 
-  _pendingMessages.push({ name: type, data });
+  const channel = channelForUser(userId);
+  const pending = _pendingMessages.get(channel) ?? [];
+  pending.push({ name: type, data });
+  _pendingMessages.set(channel, pending);
 
-  if (!_flushTimer) {
-    _flushTimer = setTimeout(() => { void flushPendingMessages(); }, BATCH_FLUSH_MS);
+  if (!_flushTimers.has(channel)) {
+    _flushTimers.set(
+      channel,
+      setTimeout(() => { void flushPendingMessages(channel); }, BATCH_FLUSH_MS),
+    );
   }
 }
