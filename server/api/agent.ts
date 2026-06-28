@@ -36,7 +36,17 @@ const registeredAgentTools = createDefaultAgentTools({
   getPortfolio: (userId) => import('../repositories/positionsRepo.js')
     .then((module) => module.getPositionsByUser(userId)),
   getTrades: (userId) => tradesRepo.getTradesByUser(userId),
+  getDataHealth: () => getDataRegistry().health(),
   queueBacktest: (userId, args) => queueAgentBacktest(userId, args),
+  createStrategyVersion: (userId, strategyId, command) => (
+    getStrategyRuntimeService().createVersion(userId, strategyId, command)
+  ),
+  validateStrategyVersion: (userId, strategyVersionId) => (
+    getStrategyRuntimeService().validateVersion(userId, strategyVersionId)
+  ),
+  getBacktestJob: (userId, jobId) => (
+    getStrategyRuntimeService().getBacktestJob(userId, jobId)
+  ),
 });
 
 // ── AI strategy draft generation (execution remains in Python runtime) ───────
@@ -429,7 +439,7 @@ agentRouter.post('/stream', async (req: AuthRequest, res) => {
       body: JSON.stringify({
         model:       streamModel,
         messages,
-        tools:       registeredAgentTools.openRouterTools(),
+        tools:       registeredAgentTools.openRouterTools(['R', 'B']),
         tool_choice: 'auto',
         temperature: 0.65,
         max_tokens:  1200,

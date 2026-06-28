@@ -92,14 +92,19 @@ export class AgentToolRegistry {
     return result;
   }
 
-  openRouterTools() {
-    return [...this.tools.values()].map(({ definition }) => ({
+  openRouterTools(scopes?: AgentScope[]) {
+    return [...this.tools.values()]
+      .filter(({ definition }) => (
+        scopes === undefined
+        || definition.requiredScopes.every((scope) => scopes.includes(scope))
+      ))
+      .map(({ definition }) => ({
       type: 'function' as const,
       function: {
         name: definition.name,
         description: definition.description,
         parameters: definition.inputSchema,
       },
-    }));
+      }));
   }
 }

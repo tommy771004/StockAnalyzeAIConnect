@@ -129,5 +129,7 @@ describe('AgentToolRegistry', () => {
         parameters: { type: 'object', properties: {} },
       },
     }]);
+    expect(registry.openRouterTools([])).toEqual([]);
+    expect(registry.openRouterTools(['R'])).toHaveLength(1);
   });
 });

@@ -11,10 +11,28 @@ interface DefaultAgentToolDependencies {
   resolveData(request: DataRequestInput): Promise<DataEnvelope>;
   getPortfolio(userId: string): Promise<unknown[]>;
   getTrades(userId: string): Promise<unknown[]>;
+  getDataHealth?(): unknown;
   queueBacktest(
     userId: string,
     args: Record<string, unknown>,
   ): Promise<{ jobId: string; status: string }>;
+  createStrategyVersion?(
+    userId: string,
+    strategyId: number,
+    command: {
+      runtime: 'indicator' | 'script';
+      source: string;
+      provenance: 'ai';
+    },
+  ): Promise<unknown>;
+  validateStrategyVersion?(
+    userId: string,
+    strategyVersionId: string,
+  ): Promise<unknown>;
+  getBacktestJob?(
+    userId: string,
+    jobId: string,
+  ): Promise<unknown | null>;
   now?: () => number;
 }
 
@@ -49,6 +67,24 @@ const MacroInputSchema = z.object({
     'UNEMPLOYMENT',
     'VIX',
   ]),
+});
+
+const FundamentalsInputSchema = z.object({
+  ticker: z.string().trim().min(1).max(64).transform((value) => value.toUpperCase()),
+});
+
+const StrategyDraftInputSchema = z.object({
+  strategyId: z.number().int().positive(),
+  runtime: z.enum(['indicator', 'script']),
+  source: z.string().trim().min(1).max(100_000),
+});
+
+const StrategyVersionInputSchema = z.object({
+  strategyVersionId: z.string().min(1).max(200),
+});
+
+const BacktestJobInputSchema = z.object({
+  jobId: z.string().min(1).max(200),
 });
 
 function marketFor(symbol: string): DataMarket {
@@ -191,6 +227,78 @@ export function createDefaultAgentTools(
 
   tools.register({
     definition: {
+      name: 'get_fundamentals',
+      version: '1',
+      description: '取得具 SEC EDGAR 來源追溯的美股基本面與申報資料',
+      riskClass: 'read',
+      requiredScopes: ['R'],
+      inputSchema: {
+        type: 'object',
+        properties: { ticker: { type: 'string' } },
+        required: ['ticker'],
+      },
+    },
+    input: FundamentalsInputSchema,
+    execute: async (input, context) => {
+      assertAllowed(input.ticker, 'us_stock', context);
+      try {
+        const envelope = await dependencies.resolveData({
+          operation: 'fundamentals',
+          symbol: input.ticker,
+          market: 'us_stock',
+        });
+        return {
+          toolName: 'get_fundamentals',
+          toolVersion: '1',
+          data: envelope.data,
+          evidence: [evidence(
+            'E1',
+            `${input.ticker} fundamentals`,
+            envelope.data,
+            envelope,
+          )],
+          warnings: envelope.warnings,
+        };
+      } catch {
+        return unavailable('get_fundamentals', '1', 'NO_PROVIDER_DATA');
+      }
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'get_data_source_health',
+      version: '1',
+      description: '檢查已註冊資料來源、熔斷器、限流與快取健康狀態',
+      riskClass: 'read',
+      requiredScopes: ['R'],
+      inputSchema: { type: 'object', properties: {} },
+    },
+    input: z.object({}),
+    execute: async () => {
+      if (!dependencies.getDataHealth) {
+        return unavailable('get_data_source_health', '1', 'HEALTH_UNAVAILABLE');
+      }
+      const data = dependencies.getDataHealth();
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'get_data_source_health',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          'Hermes data source health',
+          data,
+          'hermes-data-registry',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
       name: 'show_news_sentiment',
       version: '1',
       description: '顯示特定標的的最新新聞情緒分析卡片',
@@ -236,6 +344,93 @@ export function createDefaultAgentTools(
 
   tools.register({
     definition: {
+      name: 'create_strategy_draft',
+      version: '1',
+      description: '建立使用者擁有且不可變的 AI 策略草稿版本',
+      riskClass: 'workspace',
+      requiredScopes: ['W'],
+      inputSchema: {
+        type: 'object',
+        properties: {
+          strategyId: { type: 'number' },
+          runtime: { type: 'string', enum: ['indicator', 'script'] },
+          source: { type: 'string' },
+        },
+        required: ['strategyId', 'runtime', 'source'],
+      },
+    },
+    input: StrategyDraftInputSchema,
+    execute: async (input, context) => {
+      if (!dependencies.createStrategyVersion) {
+        return unavailable('create_strategy_draft', '1', 'STRATEGY_SERVICE_UNAVAILABLE');
+      }
+      const data = await dependencies.createStrategyVersion(
+        context.userId,
+        input.strategyId,
+        {
+          runtime: input.runtime,
+          source: input.source,
+          provenance: 'ai',
+        },
+      );
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'create_strategy_draft',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          'Immutable strategy draft',
+          data,
+          'hermes-strategy-registry',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'validate_strategy',
+      version: '1',
+      description: '透過受限 Python runtime 驗證使用者擁有的策略版本',
+      riskClass: 'workspace',
+      requiredScopes: ['W'],
+      inputSchema: {
+        type: 'object',
+        properties: { strategyVersionId: { type: 'string' } },
+        required: ['strategyVersionId'],
+      },
+    },
+    input: StrategyVersionInputSchema,
+    execute: async (input, context) => {
+      if (!dependencies.validateStrategyVersion) {
+        return unavailable('validate_strategy', '1', 'STRATEGY_SERVICE_UNAVAILABLE');
+      }
+      const data = await dependencies.validateStrategyVersion(
+        context.userId,
+        input.strategyVersionId,
+      );
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'validate_strategy',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Strategy validation ${input.strategyVersionId}`,
+          data,
+          'hermes-strategy-runtime',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
       name: 'get_portfolio_performance',
       version: '1',
       description: '讀取使用者的投資組合績效，包含持倉明細與損益統計',
@@ -272,6 +467,43 @@ export function createDefaultAgentTools(
           'Hermes portfolio ledger',
           data,
           'hermes-portfolio',
+          timestamp,
+        )],
+        warnings: [],
+      };
+    },
+  });
+
+  tools.register({
+    definition: {
+      name: 'inspect_backtest',
+      version: '1',
+      description: '讀取使用者擁有的非同步回測工作與結果',
+      riskClass: 'read',
+      requiredScopes: ['R'],
+      inputSchema: {
+        type: 'object',
+        properties: { jobId: { type: 'string' } },
+        required: ['jobId'],
+      },
+    },
+    input: BacktestJobInputSchema,
+    execute: async (input, context) => {
+      if (!dependencies.getBacktestJob) {
+        return unavailable('inspect_backtest', '1', 'STRATEGY_SERVICE_UNAVAILABLE');
+      }
+      const data = await dependencies.getBacktestJob(context.userId, input.jobId);
+      if (!data) return unavailable('inspect_backtest', '1', 'BACKTEST_NOT_FOUND');
+      const timestamp = new Date(now()).toISOString();
+      return {
+        toolName: 'inspect_backtest',
+        toolVersion: '1',
+        data,
+        evidence: [internalEvidence(
+          'E1',
+          `Backtest job ${input.jobId}`,
+          data,
+          'hermes-strategy-runtime',
           timestamp,
         )],
         warnings: [],
