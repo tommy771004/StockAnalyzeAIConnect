@@ -19,12 +19,12 @@ CREATE TABLE IF NOT EXISTS strategy_versions (
     CHECK (provenance IN ('human', 'ai', 'imported')),
   created_at timestamp NOT NULL DEFAULT now(),
   UNIQUE(strategy_id, version)
-);
+);--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS strategy_versions_user_created_idx
-  ON strategy_versions (user_id, created_at);
+  ON strategy_versions (user_id, created_at);--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS strategy_versions_strategy_idx
-  ON strategy_versions (strategy_id);
+  ON strategy_versions (strategy_id);--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS backtest_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,11 +41,11 @@ CREATE TABLE IF NOT EXISTS backtest_jobs (
   created_at timestamp NOT NULL DEFAULT now(),
   started_at timestamp,
   completed_at timestamp
-);
+);--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS backtest_jobs_user_created_idx
-  ON backtest_jobs (user_id, created_at);
+  ON backtest_jobs (user_id, created_at);--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS backtest_jobs_version_idx
-  ON backtest_jobs (strategy_version_id);
+  ON backtest_jobs (strategy_version_id);--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS backtest_jobs_status_idx
   ON backtest_jobs (status);

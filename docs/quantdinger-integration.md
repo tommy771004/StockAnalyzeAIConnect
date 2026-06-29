@@ -60,18 +60,15 @@ AI model access remains configurable through the existing model pipeline. Market
 must originate from registered evidence tools; model output alone is not a market-data
 source.
 
-## Current release-verification gaps
+## Release verification status
 
 As of 2026-06-29:
 
-- The production frontend build reaches the Vite bundle stage but cannot resolve the
-  `react-is` peer required by `recharts@3.8.1`. A React-compatible direct `react-is`
-  dependency must be installed before release verification can pass.
-- `DATABASE_URL` is not configured in the current verification environment, so
-  migrations `0004_trading_session_snapshots.sql` and
-  `0005_script_strategy_runtime_state.sql` have passed Drizzle structure checks but
-  have not been applied to a live Postgres database.
-- The latest successful Graphify report is `graphify-out/GRAPH_REPORT.md` dated
-  2026-06-28. The Graphify CLI is unavailable in the current environment, so the
-  subsequent registry evaluator pass-through and end-to-end acceptance test are not yet
-  represented in that generated graph.
+- The production Web, Electron, and PWA build passes with the Recharts-required
+  `react-is@19.2.7` peer satisfying its declared React 19 range.
+- Drizzle migration metadata includes migrations `0000` through `0005`, with explicit
+  statement boundaries compatible with Neon HTTP prepared statements.
+- `docs/quantdinger-schema.sql` contains the complete additive integration schema for
+  operator-managed application.
+- Graphify was refreshed after the final code changes; the generated node and edge
+  counts are recorded in `graphify-out/GRAPH_REPORT.md`.

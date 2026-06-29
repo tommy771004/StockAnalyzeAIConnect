@@ -8,6 +8,41 @@
       "when": 1777001539417,
       "tag": "0000_polite_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777001539418,
+      "tag": "0001_add_performance_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782539593000,
+      "tag": "0002_strategy_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782621289000,
+      "tag": "0003_agent_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782627199000,
+      "tag": "0004_trading_session_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782657132000,
+      "tag": "0005_script_strategy_runtime_state",
+      "breakpoints": true
     }
   ]
 }

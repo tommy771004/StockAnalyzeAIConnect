@@ -15,10 +15,10 @@ CREATE TABLE IF NOT EXISTS agent_tokens (
   revoked_at timestamp,
   last_used_at timestamp,
   created_at timestamp NOT NULL DEFAULT now()
-);
+);--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS agent_tokens_user_created_idx
-  ON agent_tokens (user_id, created_at);
+  ON agent_tokens (user_id, created_at);--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS agent_idempotency (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS agent_idempotency (
   created_at timestamp NOT NULL DEFAULT now(),
   updated_at timestamp NOT NULL DEFAULT now(),
   UNIQUE(token_id, key)
-);
+);--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS agent_idempotency_user_created_idx
-  ON agent_idempotency (user_id, created_at);
+  ON agent_idempotency (user_id, created_at);--> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS agent_audit_events (
   id serial PRIMARY KEY,
@@ -57,11 +57,11 @@ CREATE TABLE IF NOT EXISTS agent_audit_events (
   resource_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamp NOT NULL DEFAULT now()
-);
+);--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS agent_audit_user_created_idx
-  ON agent_audit_events (user_id, created_at);
+  ON agent_audit_events (user_id, created_at);--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS agent_audit_token_created_idx
-  ON agent_audit_events (token_id, created_at);
+  ON agent_audit_events (token_id, created_at);--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS agent_audit_route_created_idx
   ON agent_audit_events (route, created_at);

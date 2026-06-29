@@ -34,5 +34,6 @@ docs/*
 !docs/ux-audit/
 !docs/ux-audit/**
 !docs/quantdinger-integration.md
+!docs/quantdinger-schema.sql
 !docs/trading-sessions.md
 !docs/mcp.md
