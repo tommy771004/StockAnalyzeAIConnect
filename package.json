@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "mcp": "node --import=./node_modules/tsx/dist/esm/index.mjs server/mcp/stdio.ts",
     "generate:og": "node scripts/generate-og.mjs"
   },
   "dependencies": {

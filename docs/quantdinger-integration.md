@@ -30,7 +30,7 @@ Upstream license statements:
 | Idea → version → validate → backtest | User-owned immutable versions, source/data hashes, queued jobs, diagnostics, and result inspection | `server/api/strategies.ts`, `src/db/migrations/0002_strategy_runtime.sql` |
 | Provider registry | Attributable providers with operation/market capabilities, timeout, rate limit, circuit breaker, cache, freshness, and health | `server/data/*`, `server/api/dataSources.ts` |
 | AI research and agent tools | Evidence-first tool registry, concurrent quote/news/fundamental research, collision-free structured citations, prompt versions, memory/evidence separation | `server/ai/*`, `docs/ai-evidence.md` |
-| Agent Gateway / MCP-style control | Hashed scoped tokens, allowlists, expiry, rate limit, idempotency, append-only audit, paper-only `T` tools | `server/api/agentV1.ts`, `server/services/agentPolicy.ts` |
+| Agent Gateway / MCP control | Hashed scoped tokens, allowlists, expiry, rate limit, idempotency, append-only audit, paper-only `T` tools, and a standard JSON-RPC stdio MCP bridge | `server/api/agentV1.ts`, `server/mcp/*`, `docs/mcp.md` |
 | Multi-tenant trading sessions | One isolated state, RiskManager, paper broker, scheduler, locks, positions, logs, and event channel per user | `server/services/TradingSessionRegistry.ts`, `server/services/AutonomousTradingSession.ts` |
 | Paper before live | Real adapter requests are downgraded/rejected; Agent tokens are invariantly paper-only | `server/api/autotradingSessions.ts`, `server/ai/defaultTools.ts` |
 | Operator workspace | React version workspace, provider provenance, session status, token lifecycle, and audit trail | `src/components/AutoTrading/*`, `src/components/Settings/*` |

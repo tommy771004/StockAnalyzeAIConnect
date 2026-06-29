@@ -4,6 +4,10 @@ The Agent Gateway is a separate authentication surface for external AI/MCP clien
 does not accept browser JWTs, and agent bearer tokens do not authorize legacy browser
 routes.
 
+The standard stdio adapter is documented in `docs/mcp.md` and implemented by
+`server/mcp/stdio.ts`. It is a thin MCP transport over this Gateway, not a second tool
+implementation.
+
 ## Token lifecycle
 
 Browser-authenticated users manage tokens at:
@@ -65,10 +69,11 @@ Tool discovery is filtered by the token's scopes. Tool execution revalidates sco
 paper-only policy, input schema, output schema, allowlists, and evidence.
 
 `start_paper_strategy` validates user ownership and the immutable strategy version before
-starting the user's isolated session. Paper execution currently supports validated
-`indicator` versions. The same restricted Python runtime evaluates current normalized
-15-minute OHLCV, and the resulting signal still passes through proactive stops,
-freshness checks, portfolio risk, and the simulated broker.
+starting the user's isolated session. Paper execution supports validated indicators and
+long-only ScriptStrategy versions with durable runtime cursors. The same restricted
+Python runtime evaluates current normalized 15-minute OHLCV, and the resulting signal
+still passes through proactive stops, freshness checks, portfolio risk, and the simulated
+broker.
 
 ## Idempotency
 
