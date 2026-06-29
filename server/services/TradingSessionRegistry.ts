@@ -116,6 +116,7 @@ export class TradingSessionRegistry {
   private create(state: TradingSessionState): AutonomousTradingSession {
     const session = new AutonomousTradingSession(state, {
       analyze: this.options.analyze,
+      evaluateStrategyVersion: this.options.evaluateStrategyVersion,
       isMarketOpen: this.options.isMarketOpen,
       publish: (event) => this.options.publish?.(state.userId, event),
       persist: (snapshot) => this.options.repo.saveSessionSnapshot(snapshot).then(() => undefined),
